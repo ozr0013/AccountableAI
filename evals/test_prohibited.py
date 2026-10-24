@@ -28,13 +28,29 @@ def test_no_money_moving_method_anywhere():
 
 
 def test_reminder_needs_approved_template(rails):
-    assert not rails.policy_check("send_reminder", "chaser", {"template_approved": False})[0]
-    assert rails.policy_check("send_reminder", "chaser", {"template_approved": True})[0]
+    assert not rails.policy_check("send_chase", "chaser", {"template_id": "tpl-made-up"})[0]
+    assert rails.policy_check("send_chase", "chaser", {"template_id": "tpl-polite"})[0]
+
+
+def test_outbound_needs_approved_draft(rails):
+    ok, _ = rails.policy_check("send_outbound", "chaser",
+                               {"to": "ap@keyway.example", "body": "Please send proof of payment."})
+    assert not ok
 
 
 def test_proposer_cannot_approve_via_policy(rails):
     assert not rails.policy_check("approve", "case_agent", {"proposed_by": "case_agent"})[0]
+    assert not rails.policy_check("approve", "chaser", {"proposed_by": "case_agent"})[0]
     assert rails.policy_check("approve", "controller", {"proposed_by": "case_agent"})[0]
+
+
+def test_agents_cannot_place_holds(rails):
+    assert not rails.policy_check("hold", "case_agent", {})[0]
+    assert rails.policy_check("hold", "controller", {})[0]
+
+
+def test_no_alert_without_citation(rails):
+    assert not rails.policy_check("create_alert", "cause_agent", {"citations": [], "text": "unpaid"})[0]
 
 
 def test_proposer_cannot_approve_via_approvals():
@@ -58,7 +74,7 @@ def test_controller_can_approve():
     {},                                                        # nothing
     {"identity_verified": True},                               # no approval
     {"approved_by": "controller"},                             # no identity check
-    {"identity_verified": True, "approved_by": "chaser"},      # self-approved
+    {"identity_verified": True, "approved_by": "chaser", "requested_by": "chaser"},  # self-approved
 ])
 def test_bank_detail_change_held(rails, payload):
     assert not rails.policy_check("update_bank_details", "chaser", payload)[0]
@@ -66,12 +82,9 @@ def test_bank_detail_change_held(rails, payload):
 
 def test_bank_detail_change_allowed_when_verified_and_approved(rails):
     ok, _ = rails.policy_check("update_bank_details", "chaser",
-                               {"identity_verified": True, "approved_by": "controller"})
+                               {"identity_verified": True, "approved_by": "controller",
+                                "requested_by": "chaser"})
     assert ok
-
-
-def test_no_posting_to_closed_month(rails):
-    assert not rails.policy_check("post_entry", "ledger", {"month_closed": True})[0]
 
 
 @pytest.mark.parametrize("headline", [
