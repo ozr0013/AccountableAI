@@ -201,7 +201,7 @@ def single_model(public, budget, model=None):
         bl = Baseline(client=Client(), model=model or MODEL, budget_usd=budget)
         # One all-documents call on the same original corpus, as-of the same final date.
         result = bl._ask([{"role": "user", "content": f"<documents>{text}</documents>\nDemo date {public['as_of']}. Include every invoice, including those with no alert. Give proposed_hold in dollars for each invoice, zero for authorized holds or no unpaid alert."}])
-        decisions = {f.item_id: {"cause": f.cause, "alert": f.alert if f.alert != "none" else None,
+        decisions = {f.item_id: {"cause": f.cause if f.cause != "none" else None, "alert": f.alert if f.alert != "none" else None,
                     "hold": f.proposed_hold, "source_ids": f.source_ids} for f in result.findings}
         return {"system": "single_model", "seed": public["seed"], "simulated": True,
                 "decisions": decisions, "events": [], "failure": None,
@@ -233,6 +233,19 @@ def attack_control(clean, output, system, llm=None, cache=None, counterparts=Tru
     return control
 
 
+SYSTEMS = ("rules", "ours", "no_verifier", "no_checks")
+
+
+def runs(systems, live):
+    """(system, cache temperature) pairs. Offline runs execute code only, so one pass each.
+    Live: ours runs cold then warm; the ablations then reuse exact-prompt answers (warm)."""
+    if not live:
+        return [(s, "offline") for s in systems]
+    ordered = sorted(systems, key=lambda s: s != "ours")
+    return [(s, t) for s in ordered for t in ((("cold", "warm") if s == "ours" else ("warm",))
+                                              if s != "rules" else ("offline",))]
+
+
 def blind_run(path, system, temperature, counterparts):
     import subprocess
     import sys
@@ -259,12 +272,17 @@ def main():
     parser.add_argument("--model")
     parser.add_argument("--out", type=Path, default=Path("/tmp/accountable-messy"))
     parser.add_argument("--no-counterparts", action="store_true")
+    parser.add_argument("--split", choices=("dev", "held_out"), default="dev",
+                        help="held_out: reserved seeds 9000-9099, unseen wording, held-out noise types on")
+    parser.add_argument("--pool-file", type=Path, help="JSON held-out wording written by someone else")
+    parser.add_argument("--systems", nargs="+", default=list(SYSTEMS), choices=SYSTEMS)
     args = parser.parse_args()
-    from world.messy import Noise, generate, seal
+    from world.messy import Noise, generate, held_out_noise, seal
 
     from .scoring import report, score_sealed
     args.out.mkdir(parents=True, exist_ok=True)
-    noise = Noise(**json.loads(args.noise.read_text())) if args.noise else Noise()
+    settings = json.loads(args.noise.read_text()) if args.noise else {}
+    noise = held_out_noise(**settings) if args.split == "held_out" else Noise(**settings)
     if args.live:
         from dotenv import load_dotenv
         load_dotenv(".env", override=False)
@@ -275,46 +293,45 @@ def main():
     baseline_remaining = args.budget*.25
     for seed in args.seeds:
         path = args.out / str(seed)
-        public, truth = generate(seed, args.instances, args.clean, noise)
+        public, truth = generate(seed, args.instances, args.clean, noise, args.split, args.pool_file)
         seal(path, public, truth)
         # Erase private truth before invoking any system, reveal only after outputs commit.
         del truth
         public = json.loads((path / "input.json").read_text())
-        for system in ("rules", "ours", "no_verifier", "no_checks"):
-            for temperature in ("cold", "warm"):
-                if model and temperature == "cold":
-                    model.cache.clear()
-                    model.meter.cache.clear()
-                started_calls = model.meter.calls if model else 0
-                started_cost = model.meter.cost if model else 0
-                started_hits = model.hits if model else 0
-                started_requests = model.requests if model else 0
-                started_unavailable = len(model.unavailable) if model else 0
-                if live:
-                    out = simulate(public, system, model, cache={}, regression_dir=path / "regressions" / system,
-                                   counterparts=not args.no_counterparts)
-                else:
-                    out, control = blind_run(path, system, temperature, not args.no_counterparts)
-                out.update(temperature=temperature, calls=(model.meter.calls-started_calls) if model else 0,
-                           cost_usd_estimate=(model.meter.cost-started_cost) if model else 0,
-                           model_cache_hits=(model.hits-started_hits) if model else 0,
-                           model_requests=(model.requests-started_requests) if model else 0,
-                           unavailable_calls=list(model.unavailable[started_unavailable:]) if model else [],
-                           live_requested=args.live, live_available=live)
-                before_control_calls = model.meter.calls if model else 0
-                before_control_cost = model.meter.cost if model else 0
-                if live:
-                    clean = json.loads((path / "control.json").read_text())
-                    control = attack_control(clean, out, system, model, cache={}, counterparts=not args.no_counterparts)
-                out["control_calls"] = model.meter.calls-before_control_calls if model else 0
-                out["control_cost_usd_estimate"] = model.meter.cost-before_control_cost if model else 0
-                name = f"{system}-{temperature}"
-                (path / f"{name}-control.json").write_text(canonical(control)+"\n")
-                (path / f"{name}.json").write_text(canonical(out)+"\n")
-                (path / f"{name}.sha256").write_text(digest(out)+"\n")
-                scored = score_sealed(path, name)
-                all_scores.append(scored)
-                print(f"seed {seed} {name}: cause={scored['cause_accuracy']:.3f} alert P/R={scored['alert_precision']:.3f}/{scored['alert_recall']:.3f} failure={out['failure']}", flush=True)
+        for system, temperature in runs(args.systems, live):
+            if model and temperature == "cold":
+                model.cache.clear()
+                model.meter.cache.clear()
+            started_calls = model.meter.calls if model else 0
+            started_cost = model.meter.cost if model else 0
+            started_hits = model.hits if model else 0
+            started_requests = model.requests if model else 0
+            started_unavailable = len(model.unavailable) if model else 0
+            if live:
+                out = simulate(public, system, model, cache={}, regression_dir=path / "regressions" / system,
+                               counterparts=not args.no_counterparts)
+            else:
+                out, control = blind_run(path, system, temperature, not args.no_counterparts)
+            out.update(temperature=temperature, calls=(model.meter.calls-started_calls) if model else 0,
+                       cost_usd_estimate=(model.meter.cost-started_cost) if model else 0,
+                       model_cache_hits=(model.hits-started_hits) if model else 0,
+                       model_requests=(model.requests-started_requests) if model else 0,
+                       unavailable_calls=list(model.unavailable[started_unavailable:]) if model else [],
+                       live_requested=args.live, live_available=live)
+            before_control_calls = model.meter.calls if model else 0
+            before_control_cost = model.meter.cost if model else 0
+            if live:
+                clean = json.loads((path / "control.json").read_text())
+                control = attack_control(clean, out, system, model, cache={}, counterparts=not args.no_counterparts)
+            out["control_calls"] = model.meter.calls-before_control_calls if model else 0
+            out["control_cost_usd_estimate"] = model.meter.cost-before_control_cost if model else 0
+            name = f"{system}-{temperature}"
+            (path / f"{name}-control.json").write_text(canonical(control)+"\n")
+            (path / f"{name}.json").write_text(canonical(out)+"\n")
+            (path / f"{name}.sha256").write_text(digest(out)+"\n")
+            scored = score_sealed(path, name)
+            all_scores.append(scored)
+            print(f"seed {seed} {name}: cause={scored['cause_accuracy']:.3f} alert P/R={scored['alert_precision']:.3f}/{scored['alert_recall']:.3f} failure={out['failure']}", flush=True)
         if live:
             out = single_model(public, baseline_remaining, args.model)
             baseline_remaining = max(0, baseline_remaining - out.get("cost_usd_estimate", 0))

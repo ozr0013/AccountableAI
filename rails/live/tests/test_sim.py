@@ -123,3 +123,10 @@ def test_paid_on_time_invoices_are_graded_and_w9_receipt_reopens_the_unpaid_item
     metrics = score(public, truth, output)
     assert metrics["cause_accuracy"] == 1
     assert metrics["alert_precision"] == metrics["alert_recall"] == 1
+
+
+def test_run_plan_pays_for_a_cold_cache_once_per_seed():
+    from rails.live.sim import SYSTEMS, runs
+    assert runs(SYSTEMS, live=False) == [(s, "offline") for s in SYSTEMS]
+    assert runs(SYSTEMS, live=True) == [("ours", "cold"), ("ours", "warm"), ("rules", "offline"),
+                                        ("no_verifier", "warm"), ("no_checks", "warm")]
