@@ -4,7 +4,7 @@
 
 The Next.js app proxies /api/* here. One in-memory session; POST /api/reset rebuilds it.
 Rules-mode agents by default (free). POST /api/live {"on": true} sends the next events to Claude
-(Sonnet agents, verifier model stage), metered against FEED_BUDGET dollars (default 1.00, an estimated threshold);
+(agreement and chaser agents), metered against FEED_BUDGET dollars (default 1.00, an estimated threshold);
 past the cap everything falls back to rules. The briefing uses the free code briefing unless
 DASHBOARD_BRIEF_MODEL=1 (one Sonnet call each).
 """

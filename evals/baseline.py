@@ -20,7 +20,6 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from agents.verifier.verifier import _render_evidence
 from contracts.models import (
     Alert,
     AlertDraft,
@@ -34,6 +33,16 @@ from contracts.models import (
 from workflow.memrails import MemoryRails
 from world import generate
 from world.generator import ALL_SCENARIOS, MOMENT
+
+
+def _render_evidence(evidence) -> str:
+    import json
+    out = []
+    for d in sorted(evidence, key=lambda d: (str(d.dated or ""), d.id)):
+        data = json.dumps(d.data, sort_keys=True) if d.data else "{}"
+        out.append(f'<document id="{d.id}" kind="{d.kind.value}" dated="{d.dated or ""}">\n'
+                   f"{d.text}\n<data>{data}</data>\n</document>")
+    return "\n".join(out)
 
 from .schema import MomentResult, RunResult, ScenarioResult
 from .scorer import score, to_markdown

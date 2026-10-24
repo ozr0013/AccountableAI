@@ -216,7 +216,7 @@ class TracedAgents:
         return trail
 
     def classify_cause(self, line, trail, terms):
-        from agents.cause.rules import hard_facts
+        from workflow.checks.cause import hard_facts
         q = f"Why is {line.invoice_id} delayed, and whose side is it on?"
         f, ms_steps, mode, usage, ms = self._call("cause", line.invoice_id, q,
                                                   self.inner.classify_cause, line, trail, terms)

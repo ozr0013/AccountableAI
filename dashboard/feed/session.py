@@ -37,11 +37,11 @@ AGENT_OF_STEP = {"alert_raised": "verifier", "alert_rejected": "verifier",
 
 
 class _RulesVerifier:
-    """The verifier's first stage (agents/verifier/rules.py): citations exist, quotes match,
-    no accusatory wording. Free; the live model stage is `VERIFIER=real`."""
+    """Code checks (workflow/checks/wording.py): citations exist, quotes match,
+    no accusatory wording."""
 
     def verify(self, draft, evidence):
-        from agents.verifier import rules
+        from workflow.checks import wording as rules
         r = rules.check(draft, evidence)
         return Verdict(alert_id=draft.id,
                        status=VerdictStatus.approved if r.ok else VerdictStatus.blocked,
@@ -168,7 +168,7 @@ class DemoSession:
         return datetime.combine(self.rails.now(), time(h, m, s), tzinfo=UTC)
 
     def set_live(self, on: bool) -> dict:
-        """Live: the next events go to Claude (Sonnet agents, verifier model stage), metered."""
+        """Live: the next events go to Claude (agreement and chaser agents), metered."""
         import live
 
         from agents import RealAgents
@@ -179,7 +179,7 @@ class DemoSession:
         if on:
             agents = RealAgents(live.MeteredLLM(self.meter))
             agents.set_names(names_from(self.rails))
-            verifier = live.MeteredVerifier(self.meter, self.rules_verifier)
+            verifier = self.rules_verifier
         else:
             agents, verifier = self.rules_agents, self.rules_verifier
         # Deps is frozen; rebind the graph while retaining paused/checkpointed runs.
@@ -358,13 +358,10 @@ class DemoSession:
         return self._act("decision", summary, [ev], [], before)
 
     def brief(self, question: str, use_model: bool = False) -> dict:
-        from agents.briefing import Briefer
-        b = Briefer(self.rails, use_model=use_model and self.meter.ok())
+        from workflow.checks.briefing import CodeBriefer
+        b = CodeBriefer(self.rails)
         out = b.brief(MANAGER, question)
-        m = b.last or {}
-        if m.get("mode") == "model" and "input_tokens" in m:
-            self.meter.add("Briefing", m.get("model", "claude-sonnet-5-5"), m["input_tokens"], m.get("output_tokens", 0))
-        return {**out.model_dump(mode="json"), "meta": m}
+        return {**out.model_dump(mode="json"), "meta": b.last}
 
     # -- read model -----------------------------------------------------------------------
     def snapshot(self) -> dict:

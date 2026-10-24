@@ -46,10 +46,10 @@ Every unpaid vendor invoice gets one cause: **authorized hold**, **paperwork pen
  ┌──────────── LAYER 1: Deterministic workflow (code decides what runs next) ────────────┐
  └─────────────┬──────────────────────────────┬────────────────────────────┬─────────────┘
                ▼                              ▼                            ▼
-   LAYER 2: code services          LAYER 3: judgment agents          Gates (code)
-   funding ledger · matcher        agreement · payment-trail         policy + accounting checks
-   aging · source-trust rules      delay-cause · chaser              no money-moving tool
-   patterns · funded-vs-paid recon verifier · case · briefing        controller approves holds
+   LAYER 2: code services          LAYER 3: three agents             Gates (code)
+   ledger · matcher · trail        agreement                         policy + accounting checks
+   aging · source-trust · cause    chaser                            no money-moving tool
+   recon · hold · wording checks   anomaly                           controller approves holds
                └──────────────────────────────┴────────────────────────────┘
                                               ▼
               Memory (Neo4j + event log): entity graph, two-timeline facts, precedents
@@ -57,7 +57,7 @@ Every unpaid vendor invoice gets one cause: **authorized hold**, **paperwork pen
            Controller dashboard · case queue · chase log · Judge Console · eval harness
 ```
 
-Models: Haiku for fuzzy matching, Sonnet for agreement / trail / cause / chaser / case / briefing, Opus for the verifier.
+Models: Sonnet for the agreement, chaser and anomaly agents. Trail, cause, hold, wording and briefing are code (`workflow/checks/`). The autonomous runtime: `docs/AUTONOMOUS_RUNTIME.md`.
 
 ## The 9 planted scenarios (the answer key everyone builds to)
 

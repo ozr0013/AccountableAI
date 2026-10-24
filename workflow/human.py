@@ -18,8 +18,8 @@ def evidence_fingerprint(rails, case):
     # Scope and redact shared documents exactly as the investigation tool does.
     from datetime import UTC, datetime
 
-    from agents.supervisor import Supervisor
-    docs = Supervisor(rails)._docs(case, datetime.max.replace(tzinfo=UTC))
+    from workflow.evidence import case_docs
+    docs = case_docs(rails, case, datetime.max.replace(tzinfo=UTC))
     facts = [e.model_dump(mode='json') for e in rails.events(case.manager_id)
              if e.type in ('terms_confirmed', 'agreement_confirmed')]
     return digest({'documents': docs, 'terms': facts})

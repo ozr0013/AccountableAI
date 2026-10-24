@@ -114,8 +114,8 @@ def _verifier(system: str):
     if system == "no_verifier":
         return ApproveAll()
     if _live():
-        from agents.verifier import LLMVerifier
-        return LLMVerifier()
+        from workflow.checks.wording import RulesVerifier
+        return RulesVerifier()
     return FakeVerifier()
 
 

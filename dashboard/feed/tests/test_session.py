@@ -23,7 +23,6 @@ def test_switch_modes_preserves_events_and_checkpoints(demo, monkeypatch):
     import live
     monkeypatch.setattr(live, 'available', lambda: True)
     monkeypatch.setattr(live, 'MeteredLLM', lambda meter: None)
-    monkeypatch.setattr(live, 'MeteredVerifier', lambda meter, fallback: fallback)
     events = demo.rails.events()
     checkpoint = demo.wf.graph.checkpointer
     assert demo.set_live(True)['ok']

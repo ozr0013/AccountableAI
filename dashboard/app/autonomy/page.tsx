@@ -21,8 +21,6 @@ export default function AutonomyPage() {
   const [trace, setTrace] = useState<Trace[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState("");
-  const [decision, setDecision] = useState("");
   const [notice, setNotice] = useState("");
   const request = useCallback(async (path: string, body?: unknown) => {
     const response = await fetch(`/api/autonomy${path}`, {
@@ -74,7 +72,7 @@ export default function AutonomyPage() {
     <button disabled={busy || !token} onClick={() => void refresh()} style={style}>Refresh</button>
     {error && <p role="alert" style={{ color: "#fca5a5" }}>{error}</p>}
     {notice && <p role="status">{notice}</p>}
-    <p><select aria-label="Case" disabled={busy} value={selected} onChange={e => { generation.current++; setBusy(true); setSelected(e.target.value); setTickets([]); setMessages([]); setTrace([]); setDecision(""); }} style={style}>
+    <p><select aria-label="Case" disabled={busy} value={selected} onChange={e => { generation.current++; setBusy(true); setSelected(e.target.value); setTickets([]); setMessages([]); setTrace([]); }} style={style}>
       {cases.map(c => <option key={c.id} value={c.id}>{c.invoice_id} · {c.manager_id} · {c.state}</option>)}
     </select></p>
     {!current && <p>No cases loaded. Start the autonomous worker to discover database invoices.</p>}
@@ -97,12 +95,6 @@ export default function AutonomyPage() {
       {messages.map(m => <article key={m.id} style={style}><p>{m.recipient} · {m.status}</p><p>{m.body}</p></article>)}
       <h3>Agent trace</h3>
       {trace.map(e => <details key={e.id}><summary>{e.type} · {e.id.slice(-12)}</summary><pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(e.payload, null, 2)}</pre></details>)}
-      <h3>Feedback for reviewed learning</h3>
-      <select aria-label="Decision to review" value={decision} onChange={e => setDecision(e.target.value)} style={style}>
-        <option value="">Select an agent decision</option>{trace.filter(e => e.type.startsWith("supervisor_")).map(e => <option key={e.id} value={e.id}>{e.type} · {e.id.slice(-12)}</option>)}
-      </select>
-      <p><textarea aria-label="Decision feedback" maxLength={6000} value={feedback} onChange={e => setFeedback(e.target.value)} style={{ ...style, width: "100%" }} /></p>
-      <button disabled={busy || !decision || !feedback.trim()} style={style} onClick={() => void act("/feedback", { case_id: current.id, decision_id: decision, text: feedback, key: crypto.randomUUID() }, "Feedback recorded. Guidance changes require evaluation and human promotion.")}>Record feedback</button>
     </>}
   </main>;
 }

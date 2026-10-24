@@ -61,7 +61,7 @@ def main():
                     help="seconds between polls; daily scans are deduplicated in the database")
     ap.add_argument("--once", action="store_true")
     ap.add_argument("--autonomous", action="store_true",
-                    help="Run the native case supervisor with durable scheduled jobs")
+                    help="Run the agreement, chaser and anomaly agents on durable scheduled jobs")
     args = ap.parse_args()
     if args.interval <= 0:
         ap.error("--interval must be positive")
@@ -71,8 +71,10 @@ def main():
         ap.error("monitor requires RAILS=real (a persistent database)")
     rails = registry.rails()
     if args.autonomous:
+        from agents.llm import default_llm
+
         from .autonomy import AutonomyRuntime
-        monitor = AutonomyRuntime(rails)
+        monitor = AutonomyRuntime(rails, llm=default_llm())
     else:
         monitor = Monitor(Workflow(Deps.from_registry(rails)))
     logging.basicConfig(level=logging.INFO)

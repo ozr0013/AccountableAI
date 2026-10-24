@@ -66,63 +66,9 @@ def test_approval_queues_exact_draft_and_wake_without_model(monkeypatch):
     assert response.status_code == 422
 
 
-def test_feedback_endpoints_and_capability_boundary(monkeypatch):
-    rails, case, client = setup(monkeypatch)
-    headers = {"Authorization": "Bearer private-test-token"}
-    decision = CaseStore(rails).record(
-        case.id, "supervisor_tool_result", {"result": "wait"}, NOW, "decision"
-    )
-    feedback = client.post(
-        "/autonomy/feedback",
-        headers=headers,
-        json={"case_id": case.id, "decision_id": decision.id, "text": "Cite source", "key": "f"},
-    )
-    assert feedback.status_code == 200
-    candidate_body = {
-        "feedback_id": feedback.json()["id"],
-        "skill_name": "case-investigation",
-        "version": "2",
-        "text": "Cite source",
-        "capabilities": ["read"],
-        "key": "c",
-    }
-    assert (
-        client.post(
-            "/autonomy/skills/candidates",
-            headers=headers,
-            json={**candidate_body, "capabilities": ["shell"]},
-        ).status_code
-        == 422
-    )
-    candidate = client.post(
-        "/autonomy/skills/candidates", headers=headers, json=candidate_body
-    ).json()
-    base = f"/autonomy/skills/candidates/{candidate['id']}"
-    assert client.post(base + "/promote", headers=headers, json={"key": "p"}).status_code == 422
-    assert (
-        client.post(
-            base + "/evaluations",
-            headers=headers,
-            json={"case_ids": [case.id], "key": "e"},
-        ).status_code
-        == 200
-    )
-    assert client.post(base + "/promote", headers=headers, json={"key": "p"}).status_code == 200
-    assert (
-        client.get("/autonomy/skills/case-investigation/active", headers=headers).json()["version"]
-        == "2"
-    )
-    assert (
-        client.post(
-            "/autonomy/skills/case-investigation/rollback", headers=headers, json={"key": "r"}
-        ).status_code
-        == 200
-    )
-
-
 def test_review_ack_requires_exact_current_proof(monkeypatch):
     rails, case, client = setup(monkeypatch)
-    from agents.supervisor import Supervisor
+    from workflow.evidence import payment_proof
 
     headers = {"Authorization": "Bearer private-test-token"}
     approvals = HumanApprovals(rails)
@@ -135,7 +81,7 @@ def test_review_ack_requires_exact_current_proof(monkeypatch):
         ).status_code
         == 422
     )
-    proof = Supervisor(rails)._proof(case, NOW)
+    proof = payment_proof(rails, case, NOW)
     ticket = approvals.request(
         case, "case_review", {"proof_fingerprint": proof["proof_fingerprint"]}, NOW, "good"
     )

@@ -1,6 +1,5 @@
-"""A native-tool investigation survives PostgreSQL and process restarts."""
-from datetime import UTC, datetime, timedelta
-from types import SimpleNamespace
+"""The three-agent runtime survives PostgreSQL and process restarts."""
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
@@ -18,31 +17,18 @@ from world import generate
 NOW = datetime(2026, 4, 22, 12, tzinfo=UTC)
 
 
-class ScriptedClient:
-    def __init__(self):
-        self.messages = self
-        self.choices = [('read', {'kind': 'invoice'}),
-                        ('request', {'kind': 'statement', 'reason': 'Need supporting statement'}),
-                        ('wait', {'until': (NOW + timedelta(days=1)).isoformat(), 'reason': 'Await evidence'})]
-        self.calls = 0
-
-    def create(self, **kwargs):
-        name, args = self.choices[self.calls % len(self.choices)]
-        self.calls += 1
-        return SimpleNamespace(content=[{'type':'tool_use','id':str(self.calls),'name':name,'input':args}])
-
-
-def test_postgres_native_triggers_human_and_outbox_restart(schema, monkeypatch):
+def test_postgres_chaser_draft_approval_outbox_and_restart(schema, monkeypatch):
     rails = RealRails(schema)
     for event in generate(13, (3,), 0).events():
         rails.append_event(event)
-    runtime = AutonomyRuntime(rails, client=ScriptedClient())
+    runtime = AutonomyRuntime(rails)
     assert runtime.tick(NOW)
     case = CaseStore(rails).list()[0]
     ticket = HumanApprovals(rails).list(case.id)[0]
+    assert ticket['kind'] == 'send_message' and ticket['requested_by'] == 'chaser'
     restarted = RealRails(schema)
     assert CaseStore(restarted).get(case.id).next_wake_at
-    assert AutonomyRuntime(restarted, client=ScriptedClient()).tick(NOW) == []
+    assert AutonomyRuntime(restarted).tick(NOW) == []
     monkeypatch.setenv('CONTROLLER_API_TOKEN', 'test-controller-token')
     api = TestClient(create_app(restarted, clock=lambda: NOW))
     result = api.post('/autonomy/approvals/' + ticket['id'] + '/decide',
@@ -55,7 +41,7 @@ def test_postgres_native_triggers_human_and_outbox_restart(schema, monkeypatch):
         dated=NOW.date(), data={'payments':[{'invoice_id':case.invoice_id,'vendor_id':case.vendor_id,
                                          'amount':1240,'on':NOW.date().isoformat()}]})
     restarted.append_event(document_event(doc, NOW))
-    AutonomyRuntime(restarted, client=ScriptedClient()).sync(NOW)
+    AutonomyRuntime(restarted).sync(NOW)
     assert CaseStore(restarted).get(case.id).last_observation != case.last_observation
     rails.store.conn.close()
     restarted.store.conn.close()
@@ -74,12 +60,8 @@ def test_postgres_resolution_completes_own_lease(schema):
                          dated=NOW.date(),data={'lines':[{'invoice_id':case.invoice_id,
                          'vendor_id':case.vendor_id,'amount':line.amount,'status':'paid'}]})]:
         rails.append_event(document_event(doc,NOW))
-    class Resolver:
-        def __init__(self): self.messages = self
-        def create(self, **kwargs):
-            return SimpleNamespace(content=[{'type':'tool_use','id':'resolve','name':'resolve','input':{'reason':'Proof reconciled'}}])
-    results = AutonomyRuntime(rails,client=Resolver()).tick(NOW)
-    assert all(r['status'] != 'retry_scheduled' for r in results)
+    results = AutonomyRuntime(rails).tick(NOW)
+    assert all(r.get('status') != 'retry_scheduled' for r in results)
     assert CaseStore(rails).get(case.id).state == 'resolved'
     assert not any(j['status'] == 'leased' for j in Scheduler(rails).list(case.id))
     rails.store.conn.close()

@@ -1,8 +1,14 @@
-"""Database-driven case ownership and bounded, leased autonomous investigations."""
+"""Database-driven case ownership: three agents, one router, durable leased jobs.
+
+    no confirmed terms        -> agreement agent proposes terms for a controller to confirm
+    no payment seen yet       -> chaser agent (wait until due, then the reminder ladder)
+    money left for the invoice -> anomaly agent (statement, amount, recipient, timing)
+"""
 from datetime import timedelta
 from uuid import uuid4
 
-from agents.supervisor import Supervisor
+from agents.anomaly import AnomalyAgent
+from agents.chaser import ChaserAgent, DailyChaser
 from rails.cases import aware
 from workflow.cases import CaseStore
 from workflow.human import HumanApprovals, evidence_fingerprint
@@ -10,67 +16,18 @@ from workflow.runtime_lock import runtime_lock
 from workflow.scheduler import Scheduler
 
 
-class RuntimeActions:
-    def __init__(self, rails):
-        self.rails = rails
-        self.cases = CaseStore(rails)
-        self.approvals = HumanApprovals(rails)
-
-    def _draft(self, case, body, now, key):
-        return self.request_approval(case, 'send_message',
-            {'recipient': 'management:' + case.manager_id, 'body': body}, now, key)
-
-    def request_statement(self, case, now, key):
-        return self._draft(case, f'Please provide the financial statement and remittance '
-                           f'for invoice {case.invoice_id}, vendor {case.vendor_id}.', now, key)
-
-    def request_payment_proof(self, case, now, key):
-        proof = Supervisor(self.rails)._proof(case, now)
-        if proof['valid_bank_proof']:
-            return {'error': 'payment_already_proven'}
-        line = proof['line']
-        if not line.get('due_date'):
-            return {'error': 'confirmed_payment_deadline_required'}
-        from datetime import date
-        if date.fromisoformat(line['due_date']) > now.date():
-            return {'error': 'payment_not_due'}
-        return self._draft(case, f'Please provide payment evidence for invoice {case.invoice_id}, '
-                           f'vendor {case.vendor_id}; payable {proof["expected_amount"]}, '
-                           f'deadline {line["due_date"]}.', now, key)
-
-    def request_approval(self, case, kind, payload, now, key):
-        # Suppress repeated requests while the same business question is still pending.
-        if kind == 'case_review':
-            payload = {**payload, 'proof_fingerprint': Supervisor(self.rails)._proof(case, now)['proof_fingerprint']}
-        fingerprint = evidence_fingerprint(self.rails, case)
-        pending = next((t for t in self.approvals.list(case.id)
-                        if t['status'] == 'pending' and t['kind'] == kind
-                        and t['payload'] == payload and t['evidence'] == fingerprint), None)
-        if pending:
-            try:
-                self.approvals.validate(pending, now)
-                return pending
-            except ValueError:
-                pass
-        return self.approvals.request(case, kind, payload, now, key)
-
-    def notify_parties(self, case, payload, now, key):
-        event = self.cases.record(case.id, 'parties_notified',
-            {'recipients': [case.owner_id, case.manager_id], 'notification': payload,
-             'channel': 'internal_case_feed'}, now, key + ':notification')
-        ticket = self.request_approval(case, 'case_review', payload, now, key + ':review')
-        return {'status': 'human_review_required', 'event_id': event.id, 'approval_id': ticket['id']}
-
-
 class AutonomyRuntime:
-    def __init__(self, rails, client=None, worker_id=None, max_jobs=20):
+    def __init__(self, rails, llm=None, worker_id=None, max_jobs=20):
         if not 1 <= max_jobs <= 100:
             raise ValueError('max_jobs must be between 1 and 100')
         self.rails = rails
         self.cases, self.scheduler = CaseStore(rails), Scheduler(rails)
+        self.approvals = HumanApprovals(rails)
         self.worker_id = worker_id or 'worker:' + str(uuid4())
         self.max_jobs = max_jobs
-        self.supervisor = Supervisor(rails, client=client, actions=RuntimeActions(rails))
+        self.chaser = DailyChaser(rails, self.cases, self.approvals, self.scheduler,
+                                  reader=ChaserAgent(llm) if llm else None)
+        self.anomaly = AnomalyAgent(rails, self.cases, self.approvals, self.scheduler, llm=llm)
 
     def sync(self, now):
         aware(now)
@@ -95,6 +52,17 @@ class AutonomyRuntime:
                     if case.state != 'resolved':
                         self.scheduler.schedule(case.id, now, 'daily:' + now.date().isoformat())
 
+    def route(self, case, now):
+        """Pick the agent for this case from the evidence; code decides, not a model."""
+        if case.kind == 'agreement':
+            return {'case_id': case.id, 'agent': 'agreement', 'action': 'awaiting_review'}
+        if case.state == 'resolved':
+            return {'case_id': case.id, 'agent': None, 'action': 'resolved'}
+        result = self.chaser.run(case, now)
+        if result['action'] != 'handoff_anomaly':
+            return result
+        return {**self.anomaly.run(self.cases.get(case.id), now), 'replies': result['replies']}
+
     def tick(self, now):
         aware(now)
         self.sync(now)
@@ -111,13 +79,7 @@ class AutonomyRuntime:
                     case = self.cases.get(job['case_id'])
                     # Coalesce daily and evidence jobs claimed during the same poll.
                     if case.id not in handled:
-                        from workflow.feedback import FeedbackStore
-                        feedback = FeedbackStore(self.rails)
-                        self.supervisor.skill_override = feedback.active_override('case-investigation')
-                        self.supervisor.skill_overrides = {name: feedback.active_override(name)
-                            for name in ('agreement', 'chasing', 'payment_review', 'escalation')}
-                        result = self.supervisor.run(case.id, now)
-                        results.append(result)
+                        results.append(self.route(case, now))
                         handled.add(case.id)
                     self.scheduler.complete(job['id'], self.worker_id, now)
             except Exception as exc:  # noqa: BLE001 - persist retries at the worker boundary

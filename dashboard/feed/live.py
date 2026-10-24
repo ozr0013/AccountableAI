@@ -77,23 +77,5 @@ class MeteredLLM:
         return out
 
 
-class MeteredVerifier:
-    """The verifier's model stage while the budget lasts; its code checks after that."""
-
-    def __init__(self, meter: Meter, fallback):
-        from agents.verifier.verifier import LLMVerifier
-        self.inner, self.meter, self.fallback = LLMVerifier(), meter, fallback
-
-    def verify(self, draft, evidence):
-        if not self.meter.ok():
-            return self.fallback.verify(draft, evidence)
-        v = self.inner.verify(draft, evidence)
-        m = v.meta or {}
-        if "input_tokens" in m:
-            self.meter.add("Verifier", m.get("model", "claude-haiku-5-5"),
-                           m["input_tokens"], m.get("output_tokens", 0))
-        return v
-
-
 def available() -> bool:
     return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))

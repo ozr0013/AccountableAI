@@ -62,3 +62,18 @@ def check(draft: AlertDraft, evidence: list[Document]) -> RuleResult:
     if r.banned_terms:
         r.reasons.append(f"accusatory wording: {', '.join(r.banned_terms)}")
     return r
+
+
+class RulesVerifier:
+    """contracts.steps.Verifier by code: citations exist, quotes match, no accusatory wording."""
+
+    def verify(self, draft: AlertDraft, evidence: list[Document]):
+        from contracts.models import Verdict, VerdictStatus
+        r = check(draft, evidence)
+        return Verdict(alert_id=draft.id,
+                       status=VerdictStatus.approved if r.ok else VerdictStatus.blocked,
+                       reasons=r.reasons or ["citations and wording checked"])
+
+
+def build() -> RulesVerifier:
+    return RulesVerifier()

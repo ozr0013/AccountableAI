@@ -43,7 +43,7 @@ class Rails(Protocol):
 
 
 class Agents(Protocol):
-    """Kanishka: agents/agreement|trail|cause|chaser|case."""
+    """Kanishka: agents/agreement|chaser; trail, cause and hold are code in workflow/checks."""
 
     def extract_terms(self, agreement: Document) -> AgreementTerms: ...
     def build_trail(self, line: LedgerLine, docs: list[Document]) -> PaymentTrail: ...
@@ -56,13 +56,13 @@ class Agents(Protocol):
 
 
 class Verifier(Protocol):
-    """Omar: agents/verifier/."""
+    """Code checks: workflow/checks/wording.py."""
 
     def verify(self, draft: AlertDraft, evidence: list[Document]) -> Verdict: ...
 
 
 class Briefer(Protocol):
-    """Omar: agents/briefing/."""
+    """Code briefing: workflow/checks/briefing.py."""
 
     def brief(self, manager_id: str, question: str) -> Briefing: ...
 

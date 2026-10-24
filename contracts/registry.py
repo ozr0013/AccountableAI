@@ -3,8 +3,8 @@
 Real modules must expose a no-arg factory named `build()` returning the Protocol:
     rails/__init__.py              -> build() -> Rails
     agents/__init__.py             -> build() -> Agents
-    agents/verifier/__init__.py    -> build() -> Verifier
-    agents/briefing/__init__.py    -> build() -> Briefer
+    workflow/checks/wording.py     -> build() -> Verifier (code checks)
+    workflow/checks/briefing.py    -> build() -> Briefer (code briefing)
     workflow/approvals.py          -> build() -> Approvals
 """
 
@@ -18,9 +18,9 @@ from .steps import Agents, Approvals, Briefer, Rails, Verifier
 _REAL = {
     "RAILS": "rails",
     "AGENTS": "agents",
-    "VERIFIER": "agents.verifier",
+    "VERIFIER": "workflow.checks.wording",
     "APPROVALS": "workflow.approvals",
-    "BRIEFING": "agents.briefing",
+    "BRIEFING": "workflow.checks.briefing",
 }
 
 

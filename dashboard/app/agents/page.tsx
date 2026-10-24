@@ -8,11 +8,12 @@ import { CAUSE, day, named } from "@/lib/format";
 
 const ROSTER = [
   { id: "agreement_agent", name: "Agreement agent", role: "Reads the management agreement into terms with clause citations; a controller confirms them.", model: true },
-  { id: "trail", name: "Payment-trail agent", role: "Builds one timeline per invoice from funding, statements, bank, vendor and replies; source-trust rules pick the winner.", model: true },
-  { id: "cause", name: "Delay-cause agent", role: "Gives every unpaid invoice one cause. Only “unexplained” lands on Keyway.", model: true },
-  { id: "verifier", name: "Verifier", role: "Tries to refute every alert from the evidence alone; blocks uncited claims and accusatory wording. Fails closed.", model: true },
-  { id: "chaser", name: "Chaser agent", role: "Reminds Keyway from approved templates on the approved schedule, and reads replies: “paid” counts only with bank or vendor proof.", model: true },
-  { id: "case_agent", name: "Case agent", role: "Builds the evidence pack and proposes a hold before Oakline funds Keyway again. Proposes only.", model: true },
+  { id: "chaser", name: "Chaser agent", role: "Checks every invoice daily against the agreement deadline, drafts the next approved reminder for an overdue unpaid invoice, and reads replies: “paid” counts only with bank proof.", model: true },
+  { id: "anomaly", name: "Anomaly agent", role: "Once a payment is made: asks for the statement, checks amount, recipient and timing, then escalates to the owner and manager or closes the case.", model: true },
+  { id: "trail", name: "Payment trail (code)", role: "One timeline per invoice; source-trust rules pick the winner: bank > vendor > manager.", model: false },
+  { id: "cause", name: "Delay cause (code)", role: "Rules give every unpaid invoice one cause. Only “unexplained” lands on Keyway.", model: false },
+  { id: "verifier", name: "Wording check (code)", role: "Blocks uncited claims, invented quotes and accusatory wording before an alert is raised.", model: false },
+  { id: "case_agent", name: "Hold arithmetic (code)", role: "Before Oakline funds Keyway again, sums what is still unexplained and proposes that hold.", model: false },
   { id: "recheck", name: "Recheck", role: "When a fact changes, reruns only the items that depend on it and withdraws alerts that no longer hold, with the reason.", model: false },
   { id: "controller", name: "Controller", role: "The only one who approves holds and bank-detail changes. Every decision is in the log.", model: false },
 ];
@@ -27,7 +28,7 @@ export default function Agents() {
 
   return (
     <>
-      <PageTop title="Agents" sub={`${live ? "Claude (Sonnet agents, verifier model stage), metered" : "Rules mode: the agents' deterministic rules, no API cost"}. Code decides what runs next; agents only judge.`} />
+      <PageTop title="Agents" sub={`${live ? "Claude (agreement, chaser and anomaly agents), metered" : "Rules mode: the agents' deterministic rules, no API cost"}. Code decides what runs next; agents only judge.`} />
 
       {session.length > 0 && (
         <Disclosure title="Session history" hint="Actions and their agent responses" meta={`${state.history.length} actions`}>

@@ -13,7 +13,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from rails.cases import aware
 from workflow.cases import CaseConflict, CaseStore
-from workflow.feedback import FeedbackStore
 from workflow.human import HumanApprovals, Principal
 from workflow.outbox import Outbox
 from workflow.runtime_lock import runtime_lock
@@ -27,27 +26,6 @@ class Body(BaseModel):
 class DecideBody(Body):
     approve: bool
     digest: str = Field(min_length=1)
-
-
-class FeedbackBody(Body):
-    case_id: str
-    decision_id: str
-    text: str = Field(min_length=1, max_length=6000)
-    key: str = Field(min_length=1)
-
-
-class CandidateBody(Body):
-    feedback_id: str
-    skill_name: str
-    version: str
-    text: str = Field(min_length=1, max_length=6000)
-    capabilities: list[str]
-    key: str = Field(min_length=1)
-
-
-class EvaluationBody(Body):
-    case_ids: list[str] = Field(min_length=1, max_length=20)
-    key: str = Field(min_length=1)
 
 
 class ActionBody(Body):
@@ -135,10 +113,10 @@ def create_router(rails_provider: Callable, clock=None) -> APIRouter:
                 approvals = HumanApprovals(rails)
                 ticket = approvals.get(ticket_id)
                 if body.approve and ticket["kind"] == "case_review":
-                    from agents.supervisor import Supervisor
+                    from workflow.evidence import payment_proof
 
                     case = CaseStore(rails).get(ticket["case_id"])
-                    proof = Supervisor(rails)._proof(case, when)
+                    proof = payment_proof(rails, case, when)
                     if (
                         not ticket["payload"].get("proof_fingerprint")
                         or ticket["payload"]["proof_fingerprint"] != proof["proof_fingerprint"]
@@ -179,52 +157,6 @@ def create_router(rails_provider: Callable, clock=None) -> APIRouter:
                 return ticket
 
         return _call(action)
-
-    @router.get("/feedback")
-    def feedback_list(case_id: str | None = None):
-        return _call(lambda: FeedbackStore(rails_provider()).list(case_id))
-
-    @router.post("/feedback")
-    def feedback(body: FeedbackBody):
-        return _call(
-            lambda: FeedbackStore(rails_provider()).feedback(**body.model_dump(), now=now())
-        )
-
-    @router.post("/skills/candidates")
-    def candidate(body: CandidateBody):
-        return _call(
-            lambda: FeedbackStore(rails_provider()).candidate(**body.model_dump(), now=now())
-        )
-
-    @router.post("/skills/candidates/{candidate_id}/evaluations")
-    def evaluation(candidate_id: str, body: EvaluationBody):
-        return _call(
-            lambda: FeedbackStore(rails_provider()).run_evaluation(
-                candidate_id, **body.model_dump(), now=now()
-            )
-        )
-
-    @router.post("/skills/candidates/{candidate_id}/promote")
-    def promote(
-        candidate_id: str, body: ActionBody, principal: Annotated[Principal, Depends(_principal)]
-    ):
-        return _call(
-            lambda: FeedbackStore(rails_provider()).promote(
-                candidate_id, principal, now(), body.key
-            )
-        )
-
-    @router.get("/skills/{skill_name}/active")
-    def active(skill_name: str):
-        return _call(lambda: FeedbackStore(rails_provider()).active_override(skill_name))
-
-    @router.post("/skills/{skill_name}/rollback")
-    def rollback(
-        skill_name: str, body: ActionBody, principal: Annotated[Principal, Depends(_principal)]
-    ):
-        return _call(
-            lambda: FeedbackStore(rails_provider()).rollback(skill_name, principal, now(), body.key)
-        )
 
     return router
 

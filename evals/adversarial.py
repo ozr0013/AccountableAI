@@ -15,7 +15,7 @@ import os
 import sys
 from dataclasses import dataclass
 
-from agents.verifier import rules
+from workflow.checks import wording as rules
 from contracts.models import (
     AlertDraft,
     AlertKind,
@@ -198,13 +198,6 @@ def main(argv: list[str] | None = None) -> int:
     rails = MemoryRails.from_world(ALL_SCENARIOS)
     columns = {"no_verifier": run(ApproveAll(), rails), "code_rules_only": run(CodeRulesOnly(), rails)}
     budget = Budget(a.budget)
-    if os.getenv("ANTHROPIC_API_KEY") and os.getenv("LIVE") in ("1", "verifier"):
-        from agents.verifier import LLMVerifier
-        try:
-            columns["live_verifier"] = run(LLMVerifier(), rails, budget)
-        except BudgetExceeded as e:
-            print(f"STOPPED: {e}; spent ${budget.spent:.4f}")
-            return 2
     md = to_markdown(columns)
     if "live_verifier" in columns:
         md += f"\nLive verifier: {budget.calls} model calls, ${budget.spent:.4f}.\n"
