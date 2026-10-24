@@ -29,11 +29,20 @@ def scan_events(manager_ids: list[str], as_of) -> list[Event]:
             for m in manager_ids]
 
 
+def funding_event(manager_id: str, amount: float, as_of) -> Event:
+    when = datetime.combine(as_of, time(23, 30), tzinfo=UTC)
+    return Event(id=f"ev-funding-{manager_id}-{as_of.isoformat()}", type="funding_review_requested",
+                 manager_id=manager_id, valid_from=when, learned_at=when,
+                 payload={"amount": amount})
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenario", type=int, nargs="*", default=[3])
     ap.add_argument("--clean", type=int, default=30)
     ap.add_argument("--seed", type=int, default=13)
+    ap.add_argument("--funding", metavar="MANAGER:AMOUNT",
+                    help="after the replay, Oakline is about to fund e.g. keyway:18400")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
 
@@ -50,10 +59,13 @@ def main() -> None:
         wf = Workflow(Deps.from_registry(rails))
         results = wf.replay(world.events())
     results += wf.replay(scan_events([m.id for m in world.managers], world.as_of))
+    if a.funding:
+        mgr, amount = a.funding.split(":")
+        results += wf.replay([funding_event(mgr, float(amount), world.as_of)])
 
     book = WorkflowBook.load(rails)
     for r in results:
-        if a.verbose or r.raised or r.rejected or r.chases:
+        if a.verbose or r.raised or r.rejected or r.chases or r.route == "funding_review":
             print(f"[{r.route}] {r.event_id}")
             for line in r.trace:
                 print(f"    {line}")
