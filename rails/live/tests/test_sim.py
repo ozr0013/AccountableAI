@@ -6,7 +6,7 @@ import pytest
 from agents.intake.tests.test_intake import BANK, INVOICE, VENDORS
 from rails.live.scoring import score
 from rails.live.sim import attack_control, simulate
-from rails.live.system import LiveSystem
+from rails.live.sim_system import SimSystem
 from world.messy import Noise, generate
 
 
@@ -37,7 +37,7 @@ def test_full_stream_and_replay_and_adversarial_control():
 
 def test_clock_rejects_backwards_and_future_and_no_money_action():
     public, _ = generate(n_clean=0)
-    system = LiveSystem(public)
+    system = SimSystem(public)
     system.advance(date(2026, 2, 1))
     with pytest.raises(ValueError):
         system.advance(date(2026, 1, 1))

@@ -20,7 +20,7 @@ from agents.intake.parser import parse
 from contracts.models import Document, SourceKind
 from rails.serialization import canonical, digest
 
-from .system import LiveSystem
+from .sim_system import SimSystem
 
 
 class CachedModel:
@@ -120,7 +120,7 @@ class Counterparts:
 
 
 def simulate(public, system="ours", llm=None, cache=None, regression_dir=None, counterparts=True):
-    engine = LiveSystem(public, system, llm, cache, regression_dir)
+    engine = SimSystem(public, system, llm, cache, regression_dir)
     actors = Counterparts(public)
     by_day = defaultdict(list)
     for arrival in public["arrivals"]:

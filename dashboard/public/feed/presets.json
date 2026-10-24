@@ -1,0 +1,78 @@
+[
+ {
+  "id": "invoice_received_correction",
+  "label": "Invoice was actually received on a date",
+  "description": "Supersedes the recorded receipt date of one invoice; its payment deadline moves with it. Default: the Sparkline electrician invoice arrived Apr 15, not Mar 28.",
+  "params": {
+   "invoice_id": "invoice id",
+   "date": "YYYY-MM-DD"
+  },
+  "defaults": {
+   "invoice_id": "INV-KW-0402",
+   "date": "2026-04-15"
+  }
+ },
+ {
+  "id": "manager_replies_paid",
+  "label": "Manager replies \"paid\"",
+  "description": "Reply to a chase claiming payment, with no proof attached.",
+  "params": {
+   "invoice_id": "invoice id"
+  },
+  "defaults": {
+   "invoice_id": "INV-KW-0301"
+  }
+ },
+ {
+  "id": "vendor_confirms_paid",
+  "label": "Vendor confirms it was paid",
+  "description": "The vendor says it received the money.",
+  "params": {
+   "invoice_id": "invoice id",
+   "paid_on": "YYYY-MM-DD"
+  },
+  "defaults": {
+   "invoice_id": "INV-KW-0301",
+   "paid_on": "2026-04-22"
+  }
+ },
+ {
+  "id": "bank_shows_payment",
+  "label": "Bank record shows the payment",
+  "description": "The manager's bank records show an outgoing payment to the vendor.",
+  "params": {
+   "invoice_id": "invoice id",
+   "on": "YYYY-MM-DD"
+  },
+  "defaults": {
+   "invoice_id": "INV-KW-0301",
+   "on": "2026-04-22"
+  }
+ },
+ {
+  "id": "terms_changed",
+  "label": "Agreement payment window corrected",
+  "description": "Corrects the vendor payment window (days) in the confirmed terms.",
+  "params": {
+   "manager_id": "manager id",
+   "days": "number of days"
+  },
+  "defaults": {
+   "manager_id": "keyway",
+   "days": "15"
+  }
+ },
+ {
+  "id": "vendor_requests_bank_change",
+  "label": "Vendor asks to change bank details",
+  "description": "Held for identity verification and controller approval.",
+  "params": {
+   "vendor_id": "vendor id",
+   "invoice_id": "invoice id (optional)"
+  },
+  "defaults": {
+   "vendor_id": "v-summit",
+   "invoice_id": "INV-KW-0701"
+  }
+ }
+]

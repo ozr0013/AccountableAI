@@ -9,6 +9,7 @@ from agents import RealAgents
 from contracts.fakes import FakeApprovals
 from contracts.models import AlertKind, Verdict, VerdictStatus
 from workflow import Deps, Workflow
+from workflow.book import WorkflowBook
 from workflow.memrails import MemoryRails
 from workflow.run import scan_events
 from world import generate
@@ -106,3 +107,58 @@ def test_a_paid_late_invoice_with_an_open_alert_is_still_explained():
     late_paid = line.model_copy(update={"paid_amount": line.amount, "paid_on": date(2026, 4, 1)})
     assert steps._assess_one(late_paid, date(2026, 4, 22)).finding is None
     assert steps._assess_one(late_paid, date(2026, 4, 22), explain=True).finding is not None
+
+
+def test_a_blocked_paid_late_refresh_does_not_leave_the_unpaid_alert_standing():
+    """Live bug (Haiku): after the bank line proved the plumber paid, the refreshed 'paid 40 days
+    late' record was blocked by the verifier, and the old 'unpaid' alert stayed open until the
+    next scan. Now it is withdrawn at once, with the payment as the reason."""
+    from rails.console import JudgeConsole
+
+    class BlockPaidLate(SpyVerifier):
+        def verify(self, draft, evidence):
+            v = super().verify(draft, evidence)
+            if draft.amount == 0:                        # the zero-dollar 'paid late' refresh
+                return Verdict(alert_id=draft.id, status=VerdictStatus.blocked, reasons=["blocked"])
+            return v
+
+    w = generate(13, ALL_SCENARIOS, 30)
+    rails = MemoryRails()
+    wf = Workflow(Deps(rails, RealAgents(None), BlockPaidLate(), FakeApprovals()))
+    wf.replay(w.events() + scan_events(["keyway"], w.as_of))
+    assert any(a.draft.invoice_ids == ["INV-KW-0301"] for a in WorkflowBook.load(rails).open_alerts())
+
+    rec = JudgeConsole(rails).apply_preset("bank_shows_payment",
+                                           {"invoice_id": "INV-KW-0301", "on": "2026-04-22"})
+    results = [wf.ingest(e) for e in rec.events]
+    assert not any(a.draft.invoice_ids == ["INV-KW-0301"] for a in WorkflowBook.load(rails).open_alerts())
+    why = [e.payload["reason"] for e in rails.events()
+           if e.type == "alert_withdrawn" and e.invoice_id == "INV-KW-0301"][-1]
+    assert why.startswith("payment is now proven by bank or vendor records on 2026-04-22")
+    assert "days after the due date" in why and results[0].withdrawn
+
+
+def test_a_refuted_refresh_for_something_still_owed_never_withdraws_the_original():
+    """The narrow fix must not let a verifier wobble close a true unpaid alert."""
+    class RefuteEverythingNew(SpyVerifier):
+        def __init__(self):
+            super().__init__()
+            self.live = False
+
+        def verify(self, draft, evidence):
+            v = super().verify(draft, evidence)
+            if self.live:
+                return Verdict(alert_id=draft.id, status=VerdictStatus.refuted, reasons=["no"])
+            return v
+
+    w = generate(13, ALL_SCENARIOS, 30)
+    rails, spy = MemoryRails(), RefuteEverythingNew()
+    wf = Workflow(Deps(rails, RealAgents(None), spy, FakeApprovals()))
+    wf.replay(w.events() + scan_events(["keyway"], w.as_of))
+    before = {a.draft.id for a in WorkflowBook.load(rails).open_alerts()}
+    spy.live = True
+    wf.replay(scan_events(["keyway"], date(2026, 4, 27)))        # figures change; all refreshes refuted
+    after = {a.draft.id for a in WorkflowBook.load(rails).open_alerts()}
+    unpaid = {a.draft.id for a in WorkflowBook.load(rails).open_alerts()
+              if a.draft.kind == AlertKind.unexplained_unpaid and a.draft.amount > 0}
+    assert len(unpaid) == 3 and unpaid <= before and unpaid <= after

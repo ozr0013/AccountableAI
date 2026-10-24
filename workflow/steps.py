@@ -272,7 +272,14 @@ class Steps:
             target.append(draft.id)
             notes.append(f"{draft.id}: verifier {verdict.status.value}"
                          + (" (refreshed with new evidence)" if old and ok else ""))
-        withdrawn = self._withdraw_stale(s, book, {d.id for d in s.drafts})
+        still = {d.id for d in s.drafts}
+        # A refreshed alert that failed verification for an invoice that is now paid in full
+        # (for example "paid 40 days late" blocked by the verifier) must not leave the old
+        # "unpaid" alert open. Only then: a refreshed alert for something still owed that is
+        # refuted must never withdraw the original.
+        still -= {d.id for d in s.drafts if d.id in rejected and d.invoice_ids
+                  and self._is_paid(d.invoice_ids[0])}
+        withdrawn = self._withdraw_stale(s, book, still)
         withdrawn += self._fold_into_pattern(s, {d.id for d in s.drafts})
         notes += [f"{aid}: withdrawn ({why})" for aid, why in withdrawn]
         return {"raised": raised, "refreshed": refreshed, "rejected": rejected,
@@ -289,7 +296,7 @@ class Steps:
                 if al.draft.invoice_ids != [a.invoice_id] or al.draft.id in still \
                         or al.draft.kind not in ITEM_KINDS:
                     continue
-                why = self._why_not(a)
+                why = (self._paid_reason(a) if a.status == "delayed" else None) or self._why_not(a)
                 self.d.rails.append_event(wf_event(
                     "alert_withdrawn", al.draft.id, s.event,
                     {"alert_id": al.draft.id, "reason": why, "invoice_id": a.invoice_id},
@@ -319,6 +326,22 @@ class Steps:
                 {"alert_id": aid, "reason": why, "invoice_id": (al.draft.invoice_ids or [None])[0]},
                 s.manager_id, (al.draft.invoice_ids or [None])[0]))
         return out
+
+    def _is_paid(self, invoice_id: str) -> bool:
+        line = self._line(invoice_id)
+        return bool(line) and _cents(line.paid_amount) >= _cents(line.amount) > 0
+
+    def _paid_reason(self, a: Assessment) -> str | None:
+        """If the invoice is now paid in full, say so (and how late), whatever the cause agent
+        made of it: lateness is tracked by the recurring-pattern alert, not by an item alert."""
+        line = self._line(a.invoice_id)
+        if not line or _cents(line.paid_amount) < _cents(line.amount):
+            return None
+        late = (line.paid_on - line.due_date).days if line.paid_on and line.due_date else 0
+        when = f" on {line.paid_on}" if line.paid_on else ""
+        tail = (f"it was paid {late} days after the due date, which the lateness pattern tracks"
+                if late > 0 else "it was on time under the agreement terms")
+        return f"payment is now proven by bank or vendor records{when}; {tail}"
 
     @staticmethod
     def _why_not(a: Assessment) -> str:

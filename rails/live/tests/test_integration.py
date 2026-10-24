@@ -1,7 +1,7 @@
 from datetime import date
 
 from contracts.models import Document, SourceKind
-from rails.live.system import LiveSystem
+from rails.live.sim_system import SimSystem
 
 VENDORS = [{"id": "v-riogrande", "name": "Rio Grande Plumbing", "trade": "plumber"}]
 AGREEMENT = """7.2 Vendor Payment. Manager shall pay each vendor invoice within ten (10) days of receipt of a complete invoice, using funds provided by Owner.
@@ -10,7 +10,7 @@ AGREEMENT = """7.2 Vendor Payment. Manager shall pay each vendor invoice within 
 
 
 def make_system(rails=None):
-    return LiveSystem({"vendors": VENDORS, "start": "2026-01-01", "as_of": "2026-04-22",
+    return SimSystem({"vendors": VENDORS, "start": "2026-01-01", "as_of": "2026-04-22",
                        "simulated": False, "manager_id": "keyway"}, rails=rails)
 
 
