@@ -70,3 +70,14 @@ def test_owner_side_and_holds_do_not_count_against_manager():
     evs = world(invoice("big", "2026-03-05", amount=9000.0, funded=False))   # scenario 6
     assert late_months(evs, "m", AS_OF) == {}
     assert aging(evs, "m", AS_OF)["90+"] == 0
+
+
+def test_a_payment_held_for_a_bank_detail_change_is_not_the_manager_paying_late():
+    """Scenario 7: the system itself holds the payment, so the overdue invoice is not lateness."""
+    from world.generator import ALL_SCENARIOS
+    evs = generate(13, ALL_SCENARIOS, 30).events()
+    from rails.aging.aging import _late_invoices
+    late = _late_invoices(evs, "keyway", date(2026, 4, 25))      # INV-KW-0701 is overdue by Apr 25
+    assert "INV-KW-0701" not in {i for ids in late.values() for i in ids}
+    assert late.get("2026-04") in (None, [])                     # April is not late on its account
+    assert sorted(m for m, ids in late.items() if ids) == ["2026-01", "2026-02", "2026-03"]

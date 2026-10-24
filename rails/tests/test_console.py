@@ -101,10 +101,14 @@ def test_terms_change_hits_every_invoice_of_that_manager(con):
 
 
 def test_http_api(con, monkeypatch):
-    monkeypatch.setattr(console_api, "_console", con)
+    from agents import RealAgents
+    from contracts.fakes import FakeVerifier
+    from rails.live.system import LiveSystem
+    monkeypatch.setattr(console_api, "_live",
+                        LiveSystem(con.rails, agents=RealAgents(None), verifier=FakeVerifier()))
     client = TestClient(console_api.app)
     assert {p["id"] for p in client.get("/presets").json()} >= {"invoice_received_correction", "manager_replies_paid"}
-    r = client.post("/presets/invoice_received_correction", json={"params": {}})
+    r = client.post("/presets/invoice_received_correction", json={"params": {}}, params={"wait": True})
     assert r.status_code == 200 and r.json()["affected"] == ["INV-KW-0402"]
     r = client.post("/text", json={"text": "nonsense"})
     assert r.status_code == 422 and r.json()["detail"]["suggestions"]
