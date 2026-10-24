@@ -1,5 +1,15 @@
 import { schema, table, t, SenderError, type InferSchema, type ReducerCtx } from 'spacetimedb/server';
 
+const RuleInput = t.object('RuleInput', {
+  ruleId: t.string(),
+  ruleType: t.string(),
+  params: t.string(),
+  check: t.string(),
+  status: t.string(),
+  sourceQuote: t.option(t.string()),
+  location: t.option(t.string()),
+});
+
 // Live mirror of the AccountableAI PostgreSQL tables. PostgreSQL stays the source of truth; this
 // module lets the dashboard subscribe to agent work. Only the identity that published the module
 // may write. Events are append-only; cases and jobs are replaced by id; facts and dependencies
@@ -59,6 +69,44 @@ const spacetimedb = schema({
       key: t.string().primaryKey(),
       eventId: t.string().index('btree'),
       factKey: t.string().index('btree'),
+    }
+  ),
+  agreement: table(
+    { name: 'agreement', public: true },
+    {
+      docId: t.string().primaryKey(),
+      filename: t.string(),
+      kind: t.string(),
+      ownerName: t.option(t.string()),
+      vendorName: t.option(t.string()),
+      paymentDue: t.option(t.string()),
+      paymentAmount: t.option(t.string()),
+      paymentInfo: t.option(t.string()),
+      effectiveDate: t.option(t.string()),
+      complete: t.bool(),
+      missing: t.array(t.string()),
+      escalationSubject: t.option(t.string()),
+      escalationBody: t.option(t.string()),
+      fields: t.string(),
+      steps: t.string(),
+      mode: t.string(),
+      costUsd: t.f64(),
+      reviewedAt: t.timestamp(),
+    }
+  ),
+  agreementRule: table(
+    { name: 'agreement_rule', public: true },
+    {
+      ruleId: t.string().primaryKey(),
+      docId: t.string().index('btree'),
+      vendorName: t.string(),
+      ruleType: t.string().index('btree'),
+      params: t.string(),
+      check: t.string(),
+      status: t.string(),
+      sourceQuote: t.option(t.string()),
+      location: t.option(t.string()),
+      createdAt: t.timestamp(),
     }
   ),
   dependency: table(
@@ -190,3 +238,67 @@ export const clearDerived = spacetimedb.reducer(ctx => {
   for (const row of [...ctx.db.eventFact.iter()]) ctx.db.eventFact.key.delete(row.key);
   for (const row of [...ctx.db.dependency.iter()]) ctx.db.dependency.key.delete(row.key);
 });
+
+// One row per reviewed document; a re-review of the same file replaces its row.
+export const saveAgreement = spacetimedb.reducer(
+  {
+    docId: t.string(),
+    filename: t.string(),
+    kind: t.string(),
+    ownerName: t.option(t.string()),
+    vendorName: t.option(t.string()),
+    paymentDue: t.option(t.string()),
+    paymentAmount: t.option(t.string()),
+    paymentInfo: t.option(t.string()),
+    effectiveDate: t.option(t.string()),
+    complete: t.bool(),
+    missing: t.array(t.string()),
+    escalationSubject: t.option(t.string()),
+    escalationBody: t.option(t.string()),
+    fields: t.string(),
+    steps: t.string(),
+    mode: t.string(),
+    costUsd: t.f64(),
+  },
+  (ctx, args) => {
+    requireWriter(ctx);
+    const row = {
+      ...args,
+      ownerName: args.ownerName ?? undefined,
+      vendorName: args.vendorName ?? undefined,
+      paymentDue: args.paymentDue ?? undefined,
+      paymentAmount: args.paymentAmount ?? undefined,
+      paymentInfo: args.paymentInfo ?? undefined,
+      effectiveDate: args.effectiveDate ?? undefined,
+      escalationSubject: args.escalationSubject ?? undefined,
+      escalationBody: args.escalationBody ?? undefined,
+      reviewedAt: ctx.timestamp,
+    };
+    if (ctx.db.agreement.docId.find(args.docId)) {
+      ctx.db.agreement.docId.update(row);
+    } else {
+      ctx.db.agreement.insert(row);
+    }
+  }
+);
+
+// Replace the rules derived from one agreement in a single transaction.
+export const setAgreementRules = spacetimedb.reducer(
+  { docId: t.string(), vendorName: t.string(), rules: t.array(RuleInput) },
+  (ctx, { docId, vendorName, rules }) => {
+    requireWriter(ctx);
+    for (const old of [...ctx.db.agreementRule.docId.filter(docId)]) {
+      ctx.db.agreementRule.ruleId.delete(old.ruleId);
+    }
+    for (const r of rules) {
+      ctx.db.agreementRule.insert({
+        ...r,
+        docId,
+        vendorName,
+        sourceQuote: r.sourceQuote ?? undefined,
+        location: r.location ?? undefined,
+        createdAt: ctx.timestamp,
+      });
+    }
+  }
+);
