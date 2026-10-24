@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useFeed } from "./Feed";
 import { Building, Gavel, Home, Inbox, ListIcon, Mark, Shield, Spark } from "./Icons";
 import { DemoBar } from "./DemoBar";
@@ -13,14 +13,26 @@ import { DocProvider } from "./ui";
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
   const { state } = useFeed();
+  const [account, setAccount] = useState<{ signed_in: boolean; name?: string; given_name?: string; picture?: string } | null>(null);
+  useEffect(() => {
+    let current = true;
+    fetch(`${process.env.NEXT_PUBLIC_AGREEMENT_URL || "http://127.0.0.1:8771"}/api/status`, { cache: "no-store" })
+      .then((response) => response.ok ? response.json() : null)
+      .then((profile) => { if (current && profile?.signed_in) setAccount(profile); })
+      .catch(() => undefined);
+    return () => { current = false; };
+  }, []);
   const pending = state?.cases.filter((c) => c.status === "pending").length ?? 0;
   const open = state?.items.filter((i) => i.attention).length ?? 0;
+  const controllerName = account?.name || account?.given_name;
+  const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
     { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
     { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
     { href: "/keyway", label: "Keyway money trail", icon: Building },
+    { href: "/agreements", label: "Your account", icon: Shield },
   ];
   const tools = [
     { href: "/console", label: "Judge Console", icon: Gavel },
@@ -61,10 +73,10 @@ export function Shell({ children }: { children: ReactNode }) {
           </nav>
           <DemoBar />
           <div className="side-foot">
-            <div className="who">
-              <span className="who-av">D</span>
-              <span>Dana · Controller</span>
-            </div>
+            <Link href="/agreements" className="who" title={account?.signed_in ? "Manage your Google profile" : "Connect your Google account"}>
+              <span className="who-av">{account?.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : controllerInitial}</span>
+              <span>{controllerName ? `${controllerName} · Controller` : "Connect Google account"}</span>
+            </Link>
             <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway</Link>
           </div>
         </aside>

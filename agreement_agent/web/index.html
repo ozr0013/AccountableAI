@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agreement agent · AccountableAI</title>
+<style>
+  :root {
+    --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    --bg: #f9f7f1; --card: #fff; --line: #e9ddd1; --ink: #0d0d0c; --ink2: #3f3a34; --muted: #897d71;
+    --o: #ff6716; --o-ink: #c05500; --o-wash: #fff1e9; --g: #3f703d; --g-wash: #eef5ec; --rule: #272320;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--sans); color: var(--ink); background: var(--bg);
+         background-image: radial-gradient(circle at 1px 1px, #a6958566 .8px, transparent 1.1px); background-size: 14px 14px;
+         letter-spacing: -.01em; -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px 80px; }
+  .label { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--rule); }
+  .micro { font-family: var(--mono); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+  h1 { font-weight: 500; letter-spacing: -.04em; font-size: 44px; line-height: 46px; margin: 12px 0 10px; }
+  .lead { font-size: 18px; line-height: 26px; color: var(--ink2); max-width: 680px; margin: 0; }
+  .rule { display: flex; justify-content: space-between; border-top: 1px solid var(--rule); padding-top: 12px; margin: 40px 0 16px; }
+  .card { background: var(--card); border: 1px solid #f8f1ea; border-radius: 8px; padding: 22px; }
+  .block { border: 1px solid var(--rule); box-shadow: 4px 4px 0 0 var(--rule); }
+  .dense { background-color: #fdfcfa; background-image: radial-gradient(circle at 1px 1px, #27232055 .65px, transparent .9px); background-size: 4px 4px; }
+  .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .between { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+  button, .btn { font: inherit; cursor: pointer; }
+  .google { display: inline-flex; align-items: center; gap: 12px; height: 46px; padding: 0 20px 0 14px; border-radius: 6px;
+            background: #fff; border: 1px solid var(--rule); box-shadow: 3px 3px 0 0 var(--rule); color: var(--ink);
+            text-decoration: none; font-size: 15px; transition: transform .15s; }
+  .google:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 var(--rule); }
+  .btn { height: 40px; padding: 0 18px; border: 0; border-radius: 4px; background: var(--o); color: #fff; font-size: 14px; box-shadow: 0 1px 6px #0000001a; }
+  .btn:disabled { background: #e9ddd1; color: var(--muted); box-shadow: none; cursor: progress; }
+  .pill { height: 30px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--rule); background: transparent;
+          font-family: var(--mono); font-size: 10px; letter-spacing: .06em; text-transform: uppercase; }
+  .tag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 4px; font-family: var(--mono);
+         font-size: 10px; letter-spacing: .05em; text-transform: uppercase; background: var(--o-wash); color: var(--o); }
+  .tag.ok { background: var(--g-wash); color: var(--g); } .tag.n { background: #f4eee6; color: var(--muted); }
+  .doc { margin-top: 16px; }
+  .f { display: grid; grid-template-columns: 22px 210px 1fr; gap: 10px; padding: 10px 0; border-bottom: .5px solid var(--line); font-size: 14px; }
+  .f:last-child { border-bottom: 0; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; margin-top: 3px; }
+  .found .dot { background: linear-gradient(180deg,#19993c,#64c775); } .missing .dot { background: linear-gradient(180deg,#ff6716,#ff9154); }
+  .unclear .dot { background: #cfbba8; }
+  .q { color: var(--muted); font-size: 12.5px; margin-top: 3px; }
+  pre.esc { white-space: pre-wrap; font-family: var(--sans); font-size: 14px; line-height: 21px; margin: 0; }
+  .note { padding: 10px 14px; border-radius: 6px; background: #f4eee6; font-size: 13px; }
+  .note.err { background: var(--o-wash); color: var(--o-ink); } .note.ok { background: var(--g-wash); color: var(--g); }
+  label.chk { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--ink2); }
+  input[type=text] { height: 40px; flex: 1; min-width: 260px; padding: 0 12px; border-radius: 4px; border: 1px solid var(--line); font: inherit; font-size: 13px; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <span class="label">/ AccountableAI · Agreement agent</span>
+  <h1>Check every agreement before you pay it.</h1>
+  <p class="lead">Reads the agreements and invoices in your inbox, checks the company names, the payment due date and the payment details, and tells you what's missing.</p>
+
+  <div class="rule"><span class="label">/ Your Google account</span><span class="label">■</span></div>
+  <div id="account" class="card block dense">Loading…</div>
+
+  <div id="scanbox" hidden>
+    <div class="rule"><span class="label">/ Scan the inbox</span><span class="label">■</span></div>
+    <div class="card">
+      <div class="row">
+        <input id="query" type="text" aria-label="Gmail search">
+        <label class="chk">Sent on <input id="day" type="date" aria-label="Sent on" style="height:40px;border:1px solid var(--line);border-radius:4px;padding:0 8px;font:inherit;font-size:13px"></label>
+        <label class="chk"><input id="model" type="checkbox"> Use Claude (about $0.03 per document)</label>
+        <button id="go" class="btn">Scan now</button>
+      </div>
+      <p class="micro" style="margin:10px 0 0">Read-only. Only mail that arrived on that day is read; anything that isn't an agreement or invoice is skipped and never saved.</p>
+    </div>
+  </div>
+
+  <div id="results"></div>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const G = '<svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>';
+
+function account(s) {
+  const p = new URLSearchParams(location.search);
+  const msg = p.get("login") === "ok" ? '<div class="note ok" style="margin-bottom:14px">Signed in. You can scan your inbox now.</div>'
+    : p.get("login_error") ? `<div class="note err" style="margin-bottom:14px">${esc(p.get("login_error"))}</div>` : "";
+  if (!s.signed_in) {
+    $("account").innerHTML = msg + `<div class="between"><div><div style="font-size:16px">Connect the inbox your vendors write to.</div>
+      <div class="micro" style="margin-top:6px">Read-only Gmail access · you can sign out any time</div>
+      ${s.error ? `<div class="note err" style="margin-top:10px">${esc(s.error)}</div>` : ""}</div>
+      <a class="google" href="/auth/google?next=/">${G} Sign in with Google</a></div>`;
+    $("scanbox").hidden = true;
+    return;
+  }
+  $("account").innerHTML = msg + `<div class="between"><div><div class="micro">Signed in</div>
+    <div style="font-size:18px;margin-top:4px">${esc(s.email)}</div>
+    <div class="micro" style="margin-top:4px">${(s.messages ?? 0).toLocaleString()} messages · read-only</div></div>
+    <button class="pill" id="out">Sign out</button></div>`;
+  $("out").onclick = async () => { await fetch("/auth/logout", { method: "POST" }); load(); };
+  $("scanbox").hidden = false;
+  $("query").value ||= s.query;
+  $("day").value ||= s.today; $("day").max = s.today;
+  $("model").disabled = !s.model_available;
+  if (s.last?.at) results(s.last);
+}
+
+function results(r) {
+  if (!r.at) { $("results").innerHTML = ""; return; }
+  let h = `<div class="rule"><span class="label">/ ${r.sent_on ? "Sent " + esc(r.sent_on) + " · " : ""}${r.checked} checked · ${r.escalated} need you · ${r.skipped.length} skipped</span><span class="label">${r.cost ? "$" + r.cost.toFixed(4) : "rules · $0"}</span></div>`;
+  if (!r.checked) h += `<div class="card note">No agreements or invoices matched. Try a wider search, or email yourself one of the sample PDFs in agreement_agent/samples/.</div>`;
+  for (const d of r.reviews) {
+    h += `<div class="card doc ${d.escalation ? "block" : ""}"><div class="between"><div>
+      <div style="font-size:18px;font-weight:500;letter-spacing:-.02em">${esc(d.filename)}</div>
+      <div class="micro" style="margin-top:4px">${esc(d.kind)} · ${esc(d.sender || d.source)}${d.subject ? " · " + esc(d.subject) : ""}</div></div>
+      ${d.escalation ? '<span class="tag">Needs the owner</span>' : '<span class="tag ok">Complete</span>'}</div><div style="margin-top:12px">`;
+    for (const f of d.fields) {
+      h += `<div class="f ${f.status}"><span class="dot"></span><span>${esc(f.label)}</span><span>${f.status === "found"
+        ? `${esc(f.value)} <span class="micro">${esc(f.location || "")}</span><div class="q">“${esc(f.quote)}”</div>`
+        : `<span class="tag ${f.status === "unclear" ? "n" : ""}">${f.status}</span><div class="q">${esc(f.note)}</div>`}</span></div>`;
+    }
+    h += `</div>`;
+    if (d.escalation) h += `<div class="dense" style="margin-top:14px;padding:14px;border:1px solid #272320;border-radius:4px"><div class="micro" style="margin-bottom:8px">Drafted for the owner · not sent</div><div style="font-weight:500;margin-bottom:6px">${esc(d.escalation.subject)}</div><pre class="esc">${esc(d.escalation.body)}</pre></div>`;
+    h += `</div>`;
+  }
+  if (r.skipped.length) h += `<p class="micro" style="margin-top:18px">Skipped (not agreements or invoices): ${r.skipped.map((s) => esc(s.filename)).join(" · ")}</p>`;
+  $("results").innerHTML = h;
+}
+
+async function load() {
+  const s = await (await fetch("/api/status")).json();
+  account(s);
+}
+
+$("go").onclick = async () => {
+  $("go").disabled = true; $("go").textContent = "Reading the inbox…";
+  try {
+    const r = await fetch("/api/scan", { method: "POST", headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: $("query").value, model: $("model").checked, sent_on: $("day").value || undefined }) });
+    const j = await r.json();
+    if (!r.ok) $("results").innerHTML = `<div class="note err" style="margin-top:20px">${esc(j.error)}</div>`; else results(j);
+  } finally { $("go").disabled = false; $("go").textContent = "Scan now"; }
+};
+load();
+</script>
+</body>
+</html>

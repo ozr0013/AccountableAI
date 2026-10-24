@@ -132,8 +132,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .nav-disclosure .disclosure-body a { display: flex; align-items: center; gap: 10px; height: 34px; padding: 0 10px; border-radius: 9px; font-size: 13px; color: var(--n10); }
 .nav-disclosure .disclosure-body a:hover { background: #ffffffa8; color: var(--o-ink); }
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; }
-.who { display: flex; align-items: center; gap: 8px; padding: 0 4px; font-size: 13px; }
-.who-av { width: 20px; height: 20px; border-radius: 50%; background: var(--n7); color: var(--n0); display: grid; place-items: center; font-size: 10px; font-weight: 600; }
+.who { display: flex; align-items: center; gap: 8px; padding: 0 4px; color: inherit; font-size: 13px; text-decoration: none; }
+.who:hover { color: var(--o-deep); }
+.who-av { width: 22px; height: 22px; overflow: hidden; border-radius: 50%; background: var(--n7); color: var(--n0); display: grid; place-items: center; font-size: 10px; font-weight: 600; }
+.who-av img { width: 100%; height: 100%; object-fit: cover; }
 .ask-pill {
   display: flex; align-items: center; justify-content: center; gap: 8px; height: 34px;
   border-radius: var(--r-pill); background: var(--wine-grad); color: #fff; font-size: 13px;
@@ -738,3 +740,11 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; line-height
   .invoice-facts { grid-template-columns: repeat(2,minmax(0,1fr)); }
   .compact-items { min-width: 520px; }
 }
+
+/* Sign in with Google (agreements) */
+.google-btn {
+  display: inline-flex; align-items: center; gap: 12px; height: 46px; padding: 0 20px 0 14px; border-radius: 6px;
+  background: var(--white); border: 1px solid var(--n11); box-shadow: 3px 3px 0 0 var(--n11); font-size: 15px;
+  transition: transform .15s var(--ease), box-shadow .15s var(--ease);
+}
+.google-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 var(--n11); }

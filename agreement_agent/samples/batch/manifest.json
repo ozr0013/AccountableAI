@@ -1,0 +1,92 @@
+[
+  {
+    "file": "summit_roofing_services_agreement.pdf",
+    "sender": "Summit Roofing Co.",
+    "subject": "Signed roofing agreement",
+    "expect": []
+  },
+  {
+    "file": "brightpath_cleaning_agreement.pdf",
+    "sender": "BrightPath Cleaning LLC",
+    "subject": "Cleaning contract for your review",
+    "expect": [
+      "payment_info"
+    ]
+  },
+  {
+    "file": "ironwood_hvac_maintenance_agreement.pdf",
+    "sender": "Ironwood HVAC Inc.",
+    "subject": "HVAC maintenance agreement",
+    "expect": [
+      "payment_due"
+    ]
+  },
+  {
+    "file": "clearview_windows_agreement.pdf",
+    "sender": "Clearview Window Services LLC",
+    "subject": "Window cleaning agreement",
+    "expect": [
+      "payment_amount",
+      "payment_info"
+    ]
+  },
+  {
+    "file": "redrock_pest_control_agreement.pdf",
+    "sender": "Red Rock Pest Control LLC",
+    "subject": "Pest control service terms",
+    "expect": []
+  },
+  {
+    "file": "unsigned_snow_removal_terms.pdf",
+    "sender": "Northline Snow & Ice",
+    "subject": "Snow removal terms (draft)",
+    "expect": [
+      "vendor_name",
+      "payment_due",
+      "payment_info"
+    ]
+  },
+  {
+    "file": "harbor_elevator_service_contract.pdf",
+    "sender": "Harbor Elevator Corp.",
+    "subject": "Elevator service contract",
+    "expect": []
+  },
+  {
+    "file": "mesa_painting_agreement.pdf",
+    "sender": "Mesa Painting Co.",
+    "subject": "Painting agreement attached",
+    "expect": [
+      "payment_due",
+      "payment_info"
+    ]
+  },
+  {
+    "file": "summit_roofing_invoice_SR-1187.pdf",
+    "sender": "Summit Roofing Co.",
+    "subject": "Invoice SR-1187",
+    "expect": []
+  },
+  {
+    "file": "brightpath_invoice_BP-2044.pdf",
+    "sender": "BrightPath Cleaning LLC",
+    "subject": "Invoice BP-2044",
+    "expect": [
+      "payment_info"
+    ]
+  },
+  {
+    "file": "ironwood_invoice_IW-0310.pdf",
+    "sender": "Ironwood HVAC Inc.",
+    "subject": "Invoice IW-0310",
+    "expect": [
+      "payment_due"
+    ]
+  },
+  {
+    "file": "company_picnic_flyer.pdf",
+    "sender": "Oakline Homes Social Committee",
+    "subject": "Company picnic flyer",
+    "expect": "skipped"
+  }
+]
