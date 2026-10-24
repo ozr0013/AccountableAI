@@ -46,7 +46,7 @@ def perfect_run(system="full") -> RunResult:
         rechecked=["a-elec"],
         withdrawn=[_alert("unexplained_unpaid", [], state="withdrawn",
                           reason="Invoice arrived Apr 1; paid Apr 8, within the 10-day term (7.2)")],
-        kept=[_alert("unexplained_unpaid", []), _alert("unexplained_unpaid", [])],
+        kept=[_alert("unexplained_unpaid", []) for _ in range(KEY["moment"]["keep_count"])],
     )
     return RunResult(system=system, scenarios=results, moment=moment)
 
@@ -86,7 +86,7 @@ def test_scenario_9_must_hold_position():
 
 
 def test_wrong_cause():
-    run = _with(perfect_run(), 5, cause=Cause.unexplained)
+    run = _with(perfect_run(), 1, cause=Cause.unexplained)
     s = score(run)
     assert s.metrics["cause_accuracy"] < 1.0
 
@@ -130,7 +130,8 @@ def test_moment_overwithdrawal_and_full_recheck():
     run.moment.kept = []
     run.moment.rechecked = ["a", "b", "c"]
     fails = " | ".join(f for f in score(run).failures if f.startswith("moment"))
-    for expected in ("withdrew 3", "kept 0", "rechecked 3", "has no reason"):
+    n = 1 + KEY["moment"]["keep_count"]
+    for expected in (f"withdrew {n}", "kept 0", "rechecked 3", "has no reason"):
         assert expected in fails
 
 

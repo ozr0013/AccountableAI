@@ -27,7 +27,7 @@ class Assessment(BaseModel):
 
     invoice_id: str
     manager_id: str
-    status: Literal["paid", "not_due", "delayed", "skipped"]
+    status: Literal["paid", "not_due", "delayed", "skipped", "duplicate", "held"]
     days_late: int = 0
     trail: PaymentTrail | None = None
     finding: CauseFinding | None = None

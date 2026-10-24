@@ -42,8 +42,13 @@ ACTION_FOR_KIND = {
     AlertKind.unexplained_unpaid: "Chase the manager for bank or vendor proof of payment.",
     AlertKind.paperwork_request: "Draft a request for the missing vendor paperwork (needs approval).",
     AlertKind.owner_pending_approval: "Oakline's own approval/funding is pending; no manager action.",
+    AlertKind.duplicate_billing: "Don't fund this invoice again; ask the manager to return or credit the duplicate.",
+    AlertKind.recurring_pattern: ("Recommend stricter terms: a shorter payment window, proof of vendor "
+                                  "payment with each statement, and a review before the next funding."),
 }
 ITEM_KINDS = set(ALERT_FOR_CAUSE.values())
+# Recurring-lateness alert (scenario 4): late in at least this many of the last N months.
+PATTERN_MIN_LATE, PATTERN_WINDOW = 3, 6
 _IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed",
                        "approval_requested", "approval_decided"}
 
@@ -66,6 +71,15 @@ def _term_values(t) -> dict:
             if getattr(t, k) is not None}
 
 
+def _cite(docs: list[Document]) -> list[Citation]:
+    return [Citation(source_id=d.id, kind=d.kind) for d in docs]
+
+
+def _month_after(ym: str) -> str:
+    y, m = map(int, ym.split("-"))
+    return f"{y + m // 12}-{m % 12 + 1:02d}"
+
+
 def _cents(x: float) -> int:
     return round(x * 100)
 
@@ -82,7 +96,7 @@ class Steps:
         if route in (Route.assess, Route.reply):
             ids = self._affected_invoices(e)
         elif route == Route.scan:
-            ids = [l.invoice_id for l in self.d.rails.ledger(e.manager_id) if not l.duplicate_of]
+            ids = [l.invoice_id for l in self.d.rails.ledger(e.manager_id)]
         return {"now": now, "route": route, "manager_id": e.manager_id, "invoice_ids": ids,
                 "trace": [f"{e.type} {e.id} -> {route.value} ({len(ids)} invoice(s))"]}
 
@@ -134,8 +148,12 @@ class Steps:
     def _assess_one(self, line: LedgerLine, now: date) -> Assessment:
         base = {"invoice_id": line.invoice_id, "manager_id": line.manager_id}
         if line.duplicate_of:
-            return Assessment(**base, status="skipped", note=f"duplicate of {line.duplicate_of}")
+            return Assessment(**base, status="duplicate", note=f"duplicate of {line.duplicate_of}")
         unpaid = _cents(line.paid_amount) < _cents(line.amount)
+        if unpaid and self._bank_change_held(line):
+            # Scenario 7: the payment is on hold by our own gate, so the manager isn't at fault.
+            return Assessment(**base, status="held", note="payment held: vendor bank-detail change "
+                              "awaits identity check and controller approval")
         paid_late = (not unpaid and line.paid_on and line.due_date and line.paid_on > line.due_date)
         if not unpaid and not paid_late:
             return Assessment(**base, status="paid")
@@ -159,15 +177,82 @@ class Steps:
                     seen.setdefault(d.id, d)
         return list(seen.values())
 
+    def _verify_evidence(self, draft: AlertDraft, now: date | None) -> list[Document]:
+        """The invoice's evidence, plus any manager document the draft cites (pattern alerts
+        cite bank statements and the agreement, not one invoice)."""
+        ev = {d.id: d for d in self._evidence(draft.manager_id, draft.invoice_ids, now)}
+        cited = {c.source_id for cl in draft.claims for c in cl.citations} - ev.keys()
+        ev |= {d.id: d for d in self.d.rails.documents(draft.manager_id) if d.id in cited}
+        return list(ev.values())
+
+    def _bank_change_held(self, line: LedgerLine) -> bool:
+        return any(e.type == "bank_change_held" and e.invoice_id == line.invoice_id
+                   for e in self.d.rails.events(line.manager_id))
+
     # -- alerts: draft (code) -> verifier -> record ----------------------------------------
     def draft_alerts(self, s: WorkflowState) -> dict:
         drafts = []
         for a in s.assessments:
+            if a.status == "duplicate":
+                drafts.append(self._duplicate_draft(a))
+                continue
             kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding else None
             if kind is None:
                 continue
             drafts.append(self._draft(a, kind))
+        if s.route == Route.scan and s.manager_id and (p := self._pattern_draft(s.manager_id)):
+            drafts.append(p)
         return {"drafts": drafts, "trace": [f"draft {d.id} ({d.kind.value})" for d in drafts]}
+
+    def _duplicate_draft(self, a: Assessment) -> AlertDraft:
+        """Scenario 8: the same work billed and funded twice."""
+        line = next(l for l in self.d.rails.ledger(a.manager_id) if l.invoice_id == a.invoice_id)
+        pair = {line.invoice_id, line.duplicate_of}
+        docs = self.d.rails.documents(a.manager_id)
+        funding = [d for d in docs if d.kind == SourceKind.funding and d.data.get("invoice_id") in pair]
+        billed = [d for d in docs if d.kind in (SourceKind.manager_statement, SourceKind.vendor_invoice)
+                  and (d.data.get("invoice_id") in pair
+                       or any(l.get("invoice_id") in pair for l in d.data.get("lines", [])))]
+        claims = [Claim(text=f"Oakline funded {line.duplicate_of} and {line.invoice_id} for the same "
+                             f"work, ${line.funded_amount:,.2f} each", citations=_cite(funding))]
+        if billed:
+            claims.append(Claim(text=f"{line.invoice_id} was billed again for work already billed as "
+                                     f"{line.duplicate_of}", citations=_cite(billed)))
+        return AlertDraft(
+            id=alert_id(AlertKind.duplicate_billing.value, a.manager_id, sorted(pair)),
+            kind=AlertKind.duplicate_billing, manager_id=a.manager_id,
+            invoice_ids=[line.invoice_id, line.duplicate_of], amount=line.funded_amount,
+            headline=f"{line.invoice_id} ({line.vendor_id}): duplicate of {line.duplicate_of}, "
+                     f"${line.funded_amount:,.2f} funded twice",
+            claims=claims, recommended_action=ACTION_FOR_KIND[AlertKind.duplicate_billing])
+
+    def _pattern_draft(self, manager_id: str) -> AlertDraft | None:
+        """Scenario 4: a manager who pays vendors late month after month."""
+        months = self.d.rails.late_months(manager_id)
+        window = sorted(months)[-PATTERN_WINDOW:]
+        late = [m for m in window if months[m]]
+        if len(late) < PATTERN_MIN_LATE:
+            return None
+        terms = terms_for(self.d.rails, self.d.agents, manager_id)
+        if terms is None:
+            return None
+        # A month's bank statement is dated in the month or the one after.
+        bank = [d for d in self.d.rails.documents(manager_id)
+                if d.kind == SourceKind.manager_bank and d.dated
+                and any(_month_after(m) >= d.dated.strftime("%Y-%m") >= m for m in late)]
+        days = terms.vendor_payment_days
+        claims = [
+            Claim(text=f"Vendors were paid late in {len(late)} of the last {len(window)} months "
+                       f"({', '.join(late)})",
+                  citations=_cite(bank)),
+            Claim(text=f"The agreement requires vendor payment within {days.value} days of invoice receipt",
+                  citations=[days.citation]),
+        ]
+        return AlertDraft(
+            id=alert_id(AlertKind.recurring_pattern.value, manager_id, [f"late:{','.join(late)}"]),
+            kind=AlertKind.recurring_pattern, manager_id=manager_id, invoice_ids=[],
+            headline=f"{manager_id}: vendors paid late in {len(late)} of {len(window)} months",
+            claims=claims, recommended_action=ACTION_FOR_KIND[AlertKind.recurring_pattern])
 
     def _draft(self, a: Assessment, kind: AlertKind) -> AlertDraft:
         line = next(l for l in self.d.rails.ledger(a.manager_id) if l.invoice_id == a.invoice_id)
@@ -206,15 +291,14 @@ class Steps:
             if old and old.draft == draft:
                 notes.append(f"{draft.id}: still holds, unchanged")
                 continue
-            evidence = self._evidence(draft.manager_id, draft.invoice_ids, s.now)
-            verdict = self.d.verifier.verify(draft, evidence)
+            verdict = self.d.verifier.verify(draft, self._verify_evidence(draft, s.now))
             ok = verdict.status == VerdictStatus.approved
             payload = {"draft": draft.model_dump(mode="json"),
                        "verdict": verdict.model_dump(mode="json"),
                        "state": "open", "withdrawn_reason": None}
             self.d.rails.append_event(wf_event("alert_raised" if ok else "alert_rejected",
                                                draft.id, s.event, payload, draft.manager_id,
-                                               draft.invoice_ids[0]))
+                                               next(iter(draft.invoice_ids), None)))
             target = rejected if not ok else refreshed if old else raised
             target.append(draft.id)
             notes.append(f"{draft.id}: verifier {verdict.status.value}"

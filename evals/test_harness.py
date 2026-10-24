@@ -35,11 +35,11 @@ def test_books_reconcile(full):
     assert full.metrics["recon_ok"]
 
 
-@pytest.mark.parametrize("sid", [1, 2, 3, 6, 9])
-def test_built_scenarios_pass(full, sid):
+@pytest.mark.parametrize("sid", range(1, 10))
+def test_every_scenario_passes(full, sid):
     s = next(x for x in full.scenarios if x.id == sid)
     assert s.passed, s.failures
 
 
-def test_moment_withdraws_the_electrician_alert(full):
-    assert not any("withdrew" in f for f in full.failures)
+def test_judge_moment(full):
+    assert full.metrics["moment_correct"], full.failures

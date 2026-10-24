@@ -50,11 +50,11 @@
       "id": 5,
       "name": "vendor_side_on_time",
       "situation": "Electrician paid Apr 8; invoice arrived Apr 1 (agreement: pay within 10 days of invoice).",
-      "cause": "vendor_side",
+      "cause": null,
       "manager_alert": false,
       "alert_kinds": [],
-      "must_cite_kinds": ["vendor_invoice", "agreement"],
-      "notes": "Also the 'moment' withdrawal: once the Apr 1 receipt date is injected, any prior alert on this item must be withdrawn with a reason, and other alerts must stay."
+      "must_cite_kinds": [],
+      "notes": "Vendor-side = on time under the terms once the real receipt date is known, so the system reports it paid on time (causes are only assigned to late items). Graded by the 'moment': the prior alert must be withdrawn with a reason and other alerts must stay."
     },
     {
       "id": 6,
@@ -100,9 +100,9 @@
     }
   ],
   "moment": {
-    "_doc": "Keyway has 3 open alerts. Judge says 'we paid the electrician' (must hold), then adds the Apr 1 invoice date (10-day term). Only the electrician alert is rechecked and withdrawn.",
+    "_doc": "Keyway has 2 open alerts in the generated world (plumber INV-KW-0301, electrician INV-KW-0402). Judge says 'we paid the electrician' (must hold), then adds the Apr 1 invoice date (10-day term). Only the electrician alert is rechecked and withdrawn.",
     "withdraw_count": 1,
-    "keep_count": 2,
+    "keep_count": 1,
     "max_rechecked": 1
   },
   "global_rules": {
