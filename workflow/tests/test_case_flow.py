@@ -61,3 +61,30 @@ def test_review_is_replay_safe(setup):
     w = generate(scenarios=(3, 5), n_clean=10)
     wf.replay([funding_event("keyway", 18400, w.as_of)])
     assert len(rails.events()) == n and len(approvals.pending()) == 1
+
+
+def test_approval_events_use_the_injected_clock():
+    """A demo or test passes the world's clock so approval events stay inside the demo date."""
+    from datetime import UTC, datetime
+    from contracts.models import Case
+    demo = datetime(2026, 4, 22, 12, tzinfo=UTC)
+    rails = MemoryRails()
+    approvals = RailsApprovals(rails, clock=lambda: demo)
+    case = Case(id="case-x", manager_id="keyway", alerts=[], proposed_hold=100.0, summary="s",
+                evidence=[])
+    aid = approvals.request(case)
+    approvals.decide(aid, "controller.dana", True)
+    stamped = [e for e in rails.events() if e.type.startswith("approval_")]
+    assert len(stamped) == 2
+    assert {e.valid_from for e in stamped} == {e.learned_at for e in stamped} == {demo}
+
+
+def test_approvals_default_to_the_wall_clock():
+    from datetime import UTC, datetime, timedelta
+    from contracts.models import Case
+    rails = MemoryRails()
+    approvals = RailsApprovals(rails)
+    approvals.request(Case(id="case-y", manager_id="keyway", alerts=[], proposed_hold=1.0,
+                           summary="s", evidence=[]))
+    [e] = [e for e in rails.events() if e.type == "approval_requested"]
+    assert abs(datetime.now(UTC) - e.learned_at) < timedelta(minutes=1)
