@@ -140,7 +140,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
-1. [ ] Deterministic workflow: event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first)
+1. [x] Deterministic workflow: event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first)
 2. [ ] Agreement agent: term sheets (vendor payment deadline, holdback rules, approval limit, allowed charges) with clause citations; human-confirm step
 3. [ ] Payment-trail agent: one timeline per item, conflicts resolved by source-trust rules (scenario 3)
 4. [ ] Delay-cause agent: five causes with evidence and confidence (scenarios 1, 5, 6 must produce no manager alert)
