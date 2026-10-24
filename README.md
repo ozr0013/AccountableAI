@@ -154,9 +154,9 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 ### Omar: verification, evals, memory (`agents/verifier/`, `agents/briefing/`, `evals/`)
 1. [x] Answer key for all 9 scenarios (start here; it's the spec) → `evals/answer_key.json`
 2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed; live run not yet done)
-3. [ ] Scorer: cause accuracy, alert precision/recall, citation rate, prohibited actions, withdrawal correctness, recon differences, cost/latency
+3. [x] Scorer: cause accuracy, alert precision/recall, citation rate, prohibited actions, withdrawal correctness, recon differences, cost/latency → `evals/scorer.py`; runs report in the `evals/schema.py` `RunResult` shape
 4. [ ] Baselines: single strong model with all documents; system without the verifier
-5. [ ] Prohibited-action tests (outbound send, money move, accusation, self-approval all blocked)
+5. [x] Prohibited-action tests (outbound send, money move, accusation, self-approval all blocked) → `evals/test_prohibited.py`; they run against whatever `RAILS`/`VERIFIER`/`APPROVALS` selects, so real rails must pass them too
 6. [ ] Briefing agent: "What's open with Keyway?" with citations and prior rulings
 7. [ ] **NEEDS** Checkpoint B: first full score → `evals/results.md`
 8. [ ] **NEEDS** Checkpoint C: final numbers to Audrey
@@ -205,7 +205,8 @@ python -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'
 pytest -q                                           # contracts + verifier tests, offline
 set -a; source .env; set +a; LIVE=1 pytest -s agents/verifier -k live   # one real verifier call
 RAILS=fake AGENTS=fake VERIFIER=fake python -m workflow.run --scenario 3
-python -m evals.run --dataset contracts/fixtures/sample
+python -m evals.run evals/runs/full.json evals/runs/no_verifier.json --out evals/results.md
+RAILS=real pytest evals/test_prohibited.py          # guardrails against the real rails
 cd dashboard && npm install && npm run dev     # Audrey sets this up (Next.js)
 ```
 
