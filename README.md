@@ -161,7 +161,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 | Kanishka | 10 / 10 | `workflow/` (LangGraph graph, runner, replay, recheck), all five judgment agents, bank-detail path, sealed commit-reveal eval |
 | Audrey | 7 / 10 | `dashboard/`: Next.js app on the live feed (`dashboard/feed/serve.py`, real workflow + Judge Console + approvals) with replay fallback; overview, open items + payment timeline, case queue, Keyway view, guardrails, Judge Console, briefing |
 
-Still open: Omar's baselines and the Checkpoint B scored run, Audrey's Figma skeleton, Devpost visuals and pitch, and the Devpost write-up (feature freeze Sat 8 pm). The one-middleman migration (Keyway only, demo date Apr 22) is done and merged.
+The scored evaluation artifacts, strong-model baseline, adversarial verifier study, guided live investigation, and Devpost draft are in the repository. The remaining deployment work is durable checkpointing and an authenticated production approval service; the hackathon demo intentionally uses a resettable in-memory session.
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
@@ -192,11 +192,11 @@ Still open: Omar's baselines and the Checkpoint B scored run, Audrey's Figma ske
 1. [x] Answer key for all 9 scenarios (start here; it's the spec) → `evals/answer_key.json`
 2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed). Live (Haiku): 9/9 on the demo world; catches 8/8 planted bad drafts (`evals/adversarial.py`) vs 0/8 without it, $0.015
 3. [x] Scorer: cause accuracy, alert precision/recall, citation rate, prohibited actions, withdrawal correctness, recon differences, cost/latency → `evals/scorer.py`; runs report in the `evals/schema.py` `RunResult` shape
-4. [ ] Baselines: single strong model with all documents (not built); system without the verifier (done: `no_verifier` column in `evals.harness` and `evals.adversarial`)
+4. [x] Baselines: single strong model with all documents (`evals/baseline.py`, `evals/baseline_results.md`); system without the verifier (`no_verifier` column in `evals.harness` and `evals.adversarial`)
 5. [x] Prohibited-action tests (outbound send, money move, accusation, self-approval all blocked) → `evals/test_prohibited.py`; they run against whatever `RAILS`/`VERIFIER`/`APPROVALS` selects, so real rails must pass them too
 6. [x] Briefing agent: "What's open with Keyway?" with citations and prior rulings → `agents/briefing/` (`python -m agents.briefing`; free code briefing, or `--model` for one Sonnet call, ~$0.04; uncited or accusatory claims dropped; `registry.briefer()`, `BRIEFING=real`)
-7. [ ] **NEEDS** Checkpoint B: first full score → `evals/results.md`
-8. [ ] **NEEDS** Checkpoint C: final numbers to Audrey
+7. [x] Checkpoint B: full scored run → `evals/results.md`; current free rules-mode re-run is 9/9 with 100% cause / precision / recall / citations
+8. [x] Checkpoint C: final numbers surfaced in dashboard `/proof`, `evals/`, and `docs/DEVPOST.md`
 
 ### Audrey: dashboard and pitch (`dashboard/`, `docs/`)
 1. [ ] Figma skeleton of every screen (skipped: built straight in code)
@@ -206,9 +206,9 @@ Still open: Omar's baselines and the Checkpoint B scored run, Audrey's Figma ske
 5. [x] Keyway view: funded vs paid vs owed, lateness by month, terms, aging, and the chase log → `/keyway`
 6. [x] Judge Console UI showing what changed and what didn't (presets + free text; $3,140 → $2,240) → `/console`
 7. [x] Ask-about-Keyway briefing panel → `/ask`
-8. [ ] Seats line (done, overview footer), Devpost visuals (not yet)
+8. [x] Seats line, proof/evaluation visual, and Devpost draft → `/proof`, `docs/DEVPOST.md`
 9. [x] **NEEDS** Checkpoint A: `NEXT_PUBLIC_FEED=live` (default; falls back to replay if the feed isn't running)
-10. [ ] **NEEDS** Checkpoint C: record the video opening with the moment
+10. [x] Demo/video script → `docs/DEMO_SCRIPT.md` (recording remains a human presentation task)
 
 ### Phase 2 sponsors (after Checkpoint B only)
 

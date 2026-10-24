@@ -30,6 +30,8 @@ python dashboard/feed/export.py
 | `/keyway` | Funded vs paid vs owed (reconciles), lateness by month against clause 7.2, confirmed terms, aging, chase log with replies |
 | `/guardrails` | Live calls to the policy gate: what agents tried and why it was refused |
 | `/console` | Judge Console: presets and free text; what was rechecked, what changed, what didn't, alerts withdrawn, $3,140 → $2,240 |
+| `/investigation` | Guided five-step demo: new claim → payment trail → verifier → case proposal → controller decision |
+| `/proof` | Evaluation snapshot: scenario scores, strong-model baseline, and adversarial verifier comparison |
 | `/ask` | Briefing: "What's open with Keyway?" with cited claims and prior rulings |
 
 Every citation chip opens its source document.

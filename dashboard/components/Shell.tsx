@@ -17,6 +17,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const open = state?.items.filter((i) => i.attention).length ?? 0;
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
+    { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
     { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
     { href: "/keyway", label: "Keyway money trail", icon: Building },
@@ -48,6 +49,7 @@ export function Shell({ children }: { children: ReactNode }) {
             ))}
             <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
               <Link href="/agents"><Spark /> Agents</Link>
+              <Link href="/proof"><Spark /> Proof & evals</Link>
               <Link href="/guardrails"><Shield /> Guardrails</Link>
             </Disclosure>
             <div className="nav-group micro faint" style={{ marginTop: 14, marginBottom: 4 }}>Demo tools</div>

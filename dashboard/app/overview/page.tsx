@@ -27,8 +27,8 @@ export default function Overview() {
           <p>{h.unexplained_items.length} invoices still need payment proof.</p>
         </div>
         <div className="moment-actions">
-          <Link href="/cases" className="btn on-wine">{pending.length ? `Review ${pending.length} pending ${pending.length === 1 ? "case" : "cases"}` : "View decisions"} <span aria-hidden="true">↗</span></Link>
-          <span className="micro" style={{ color: "#ddd", lineHeight: "16px" }}>You decide. No money moves here.</span>
+          <Link href="/investigation" className="btn on-wine">Run live investigation <span aria-hidden="true">↗</span></Link>
+          <span className="micro" style={{ color: "#ddd", lineHeight: "16px" }}>{pending.length ? `${pending.length} case${pending.length === 1 ? "" : "s"} waiting after review` : "You decide. No money moves here."}</span>
         </div>
       </Spotlight>
 
