@@ -207,7 +207,7 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 8. [x] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
 9. [x] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
 10. [x] Judge Console backend: presets + free text → events
-11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
+11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`. Rails side verified: on the full demo world, `RAILS=real AGENTS=real VERIFIER=fake python -m workflow.run --scenario 1 2 3 4 5 6 7 8 9 --clean 100 --funding keyway:18400` gives the 8 expected alerts and the $3,140 hold; `RAILS=real pytest evals/test_prohibited.py` passes; the workflow's in-memory rails answer exactly like Postgres (parity test). Left: Kanishka and Omar run their flows on `RAILS=real` (load the matching world first: `python -m rails.load --fresh --scenarios … --clean …`) and tick this
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
 1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Scored end to end by `evals/harness.py`. Still to do: Postgres checkpointer (in-memory today)

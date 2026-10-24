@@ -78,3 +78,30 @@ def test_reply_from_stand_in_reader_reaches_trust_rules(real):
                             payload=reply.model_dump(mode="json")))
     assert any(d.kind == "manager_reply" for d in real.documents("keyway", "INV-KW-0301"))
     assert "INV-KW-0301" in real.dependents_of(reply.id)
+
+
+def test_loading_a_different_world_is_refused_clearly(real):
+    from rails import WorldMismatch
+    real.load(generate(n_clean=0).events())                    # same world again: fine
+    with pytest.raises(WorldMismatch, match="--fresh"):
+        real.load(generate(n_clean=5).events())
+
+
+def test_memory_rails_answers_like_real_rails_on_the_demo_world(schema):
+    """Kanishka's in-memory rails (used by the workflow tests and Omar's harness) must give the
+    same answers as the Postgres rails, or the scores don't describe the demo."""
+    from workflow.memrails import MemoryRails
+    from world.generator import ALL_SCENARIOS
+    evs = generate(13, ALL_SCENARIOS, 100).events()
+    real, mem = RealRails(schema=schema), MemoryRails(evs)
+    real.load(evs)
+    assert real.ledger("keyway") == mem.ledger("keyway")
+    assert real.unpaid("keyway", AS_OF) == mem.unpaid("keyway", AS_OF)
+    assert real.late_months("keyway") == mem.late_months("keyway")
+    assert real.reconcile("keyway") == mem.reconcile("keyway")
+    assert real.now() == mem.now() == AS_OF
+    keys = ["invoice:INV-KW-0402.received", "invoice:INV-KW-0301.payment",
+            "terms:keyway.vendor_payment_days", "ev-fact-kw-0402-received", "ev-doc-doc-bank-kw-2026-03"]
+    for k in keys:
+        assert real.dependents_of(k) == mem.dependents_of(k), k
+    assert {d.id for d in real.documents("keyway")} == {d.id for d in mem.documents("keyway")}
