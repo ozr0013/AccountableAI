@@ -39,7 +39,7 @@ Built vs planned (keep this honest when you change things):
 | `agents/agreement` | Workflow agreement agent: terms with clause citations, a controller confirms |
 | `agents/chaser` | Reminders from approved templates; reads middleman replies with proof checks |
 | `agents/anomaly` | Statement amounts vs approved amounts |
-| `agents/trail`, `agents/cause`, `agents/case` | Supporting: what happened to a payment, why it's late, how much funding to hold |
+| `agents/trail`, `agents/cause`, `agents/case` | Code only, no model: what happened to a payment, why it's late, how much funding to hold. The chaser's steps |
 | `agents/verifier` | Blocks alerts with uncited claims or accusing wording (rules first, then a model) |
 | `agreement_agent/` | Standalone Gmail agreement agent: parser, LangGraph tool loop, Gmail connector, Sign in with Google server (`server.py`), CLI |
 | `rails/` | Event log, ledger, matcher, trust rules, recon, policy gate (`rails/guards/policy.py`), templates |
@@ -68,7 +68,9 @@ event in the rails; `workflow/book.py:WorkflowBook` folds the events back into s
 
 ## How an agent is built
 
-Every agent follows the same shape (see `agents/chaser`, `agents/anomaly`):
+A model is used only where human text must be read: agreement, chaser (replies), anomaly
+(free-text statements), plus the verifier. Trail, cause and case are `rules.py` only; keep them
+that way. An agent that reads text follows this shape (see `agents/chaser`, `agents/anomaly`):
 - `rules.py`: the free, deterministic version. It must work with no API key.
 - `agent.py`: the model version. It calls `agents.llm.guarded_call(llm, Schema, SYSTEM, prompt,
   check)`: `check` lists problems (an id not in the documents, a quote not in the text) and the
@@ -102,6 +104,7 @@ ruff check .
 python dashboard/feed/serve.py              # dashboard backend :8765 (rules mode, free)
 cd dashboard && npm run dev                 # dashboard :3000
 python -m agreement_agent.server            # Gmail agreement agent :8770
+python -m workflow.engine                   # messy raw files -> alerts -> $3,140 -> $2,240 (free)
 ```
 
 A running server keeps the code it started with: restart `serve.py` / `agreement_agent.server`

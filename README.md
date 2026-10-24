@@ -57,7 +57,9 @@ Triggered **only** when the middleman sends a financial statement. Every line is
 | Chaser: "owner told after 3 days, middleman told the owner knows" | **Planned**: today the escalation is the third reminder, at least 5 days apart (`rails/guards/templates.py`) | |
 | Anomaly detector: statement amount vs approved amount, owner alert, drafted note to the middleman | Built; the note goes out only after a controller approves that exact draft | `agents/anomaly/`, `workflow/steps.py` (`detect_anomalies`) |
 
-Behind the three agents, the workflow also runs supporting checks that existed before the three-agent plan: the payment-trail and delay-cause agents (what really happened to a payment, and why it is late), the verifier (blocks any alert without a cited record or with accusing wording), duplicate-billing and recurring-lateness checks, and the case agent (how much of the next funding to hold).
+Models are used only where human text has to be read: the agreement, the middleman's replies, and statements that arrive as free text. Everything else is code. The chaser's steps are deterministic: the payment trail (what really happened, settled by source-trust rules), the delay cause (why it is late; only "unexplained" is chased) and the case (how much of the next funding to hold, as arithmetic). A fourth piece, the verifier, checks every alert before the owner sees it: code rules first, then one model call that tries to refute it. Duplicate-billing and recurring-lateness checks are code too.
+
+Run it end to end on messy paperwork (PDFs, scans, emails, bank CSVs): `python -m workflow.engine` (free; `--live` uses the models).
 
 ---
 
@@ -97,7 +99,7 @@ Every unpaid vendor invoice gets one cause: **authorized hold**, **paperwork pen
            Owner dashboard · alerts · chase log · approvals · Judge Console · eval harness
 ```
 
-Models: Sonnet for the agreement, trail, cause, chaser, case and briefing agents and for reading free-text statements; Opus for the verifier. Every agent has a free rules mode that runs with no API key.
+Models: Sonnet for the agreement, chaser (reading replies) and briefing agents and for reading free-text statements; Opus for the verifier. Trail, cause and case are code only. Every agent has a free rules mode that runs with no API key.
 
 ## The 9 planted scenarios (the answer key everyone builds to)
 

@@ -1,5 +1,5 @@
-"""Kanishka: delay-cause agent."""
+"""Kanishka: delay cause. Deterministic: one of five causes, first matching rule wins."""
 
-from .agent import CauseAgent
+from .rules import classify, hard_facts
 
-__all__ = ["CauseAgent"]
+__all__ = ["classify", "hard_facts"]

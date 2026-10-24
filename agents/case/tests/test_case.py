@@ -1,8 +1,6 @@
-"""Task 5b: case agent. Hold amount is arithmetic; summary is guarded; agents only recommend."""
+"""Task 5b: case. Hold amount is arithmetic; agents only recommend."""
 
-from agents.case import CaseAgent
-from agents.case.agent import CaseSummary
-from agents.testing import ScriptedLLM
+from agents.case import build_case
 from contracts.models import (
     Alert,
     AlertDraft,
@@ -31,7 +29,7 @@ ALERTS = [_alert("INV-1", 1240.0), _alert("INV-2", 1450.0), _alert("INV-3", 450.
 
 
 def test_hold_is_the_sum_still_owed_on_open_unexplained_items():
-    c = CaseAgent(None).build_case("keyway", ALERTS)
+    c = build_case("keyway", ALERTS)
     assert c.proposed_hold == 3140.00                              # the README's $3,140
     assert c.alerts == ["al-INV-1", "al-INV-2", "al-INV-3"]
     assert {e.source_id for e in c.evidence} == {"doc-INV-1", "doc-INV-2", "doc-INV-3"}
@@ -39,23 +37,5 @@ def test_hold_is_the_sum_still_owed_on_open_unexplained_items():
 
 
 def test_no_unexplained_money_no_hold():
-    c = CaseAgent(None).build_case("keyway", ALERTS[3:])
+    c = build_case("keyway", ALERTS[3:])
     assert c.proposed_hold == 0 and "No hold recommended" in c.summary
-
-
-def test_llm_summary_must_state_the_amount_and_only_recommend():
-    bad1 = CaseSummary(summary="Keyway owes several vendors.", cited_source_ids=[])
-    bad2 = CaseSummary(summary="We held $3,140.00 from Keyway.", cited_source_ids=["doc-INV-1"])
-    good = CaseSummary(summary="Keyway still owes 3 vendors $3,140.00. Recommend holding "
-                               "$3,140.00 until payment is shown.", cited_source_ids=["doc-INV-1"])
-    llm = ScriptedLLM(bad1, good)
-    assert CaseAgent(llm).build_case("keyway", ALERTS).summary == good.summary
-    assert "must state the hold amount" in llm.prompts[1]
-    llm = ScriptedLLM(bad2, bad2)
-    c = CaseAgent(llm).build_case("keyway", ALERTS)
-    assert "never say one was placed" in llm.prompts[1] and c.summary.startswith("keyway still owes")
-
-
-def test_llm_cannot_change_the_hold_amount():
-    llm = ScriptedLLM(CaseSummary(summary="Recommend holding $3,140.00.", cited_source_ids=[]))
-    assert CaseAgent(llm).build_case("keyway", ALERTS).proposed_hold == 3140.00
