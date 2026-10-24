@@ -152,13 +152,13 @@ Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the
 11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
-1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Still to do: Postgres checkpointer (in-memory today) and an adapter to the scorer's `evals/schema.py` `RunResult`
-2. [ ] Agreement agent: term sheets (vendor payment deadline, holdback rules, approval limit, allowed charges) with clause citations; human-confirm step
+1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Scored end to end by `evals/harness.py`. Still to do: Postgres checkpointer (in-memory today)
+2. [x] Agreement agent: term sheets (vendor payment deadline, holdback rules, approval limit, allowed charges) with clause citations; human-confirm step
 3. [x] Payment-trail agent: one timeline per item, conflicts resolved by source-trust rules (scenario 3)
 4. [x] Delay-cause agent: five causes with evidence and confidence (scenarios 1, 5, 6 must produce no manager alert)
-5. [ ] Chaser agent: reminders to the middleman (polite, then firmer) from approved templates, logs replies; a "paid" reply counts only with vendor or bank proof (scenario 9)
-5b. [ ] Case agent: evidence pack and proposed hold amount for the controller
-6. [ ] Bank-detail change path (scenario 7)
+5. [x] Chaser agent: reminders to the middleman (polite, then firmer) from approved templates, logs replies; a "paid" reply counts only with vendor or bank proof (scenario 9)
+5b. [x] Case agent: evidence pack and proposed hold amount for the controller
+6. [x] Bank-detail change path (scenario 7)
 7. [ ] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)
 8. [ ] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
 9. [ ] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed

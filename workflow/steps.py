@@ -10,11 +10,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from langgraph.types import interrupt
+
 from contracts import registry
 from contracts.models import (
     AlertDraft,
     AlertKind,
+    Case,
     Cause,
+    Citation,
     Claim,
     Document,
     Event,
@@ -23,8 +27,9 @@ from contracts.models import (
     VerdictStatus,
 )
 from contracts.steps import Agents, Approvals, Rails, Verifier
+from rails.facts import current_terms
 
-from .book import WF_TYPES, WorkflowBook, alert_id, done_event, wf_event
+from .book import WF_TYPES, WorkflowBook, alert_id, digest, done_event, wf_event
 from .state import Assessment, Route, WorkflowState
 from .terms import terms_for
 
@@ -39,7 +44,8 @@ ACTION_FOR_KIND = {
     AlertKind.owner_pending_approval: "Oakline's own approval/funding is pending; no manager action.",
 }
 ITEM_KINDS = set(ALERT_FOR_CAUSE.values())
-_IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed"}
+_IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed",
+                       "approval_requested", "approval_decided"}
 
 
 @dataclass(frozen=True)
@@ -53,6 +59,11 @@ class Deps:
     def from_registry(cls, rails: Rails | None = None) -> Deps:
         return cls(rails or registry.rails(), registry.agents(), registry.verifier(),
                    registry.approvals())
+
+
+def _term_values(t) -> dict:
+    return {k: getattr(t, k).value for k in ("vendor_payment_days", "holdback_pct", "approval_limit")
+            if getattr(t, k) is not None}
 
 
 def _cents(x: float) -> int:
@@ -244,11 +255,17 @@ class Steps:
 
     # -- chase: approved-template reminder, gated by policy --------------------------------
     def chase(self, s: WorkflowState) -> dict:
+        """Remind on newly raised unexplained items; on a scan, follow up on every open one.
+        Level and timing come from the approved schedule; the policy gate has the last word."""
         book = WorkflowBook.load(self.d.rails)
+        wanted = set(s.raised)
+        if s.route == Route.scan:
+            wanted |= {a.draft.id for a in book.open_alerts(s.manager_id)}
         by_mgr: dict[str, list] = {}
-        for aid in s.raised:
+        for aid in sorted(wanted):
             a = book.alerts[aid]
-            if a.draft.kind == AlertKind.unexplained_unpaid and a.draft.amount > 0:
+            if aid in book.open_ids and a.draft.kind == AlertKind.unexplained_unpaid \
+                    and a.draft.amount > 0:
                 by_mgr.setdefault(a.draft.manager_id, []).append(a)
         sent, notes = [], []
         for mgr, alerts in sorted(by_mgr.items()):
@@ -258,25 +275,146 @@ class Steps:
             ok, why = self.d.rails.policy_check("send_chase", "chaser", {
                 "template_id": msg.template_id, "prior_levels": [p.level for p in prior],
                 "days_since_last": (s.now - last).days if last else None})
+            if not ok and ("off schedule" in why or "already sent" in why):
+                notes.append(f"{mgr}: next reminder not due yet ({why})")
+                continue
             key = f"{mgr}|{msg.template_id}|{','.join(sorted(msg.invoice_ids))}"
-            msg = msg.model_copy(update={"id": f"chase-{wf_event('x', key, s.event, {}).id[-12:]}",
+            msg = msg.model_copy(update={"id": f"chase-{digest(key, s.event.id)}",
                                          "sent_at": s.event.learned_at if ok else None})
-            kind = "chase_sent" if ok else "chase_held"
-            self.d.rails.append_event(wf_event(kind, key, s.event,
-                                               {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
+            self.d.rails.append_event(wf_event(
+                "chase_sent" if ok else "chase_held", key, s.event,
+                {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
             sent.append(msg.id)
             notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why}")
         return {"chases": sent, "trace": notes}
 
-    # -- reply: read it, then reassess the invoices it covers ------------------------------
+    # -- reply: read it (proof only from bank/vendor records), then reassess ---------------
     def read_reply(self, s: WorkflowState) -> dict:
         p = s.event.payload
-        docs = self._evidence(s.manager_id, s.invoice_ids, None)
+        docs = self._evidence(s.manager_id, s.invoice_ids, s.now)
         reply = self.d.agents.read_reply(p.get("text", ""), s.manager_id, docs)
-        proof = "with proof" if reply.proof else "no vendor or bank proof"
-        return {"trace": [f"reply read: claims_paid={reply.claims_paid}, {proof}"]}
+        if not reply.claims_paid:
+            verdict = "reply does not claim payment"
+        elif reply.proof:
+            verdict = "payment claim backed by " + ", ".join(c.source_id for c in reply.proof)
+        else:
+            verdict = "holding position: reply claims payment with no vendor or bank proof"
+        self.d.rails.append_event(wf_event(
+            "reply_read", s.event.id, s.event,
+            {"reply": reply.model_dump(mode="json", exclude={"received_at"}), "verdict": verdict},
+            s.manager_id, (reply.invoice_ids or [None])[0]))
+        ids = sorted(set(s.invoice_ids) | set(reply.invoice_ids))
+        return {"invoice_ids": ids, "trace": [f"reply read: {verdict}"]}
 
-    # -- not built yet (README tasks 2, 5b, 6) ---------------------------------------------
+    # -- funding review ("the moment"): case agent proposes, controller decides ----------
+    def funding_review(self, s: WorkflowState) -> dict:
+        """Oakline is about to fund the manager again: recommend holding what's still owed."""
+        book = WorkflowBook.load(self.d.rails)
+        amount = float(s.event.payload.get("amount", 0))
+        alerts = book.open_alerts(s.manager_id)
+        case = self.d.agents.build_case(s.manager_id, alerts)
+        hold = round(min(case.proposed_hold, amount) if amount else case.proposed_hold, 2)
+        case = case.model_copy(update={"proposed_hold": hold, "proposed_by": "case_agent"})
+        ok, why = self.d.rails.policy_check("propose_hold", "case_agent", {})
+        if not ok:
+            return {"trace": [f"case not proposed: {why}"]}
+        chased = len(book.chases.get(s.manager_id, []))
+        rec = (f"Recommend holding ${hold:,.2f} of the ${amount:,.2f} funding" if hold
+               else f"No hold recommended; release the ${amount:,.2f} funding")
+        approval = self.d.approvals.request(case) if hold else None
+        self.d.rails.append_event(wf_event("case_proposed", case.id, s.event, {
+            "case": case.model_dump(mode="json"), "approval_id": approval,
+            "funding_amount": amount, "times_chased": chased,
+            "recommendation": f"{rec}. {case.summary} Chased {chased} time(s)."}, s.manager_id))
+        return {"case_id": case.id,
+                "trace": [f"{rec} (case {case.id}, approval {approval or 'not needed'})"]}
+
+    # -- agreement: agent extracts terms, a controller confirms (LangGraph interrupt) ------
+    def extract_terms(self, s: WorkflowState) -> dict:
+        doc = Document(**s.event.payload)
+        terms = self.d.agents.extract_terms(doc)
+        self.d.rails.append_event(wf_event("terms_proposed", doc.id, s.event,
+                                           {"terms": terms.model_dump(mode="json")}, s.manager_id))
+        return {"terms": terms, "trace": [f"terms proposed for {s.manager_id}: "
+                                          + ", ".join(f"{k}={v}" for k, v in _term_values(terms).items())]}
+
+    def confirm_terms(self, s: WorkflowState) -> dict:
+        """Pause until a controller confirms. Identical to what's already confirmed -> no pause."""
+        vals = _term_values(s.terms)
+        current = current_terms(self.d.rails.events(s.manager_id)).get(s.manager_id) or {}
+        if current and all(current.get(k) == v for k, v in vals.items()):
+            return {"trace": ["matches the confirmed terms; nothing to confirm"]}
+        decision = interrupt({"manager_id": s.manager_id, "proposed": vals, "current": current,
+                              "clauses": {k: getattr(s.terms, k).citation.locator
+                                          for k in vals if getattr(s.terms, k)}})
+        by, approve = decision.get("by", ""), bool(decision.get("approve"))
+        ok, why = self.d.rails.policy_check("approve", by, {"proposed_by": "agreement_agent"})
+        if not approve or not ok:
+            return {"trace": [f"terms not confirmed ({why if approve else 'declined by ' + by})"]}
+        final = {**vals, **{k: v for k, v in (decision.get("edits") or {}).items() if k in vals}}
+        prev = [e for e in self.d.rails.events(s.manager_id) if e.type == "terms_confirmed"]
+        ev = Event(id=f"ev-terms-confirmed-{s.manager_id}-{digest(str(sorted(final.items())), s.event.id)}",
+                   type="terms_confirmed", manager_id=s.manager_id, valid_from=s.event.valid_from,
+                   learned_at=s.event.learned_at, supersedes=prev[-1].id if prev else None,
+                   payload={"manager_id": s.manager_id, **final, "confirmed_by": by},
+                   source=s.terms.vendor_payment_days.citation)
+        self.d.rails.append_event(ev)
+        ids = sorted(i for i in self.d.rails.dependents_of(ev.id) if i.startswith("INV-"))
+        return {"invoice_ids": ids,
+                "trace": [f"terms confirmed by {by}; rechecking {len(ids)} invoice(s)"]}
+
+    # -- bank-detail change (scenario 7): hold, verify identity, controller decides --------
+    def bank_change(self, s: WorkflowState) -> dict:
+        """A vendor asks to change where it gets paid. Never applied automatically: the payment
+        is held, identity must be verified through a known contact, and a controller approves.
+        No step here (or anywhere) can change bank details or move money."""
+        e, p = s.event, s.event.payload
+        doc = Document(**p) if e.type == "document_ingested" else Document(
+            id=e.id, kind=SourceKind.judge, dated=e.valid_from.date(),
+            text=f"Vendor {p.get('vendor_id')} asked to change its bank details.",
+            data={"invoice_id": e.invoice_id, "vendor_id": p.get("vendor_id")})
+        vendor = doc.vendor_id or doc.data.get("vendor_id")
+        iid = doc.data.get("invoice_id") or e.invoice_id
+        line = self._line(iid) if iid else None
+        manager = doc.manager_id or (line.manager_id if line else None) or s.manager_id
+        _, why = self.d.rails.policy_check("request_bank_change", "workflow", {})
+        at_stake = round(line.amount - line.paid_amount, 2) if line else 0.0
+        claim = Claim(text=f"Vendor {vendor} asked to change its bank details"
+                           + (f" before a ${at_stake:,.2f} payment on {iid}." if line else "."),
+                      citations=[Citation(source_id=doc.id, kind=doc.kind)])
+        draft = AlertDraft(
+            id=alert_id(AlertKind.bank_detail_change.value, manager or "?", [iid or vendor]),
+            kind=AlertKind.bank_detail_change, manager_id=manager or "", invoice_ids=[iid] if iid else [],
+            amount=at_stake, headline=f"Bank-detail change request from {vendor}: payment held",
+            claims=[claim], recommended_action=(
+                "Hold the payment. Verify the request through the vendor's known contact "
+                "(not the details in the request), then a controller approves or declines."))
+        verdict = self.d.verifier.verify(draft, [doc])
+        self.d.rails.append_event(wf_event("alert_raised", draft.id, e, {
+            "draft": draft.model_dump(mode="json"), "verdict": verdict.model_dump(mode="json"),
+            "state": "open", "withdrawn_reason": None}, manager, iid))
+        case = Case(id=f"case-bankchange-{digest(draft.id)}", manager_id=manager or "",
+                    alerts=[draft.id], proposed_hold=at_stake, evidence=claim.citations,
+                    summary=f"{vendor} asked to change bank details. Hold "
+                            f"${at_stake:,.2f} until identity is verified and a controller "
+                            "approves the change.")
+        approval = self.d.approvals.request(case)
+        self.d.rails.append_event(wf_event("bank_change_held", draft.id, e, {
+            "vendor_id": vendor, "invoice_id": iid, "held_amount": at_stake, "policy": why,
+            "approval_id": approval, "requires": ["identity_verification", "controller_approval"]},
+            manager, iid))
+        return {"raised": [draft.id], "case_id": case.id,
+                "trace": [f"bank-detail change from {vendor}: {why}; "
+                          f"${at_stake:,.2f} held pending approval {approval}"]}
+
+    def _line(self, invoice_id: str) -> LedgerLine | None:
+        for d in self.d.rails.documents():
+            if d.kind == SourceKind.vendor_invoice and d.data.get("invoice_id") == invoice_id:
+                return next((l for l in self.d.rails.ledger(d.manager_id)
+                             if l.invoice_id == invoice_id), None)
+        return None
+
+    # -- not built yet ----------------------------------------------------------------------
     def pending(self, s: WorkflowState) -> dict:
         return {"trace": [f"{s.route.value}: step not implemented yet, event recorded only"]}
 
