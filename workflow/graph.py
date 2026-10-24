@@ -3,7 +3,8 @@
     route ─┬─ assess ──▶ assess ─▶ draft_alerts ─▶ verify ─▶ chase ─▶ finish
            ├─ scan   ──▶ assess (all of one manager's invoices)
            ├─ reply  ──▶ read_reply ─▶ assess
-           ├─ agreement | bank_change | funding_review ─▶ pending (later tasks)
+           ├─ funding_review ─▶ funding_review (case agent -> controller approval)
+           ├─ agreement | bank_change ─▶ pending (later tasks)
            └─ ignore ──▶ finish
 """
 
@@ -18,7 +19,7 @@ from .steps import Steps
 
 _AFTER_ROUTE = {
     Route.assess: "assess", Route.scan: "assess", Route.reply: "read_reply",
-    Route.agreement: "pending", Route.bank_change: "pending", Route.funding_review: "pending",
+    Route.agreement: "pending", Route.bank_change: "pending", Route.funding_review: "funding_review",
     Route.ignore: "finish",
 }
 
@@ -26,7 +27,7 @@ _AFTER_ROUTE = {
 def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g = StateGraph(WorkflowState)
     for name in ("route", "assess", "draft_alerts", "verify", "chase", "read_reply",
-                 "pending", "finish"):
+                 "funding_review", "pending", "finish"):
         g.add_node(name, getattr(steps, name))
     g.add_edge(START, "route")
     g.add_conditional_edges("route", lambda s: _AFTER_ROUTE[s.route],
@@ -37,5 +38,6 @@ def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g.add_edge("verify", "chase")
     g.add_edge("chase", "finish")
     g.add_edge("pending", "finish")
+    g.add_edge("funding_review", "finish")
     g.add_edge("finish", END)
     return g.compile(checkpointer=checkpointer or InMemorySaver())

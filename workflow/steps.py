@@ -39,7 +39,8 @@ ACTION_FOR_KIND = {
     AlertKind.owner_pending_approval: "Oakline's own approval/funding is pending; no manager action.",
 }
 ITEM_KINDS = set(ALERT_FOR_CAUSE.values())
-_IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed"}
+_IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed",
+                       "approval_requested", "approval_decided"}
 
 
 @dataclass(frozen=True)
@@ -295,7 +296,30 @@ class Steps:
         ids = sorted(set(s.invoice_ids) | set(reply.invoice_ids))
         return {"invoice_ids": ids, "trace": [f"reply read: {verdict}"]}
 
-    # -- not built yet (README tasks 2, 5b, 6) ---------------------------------------------
+    # -- funding review ("the moment"): case agent proposes, controller decides ----------
+    def funding_review(self, s: WorkflowState) -> dict:
+        """Oakline is about to fund the manager again: recommend holding what's still owed."""
+        book = WorkflowBook.load(self.d.rails)
+        amount = float(s.event.payload.get("amount", 0))
+        alerts = book.open_alerts(s.manager_id)
+        case = self.d.agents.build_case(s.manager_id, alerts)
+        hold = round(min(case.proposed_hold, amount) if amount else case.proposed_hold, 2)
+        case = case.model_copy(update={"proposed_hold": hold, "proposed_by": "case_agent"})
+        ok, why = self.d.rails.policy_check("propose_hold", "case_agent", {})
+        if not ok:
+            return {"trace": [f"case not proposed: {why}"]}
+        chased = len(book.chases.get(s.manager_id, []))
+        rec = (f"Recommend holding ${hold:,.2f} of the ${amount:,.2f} funding" if hold
+               else f"No hold recommended; release the ${amount:,.2f} funding")
+        approval = self.d.approvals.request(case) if hold else None
+        self.d.rails.append_event(wf_event("case_proposed", case.id, s.event, {
+            "case": case.model_dump(mode="json"), "approval_id": approval,
+            "funding_amount": amount, "times_chased": chased,
+            "recommendation": f"{rec}. {case.summary} Chased {chased} time(s)."}, s.manager_id))
+        return {"case_id": case.id,
+                "trace": [f"{rec} (case {case.id}, approval {approval or 'not needed'})"]}
+
+    # -- not built yet (README tasks 2, 6) ---------------------------------------------
     def pending(self, s: WorkflowState) -> dict:
         return {"trace": [f"{s.route.value}: step not implemented yet, event recorded only"]}
 

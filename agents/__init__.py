@@ -24,12 +24,14 @@ class RealAgents:
     def __init__(self, llm=None, names=None):
         from contracts.fakes import FakeAgents
 
+        from .case import CaseAgent
         from .cause import CauseAgent
         from .chaser import ChaserAgent
         from .trail import TrailAgent
         self._stand_in = FakeAgents()
         self.trail = TrailAgent(llm)
         self.cause = CauseAgent(llm)
+        self.case = CaseAgent(llm)
         self.chaser = ChaserAgent(llm, names) if names else ChaserAgent(llm)
 
     def set_names(self, names) -> None:
@@ -54,7 +56,7 @@ class RealAgents:
         return self.chaser.read_reply(reply_text, manager_id, docs)
 
     def build_case(self, manager_id: str, alerts: list[Alert]) -> Case:
-        return self._stand_in.build_case(manager_id, alerts)
+        return self.case.build_case(manager_id, alerts)
 
 
 def build() -> RealAgents:
