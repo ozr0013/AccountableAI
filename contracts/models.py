@@ -213,6 +213,7 @@ class Verdict(BaseModel):
     uncited_claims: list[str] = Field(default_factory=list)
     banned_terms: list[str] = Field(default_factory=list)
     counter_evidence: list[Citation] = Field(default_factory=list)
+    meta: dict = Field(default_factory=dict)  # model, tokens, latency_ms (for the scorer)
 
 
 class Alert(BaseModel):

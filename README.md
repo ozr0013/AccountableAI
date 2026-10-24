@@ -152,8 +152,8 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 9. [ ] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed
 
 ### Omar: verification, evals, memory (`agents/verifier/`, `agents/briefing/`, `evals/`)
-1. [ ] Answer key for all 9 scenarios (start here; it's the spec)
-2. [ ] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording
+1. [x] Answer key for all 9 scenarios (start here; it's the spec) → `evals/answer_key.json`
+2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed; live run not yet done)
 3. [ ] Scorer: cause accuracy, alert precision/recall, citation rate, prohibited actions, withdrawal correctness, recon differences, cost/latency
 4. [ ] Baselines: single strong model with all documents; system without the verifier
 5. [ ] Prohibited-action tests (outbound send, money move, accusation, self-approval all blocked)
@@ -201,7 +201,9 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 ```bash
 cp .env.example .env            # add ANTHROPIC_API_KEY
 docker compose up -d            # postgres + neo4j
-python -m venv .venv && source .venv/bin/activate && pip install -e .
+python -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'
+pytest -q                                           # contracts + verifier tests, offline
+set -a; source .env; set +a; LIVE=1 pytest -s agents/verifier -k live   # one real verifier call
 RAILS=fake AGENTS=fake VERIFIER=fake python -m workflow.run --scenario 3
 python -m evals.run --dataset contracts/fixtures/sample
 cd dashboard && npm install && npm run dev     # Audrey sets this up (Next.js)
