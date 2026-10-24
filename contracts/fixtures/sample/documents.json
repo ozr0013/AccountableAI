@@ -1,0 +1,52 @@
+[
+  {
+    "id": "doc-agreement-keyway",
+    "kind": "agreement",
+    "manager_id": "keyway",
+    "dated": "2026-01-01",
+    "text": "7.2 Vendor Payment. Manager shall pay each vendor invoice within ten (10) days of receipt of a complete invoice, using funds provided by Owner.\n7.4 Holdback. Manager may withhold up to ten percent (10%) of a repair invoice until the work passes inspection.\n8.1 Approval Limit. Any single repair exceeding $5,000 requires Owner's written approval and funding before work is ordered.",
+    "data": {}
+  },
+  {
+    "id": "doc-inv-kw-0301",
+    "kind": "vendor_invoice",
+    "manager_id": "keyway",
+    "vendor_id": "v-riogrande",
+    "dated": "2026-03-03",
+    "text": "Rio Grande Plumbing. Invoice KW-0301. Repair burst supply line, 412 Alder St. Amount due: $1,240.00. Terms: Net 10.",
+    "data": {"invoice_id": "INV-KW-0301", "amount": 1240.00, "received": "2026-03-03"}
+  },
+  {
+    "id": "doc-funding-kw-0305",
+    "kind": "funding",
+    "manager_id": "keyway",
+    "dated": "2026-03-05",
+    "text": "Oakline Homes wire to Keyway Property Management, repair funding batch 2026-03-A, includes INV-KW-0301 $1,240.00.",
+    "data": {"invoice_id": "INV-KW-0301", "amount": 1240.00, "funded_on": "2026-03-05"}
+  },
+  {
+    "id": "doc-stmt-kw-2026-03",
+    "kind": "manager_statement",
+    "manager_id": "keyway",
+    "dated": "2026-03-31",
+    "text": "Keyway monthly statement, March 2026. L14: 03/10 Rio Grande Plumbing INV-KW-0301 $1,240.00 PAID.",
+    "data": {"lines": [{"line": "L14", "invoice_id": "INV-KW-0301", "amount": 1240.00, "status": "paid", "on": "2026-03-10"}]}
+  },
+  {
+    "id": "doc-bank-kw-2026-03",
+    "kind": "manager_bank",
+    "manager_id": "keyway",
+    "dated": "2026-04-05",
+    "text": "Keyway operating account, 03/01-04/05. No outgoing payment to Rio Grande Plumbing.",
+    "data": {"payments": []}
+  },
+  {
+    "id": "doc-notice-riogrande-0420",
+    "kind": "vendor_notice",
+    "manager_id": "keyway",
+    "vendor_id": "v-riogrande",
+    "dated": "2026-04-20",
+    "text": "PAST DUE. Invoice KW-0301 dated 03/03 for $1,240.00 remains unpaid as of 04/20. Please remit immediately.",
+    "data": {"invoice_id": "INV-KW-0301", "status": "not_received"}
+  }
+]

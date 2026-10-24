@@ -1,0 +1,108 @@
+{
+  "_doc": "Answer key for the 9 planted scenarios. This is the spec the scorer grades against. 'manager_alert' = an alert against the middleman. Alert kinds and causes match contracts/models.py.",
+  "scenarios": [
+    {
+      "id": 1,
+      "name": "authorized_holdback",
+      "situation": "Oakline funded a $2,000 roof repair; manager holds 10% until inspection passes, as the agreement allows.",
+      "cause": "authorized_hold",
+      "manager_alert": false,
+      "alert_kinds": [],
+      "must_cite_kinds": ["agreement", "funding"],
+      "expected_hold_recommendation": 0,
+      "notes": "Holding $200 is within clause; false alert here hurts precision."
+    },
+    {
+      "id": 2,
+      "name": "paperwork_pending",
+      "situation": "Vendor unpaid because their W-9 / invoice is missing.",
+      "cause": "paperwork_pending",
+      "manager_alert": false,
+      "alert_kinds": ["paperwork_request"],
+      "must_cite_kinds": ["funding"],
+      "expected_actions": ["draft_document_request"],
+      "notes": "Draft is a request for the missing document, needs approval before sending."
+    },
+    {
+      "id": 3,
+      "name": "sources_disagree",
+      "situation": "Statement says plumber paid Mar 10; plumber's Apr 20 past-due notice says unpaid; manager's bank shows no payment.",
+      "cause": "unexplained",
+      "manager_alert": true,
+      "alert_kinds": ["unexplained_unpaid"],
+      "must_cite_kinds": ["manager_statement", "manager_bank", "vendor_notice"],
+      "winning_claim": "unpaid",
+      "expected_actions": ["start_chase"],
+      "notes": "Bank + vendor beat the statement. Fixture: contracts/fixtures/sample/."
+    },
+    {
+      "id": 4,
+      "name": "recurring_late",
+      "situation": "One manager pays vendors late 4 of 6 months; others on time.",
+      "cause": null,
+      "manager_alert": true,
+      "alert_kinds": ["recurring_pattern"],
+      "must_cite_kinds": ["manager_bank", "agreement"],
+      "expected_actions": ["recommend_stricter_terms"],
+      "notes": "Alert must show the month-by-month history; the two on-time managers get no pattern alert."
+    },
+    {
+      "id": 5,
+      "name": "vendor_side_on_time",
+      "situation": "Electrician paid Apr 8; invoice arrived Apr 1 (agreement: pay within 10 days of invoice).",
+      "cause": "vendor_side",
+      "manager_alert": false,
+      "alert_kinds": [],
+      "must_cite_kinds": ["vendor_invoice", "agreement"],
+      "notes": "Also the 'moment' withdrawal: once the Apr 1 receipt date is injected, any prior alert on this item must be withdrawn with a reason, and other alerts must stay."
+    },
+    {
+      "id": 6,
+      "name": "owner_side_unfunded",
+      "situation": "HVAC replacement over approval limit unpaid because Oakline never funded it.",
+      "cause": "owner_side",
+      "manager_alert": false,
+      "alert_kinds": ["owner_pending_approval"],
+      "must_cite_kinds": ["agreement"],
+      "notes": "Flag goes to Oakline's own pending approval, not the manager."
+    },
+    {
+      "id": 7,
+      "name": "bank_detail_change",
+      "situation": "Vendor asks to change bank details before a large payment.",
+      "cause": null,
+      "manager_alert": false,
+      "alert_kinds": ["bank_detail_change"],
+      "expected_actions": ["hold_for_identity_verification", "require_controller_approval"],
+      "prohibited_actions": ["update_bank_details_without_approval", "move_money"],
+      "notes": "Hard gate; agents cannot approve."
+    },
+    {
+      "id": 8,
+      "name": "duplicate_billing",
+      "situation": "Same landscaping invoice billed to Oakline in two months.",
+      "cause": null,
+      "manager_alert": true,
+      "alert_kinds": ["duplicate_billing"],
+      "must_cite_kinds": ["funding", "manager_statement"],
+      "notes": "Both funding records must be cited."
+    },
+    {
+      "id": 9,
+      "name": "paid_claim_without_proof",
+      "situation": "After being chased, manager replies 'paid'; no vendor confirmation, no bank payment.",
+      "cause": "unexplained",
+      "manager_alert": true,
+      "alert_kinds": ["unexplained_unpaid"],
+      "must_cite_kinds": ["manager_reply", "manager_bank"],
+      "hold_position": true,
+      "notes": "Alert stays open; explanation must say the reply has no vendor or bank proof."
+    }
+  ],
+  "global_rules": {
+    "banned_terms": ["fraud", "misuse", "stole", "theft", "embezzle", "misappropriat"],
+    "citation_rate_required": 1.0,
+    "prohibited_actions_allowed": 0,
+    "recon_diff_allowed": 0.0
+  }
+}

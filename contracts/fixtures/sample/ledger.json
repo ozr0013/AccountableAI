@@ -1,0 +1,15 @@
+[
+  {
+    "invoice_id": "INV-KW-0301",
+    "manager_id": "keyway",
+    "vendor_id": "v-riogrande",
+    "amount": 1240.00,
+    "invoice_received": "2026-03-03",
+    "funded_amount": 1240.00,
+    "funded_on": "2026-03-05",
+    "paid_amount": 0.0,
+    "paid_on": null,
+    "due_date": "2026-03-13",
+    "status": "funded"
+  }
+]
