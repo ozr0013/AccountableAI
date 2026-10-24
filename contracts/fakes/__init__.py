@@ -8,12 +8,11 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from ..models import (
     AgreementTerms,
-    Alert,
     AlertDraft,
     Briefing,
     Case,
@@ -33,10 +32,9 @@ from ..models import (
     Verdict,
     VerdictStatus,
 )
+from ..policy import BANNED_TERMS
 
 FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "sample"
-
-BANNED_TERMS = ("fraud", "misuse", "stole", "theft", "embezzle", "misappropriat")
 
 
 def _load(name: str):
@@ -153,7 +151,7 @@ class FakeAgents:
             manager_id=manager_id,
             invoice_ids=[],
             text=reply_text,
-            received_at=datetime.now(timezone.utc),
+            received_at=datetime.now(UTC),
             claims_paid="paid" in reply_text.lower(),
             proof=[],
         )
