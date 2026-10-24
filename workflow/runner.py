@@ -13,7 +13,10 @@ from __future__ import annotations
 
 import logging
 import os
-from dataclasses import dataclass, field
+import queue
+import threading
+from collections.abc import Callable, Iterator
+from dataclasses import dataclass, field, replace
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.types import Command
@@ -24,6 +27,7 @@ from .book import WorkflowBook
 from .graph import build_graph
 from .names import names_from
 from .steps import Deps, Steps
+from .trace import DecisionRecord, ReasonStep, TracedAgents, TracedVerifier, Tracer
 
 log = logging.getLogger(__name__)
 
@@ -60,7 +64,56 @@ class Workflow:
         self.deps = deps
         if hasattr(deps.agents, "set_names"):       # real chaser renders templates with names
             deps.agents.set_names(names_from(deps.rails))
-        self.graph = build_graph(Steps(deps), checkpointer or checkpointer_from_env())
+        # Every agent and verifier call becomes a DecisionRecord (kept + streamed).
+        self.tracer = Tracer(deps.rails)
+        traced = replace(deps, agents=TracedAgents(deps.agents, self.tracer),
+                         verifier=TracedVerifier(deps.verifier, self.tracer))
+        self.graph = build_graph(Steps(traced), checkpointer or checkpointer_from_env())
+
+    def subscribe(self, fn: Callable[[DecisionRecord], None]) -> Callable[[], None]:
+        """Call fn with each DecisionRecord as it is made. Returns an unsubscribe function."""
+        return self.tracer.subscribe(fn)
+
+    def subscribe_live(self, fn: Callable[[dict], None]) -> Callable[[], None]:
+        """Call fn with in-progress signals: a workflow step finishing, an agent starting,
+        Claude's thinking pieces. Returns an unsubscribe function."""
+        return self.tracer.subscribe_live(fn)
+
+    def _run(self, inp, cfg) -> dict:
+        """graph.invoke, step by step: each finished node is announced as it completes."""
+        for chunk in self.graph.stream(inp, cfg, stream_mode="updates"):
+            for node, update in chunk.items():
+                if node != "__interrupt__":
+                    notes = update.get("trace", []) if isinstance(update, dict) else []
+                    self.tracer.live({"type": "step", "step": node, "notes": notes})
+        st = self.graph.get_state(cfg)
+        out = dict(st.values)
+        if st.interrupts:
+            out["__interrupt__"] = st.interrupts
+        return out
+
+    def stream(self, event: Event, ingest: bool = True) -> Iterator[DecisionRecord | RunResult]:
+        """Yield this event's DecisionRecords live, then its RunResult."""
+        q: queue.Queue = queue.Queue()
+        done = object()
+        unsubscribe = self.subscribe(q.put)
+
+        def work():
+            try:
+                q.put(self.ingest(event) if ingest else self.handle(event))
+            except Exception as e:      # noqa: BLE001 - surfaced to the consumer below
+                q.put(e)
+            finally:
+                q.put(done)
+
+        threading.Thread(target=work, daemon=True).start()
+        try:
+            while (item := q.get()) is not done:
+                if isinstance(item, Exception):
+                    raise item
+                yield item
+        finally:
+            unsubscribe()
 
     @staticmethod
     def _cfg(event_id: str) -> dict:
@@ -75,10 +128,28 @@ class Workflow:
         if st.next and st.interrupts:                    # paused for a human: don't re-run
             return RunResult(event.id, route=getattr(st.values.get("route"), "value", None),
                              waiting=st.interrupts[0].value)
-        result = self._result(event.id, self.graph.invoke(None if st.next else {"event": event}, cfg))
+        with self.tracer.run(event):
+            result = self._result(event.id, self._run(None if st.next else {"event": event}, cfg))
+            self._record_run(event, result)
         if event.type == "terms_confirmed" and event.manager_id:
             self._settle_terms(event.manager_id)
         return result
+
+    def _record_run(self, event: Event, r: RunResult) -> None:
+        """The workflow's own decision for this event: what it rechecked and what it changed."""
+        lines = [t for t in r.trace if t != "done"]
+        if r.route in (None, "ignore") or not (r.raised or r.withdrawn or r.chases or r.rejected
+                                                or len(lines) > 1):
+            return
+        steps = [ReasonStep(kind="evidence", text=lines[0])]
+        steps += [ReasonStep(kind="result" if ("withdrawn" in t or "verifier" in t or "reminder" in t
+                                               or t.startswith("Recommend")) else "rule", text=t)
+                  for t in lines[1:]]
+        self.tracer.record(agent="workflow", invoice_id=event.invoice_id,
+                           question=f"What does {event.type.replace('_', ' ')} change?",
+                           steps=steps, answer={"route": r.route, "raised": r.raised,
+                                                "withdrawn": r.withdrawn, "chases": r.chases,
+                                                "blocked": r.rejected})
 
     def _settle_terms(self, manager_id: str) -> None:
         """Terms confirmed elsewhere: paused proposals that now match close themselves
@@ -86,14 +157,16 @@ class Workflow:
         for eid in self.waiting():
             v = self.graph.get_state(self._cfg(eid)).values
             if v.get("manager_id") == manager_id and v.get("terms") is not None:
-                self.graph.invoke(Command(resume={}), self._cfg(eid))
+                with self.tracer.run(v["event"]):
+                    self._run(Command(resume={}), self._cfg(eid))
 
     def resume(self, event_id: str, decision: dict) -> RunResult:
         """Continue a run paused for a human, e.g. {"approve": True, "by": "controller.dana"}."""
         cfg = self._cfg(event_id)
         if not self.graph.get_state(cfg).next:
             raise ValueError(f"no paused run for {event_id}")
-        return self._result(event_id, self.graph.invoke(Command(resume=decision), cfg))
+        with self.tracer.run(self.graph.get_state(cfg).values["event"]):
+            return self._result(event_id, self._run(Command(resume=decision), cfg))
 
     def waiting(self) -> list[str]:
         """Event ids of runs paused for a human (latest state of each thread)."""

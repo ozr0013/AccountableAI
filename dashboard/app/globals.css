@@ -748,3 +748,40 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; line-height
   transition: transform .15s var(--ease), box-shadow .15s var(--ease);
 }
 .google-btn:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 0 var(--n11); }
+
+/* Live agent reasoning + day-by-day timeline (components/AgentStream.tsx, DayTimeline.tsx) */
+.live-reasoning,.day-timeline { margin-top:24px; padding:28px; border-radius:24px; background:var(--white); box-shadow:inset 0 0 0 1px var(--n3); }
+.live-action { margin:6px 0 14px; color:var(--n10); font-size:14px; }
+.decision-list { display:grid; gap:10px; margin-top:12px; }
+.decision-card { padding:12px 14px; border-radius:14px; background:var(--n1); box-shadow:inset 0 0 0 1px var(--n3); animation:rise .35s var(--ease) both; }
+.decision-card.workflow { background:var(--o-pill); }
+.decision-head { display:flex; align-items:center; gap:10px; width:100%; padding:0; border:0; background:none; font:inherit; color:var(--ink); cursor:pointer; text-align:left; flex-wrap:wrap; }
+.decision-agent { font-weight:500; }
+.decision-ms { margin-left:auto; }
+.decision-q { margin:6px 0 0; color:var(--n10); font-size:13px; }
+.decision-result { margin:4px 0 0; font-size:14px; line-height:20px; }
+.decision-thinking-peek { margin:6px 0 0; padding-left:10px; border-left:2px solid var(--o); color:var(--n10); font-size:12px; font-style:italic; border-radius:0; }
+.decision-steps { margin:10px 0 0; padding:0; list-style:none; display:grid; gap:6px; }
+.decision-steps li { display:grid; grid-template-columns:150px 1fr; gap:10px; font-size:13px; line-height:19px; }
+.step-kind { font-family:var(--mono, monospace); font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--n9); padding-top:1px; }
+.step-thinking .step-text { font-style:italic; border-left:2px solid var(--o); padding-left:8px; border-radius:0; }
+.step-guard .step-text,.step-fallback .step-text { color:var(--n10); }
+.step-result .step-text { font-weight:500; }
+.tag.warn { background:var(--o-pill); }
+.day-list { display:grid; gap:8px; margin-top:14px; }
+.day-card { border-radius:14px; box-shadow:inset 0 0 0 1px var(--n3); background:var(--n1); }
+.day-card.quiet { opacity:.55; }
+.day-head { display:flex; align-items:center; gap:12px; width:100%; padding:10px 14px; border:0; background:none; font:inherit; color:var(--ink); text-align:left; cursor:pointer; flex-wrap:wrap; }
+.day-head:disabled { cursor:default; }
+.day-counts { color:var(--n10); font-size:13px; }
+.day-money { margin-left:auto; font-weight:500; }
+.day-money.down { color:#2f7a4f; }
+.day-money.up { color:#b5432a; }
+.day-body { display:grid; gap:12px; padding:0 14px 14px; }
+.day-body ul { margin:6px 0 0; padding-left:18px; font-size:13px; line-height:20px; }
+@media (max-width:760px) { .decision-steps li { grid-template-columns:1fr; } .day-money { margin-left:0; } }
+.live-now { margin:4px 0 10px; font-size:14px; }
+.decision-card.thinking-now { box-shadow:inset 0 0 0 1px var(--o); }
+.decision-thinking-live { margin:8px 0 0; padding-left:10px; border-left:2px solid var(--o); border-radius:0; font-size:13px; line-height:20px; font-style:italic; white-space:pre-wrap; color:var(--n10); }
+.decision-thinking-live .caret { display:inline-block; width:7px; height:14px; margin-left:2px; background:var(--o); vertical-align:-2px; animation:blink 1s steps(1) infinite; border-radius:0; }
+@keyframes blink { 50% { opacity:0; } }

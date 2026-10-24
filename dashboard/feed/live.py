@@ -47,31 +47,33 @@ class Meter:
 
 
 class MeteredLLM:
-    """agents.llm.StructuredLLM: (schema, system, user) -> instance | None, priced and capped."""
+    """agents.llm.StructuredLLM: (schema, system, user) -> instance | None, priced and capped.
+
+    Calls go through Kanishka's agents.llm.AnthropicLLM, so Claude's summarized thinking, tokens
+    and latency reach the workflow's decision records (and the dashboard's live stream)."""
 
     def __init__(self, meter: Meter, model: str | None = None):
-        import anthropic
-        self.anthropic = anthropic
-        self.client = anthropic.Anthropic(timeout=120, max_retries=2)
-        self.model = model or os.getenv("AGENT_MODEL", "claude-sonnet-5-5")
+        from agents.llm import AnthropicLLM
+        self.inner = AnthropicLLM(model or os.getenv("AGENT_MODEL", "claude-sonnet-5-5"))
+        self.model = self.inner.model
         self.meter, self.cache = meter, {}
 
     def __call__(self, schema, system, user):
+        from agents.llm import report_call
         key = (schema.__name__, system, user)
         if key in self.cache:
-            return self.cache[key]
+            out, meta = self.cache[key]
+            report_call(**{**meta, "ms": 0, "cached": True})     # same answer, shown as reused
+            return out
         if not self.meter.ok():
             return None                     # budget spent: the agent uses its rules
-        try:
-            resp = self.client.messages.parse(model=self.model, max_tokens=8000, system=system,
-                                              messages=[{"role": "user", "content": user}],
-                                              output_format=schema)
-        except self.anthropic.APIError as e:
-            log.warning("agent call failed (%s): %s", schema.__name__, e)
-            return None
-        self.meter.add(schema.__name__, resp.model, resp.usage.input_tokens, resp.usage.output_tokens)
-        out = resp.parsed_output if resp.stop_reason != "refusal" else None
-        self.cache[key] = out
+        out = self.inner(schema, system, user)
+        meta = dict(self.inner.last)
+        if meta.get("input_tokens") is not None:
+            self.meter.add(schema.__name__, meta.get("model") or self.model,
+                           meta["input_tokens"], meta.get("output_tokens") or 0)
+        if out is not None:
+            self.cache[key] = (out, meta)
         return out
 
 

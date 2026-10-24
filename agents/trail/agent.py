@@ -63,7 +63,17 @@ class TrailAgent:
         out, _ = guarded_call(self.llm, TrailDraft, SYSTEM, self._prompt(line, docs, base), check)
         if out is None:
             return base
-        entries = [TrailEntry(on=_date(e.on), kind=by_id[e.source_id].kind, claim=e.claim,
+        # Facts read from document data (inspection pending, a hold reason, a bank-change
+        # request, amounts and dates) must survive Claude's wording: downstream guards read them.
+        facts: dict[str, list[str]] = {}
+        for e in base.entries:
+            facts.setdefault(e.citation.source_id, []).append(e.claim)
+
+        def claim(e) -> str:
+            missing = [f for f in facts.get(e.source_id, []) if f.lower() not in e.claim.lower()]
+            return f"{e.claim} [record: {'; '.join(missing)}]" if missing else e.claim
+
+        entries = [TrailEntry(on=_date(e.on), kind=by_id[e.source_id].kind, claim=claim(e),
                               citation=Citation(source_id=e.source_id, kind=by_id[e.source_id].kind,
                                                 locator=e.locator))
                    for e in out.entries]

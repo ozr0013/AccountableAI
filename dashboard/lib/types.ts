@@ -95,3 +95,36 @@ export type Briefing = {
 };
 
 export type Preset = { id: string; label: string; description: string; params: Record<string, string>; defaults: Record<string, string> };
+
+// Live agent reasoning (workflow/trace.py DecisionRecord), streamed by GET /api/stream.
+export type ReasonStep = {
+  kind: "evidence" | "fact" | "rule" | "thinking" | "model" | "guard" | "fallback" | "result";
+  text: string; citations: Citation[];
+};
+
+export type Decision = {
+  id: string; trigger: string | null; seq: number; at: string | null; day: string | null;
+  agent: string; invoice_id: string | null; question: string; steps: ReasonStep[];
+  answer: Record<string, unknown>; confidence: number | null; mode: "rules" | "llm" | "fallback";
+  citations: Citation[]; model: string | null; tokens_in: number | null; tokens_out: number | null; ms: number;
+};
+
+export type LiveSignal =
+  | { type: "step"; step: string; notes: string[]; trigger: string | null }
+  | { type: "agent_started"; agent: string; invoice_id: string | null; question: string; trigger: string | null }
+  | { type: "thinking"; agent: string; invoice_id: string | null; text: string; trigger: string | null };
+
+export type StreamAction = { type: "action"; status: "started" | "finished"; kind: string; summary: string; as_of: string; unexplained?: number; cost?: number };
+
+// GET /api/timeline (workflow/timeline.py)
+export type TimelineDay = {
+  date: string; label: string; quiet: boolean;
+  facts: { id: string; type: string; what: string; source_id: string | null; invoice_id: string | null }[];
+  decisions: Decision[];
+  outcomes: { type: string; what: string | null; invoice_ids: (string | null)[]; alert_id?: string; amount?: number; hold?: number }[];
+  human: { type: string; what: string }[];
+  unexplained_start: number; unexplained_end: number;
+  counts: { facts: number; decisions: number; claude: number; fallback: number; outcomes: number; human: number };
+};
+
+export type Timeline = { as_of: string; start: string; days: TimelineDay[] };

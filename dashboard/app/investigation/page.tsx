@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { LiveReasoning } from "@/components/AgentStream";
+import { DayTimeline } from "@/components/DayTimeline";
 import { useFeed } from "@/components/Feed";
 import { Badge, Cites, Loading, PageTop } from "@/components/ui";
 import { money, named } from "@/lib/format";
@@ -109,26 +111,30 @@ export default function Investigation() {
       setRunning(false);
       return;
     }
-    const add = (day: string, title: string, detail: string, result?: ActionResult) => {
+    // Captions come from the backend: what the action was and what it changed. Nothing is scripted
+    // except which facts are injected and when.
+    const add = (day: string, title: string, result?: ActionResult) => {
+      const detail = !result ? "" : result.ok
+        ? `${result.summary}${result.diff.unexplained[0] !== result.diff.unexplained[1]
+          ? ` Unexplained: ${money(result.diff.unexplained[0], false)} → ${money(result.diff.unexplained[1], false)}.` : ""}`
+        : result.error;
       setSimulation(previous => [...previous, { day, title, detail, responses: result?.ok ? result.responses : [] }]);
     };
     await reset();
-    add("Day 01", "A claim enters the record", "Keyway says Rio Grande was paid. No bank or vendor proof is attached.");
-    await wait(700);
     const claim = await runConsole({ preset: "manager_replies_paid" });
-    add("Day 01", "Agents challenge the claim", claim.ok ? "The trail and verifier test the claim against the evidence already on file." : claim.error, claim);
+    add("Day 01", "Keyway claims it paid", claim);
     await wait(1500);
     const chase = await advance(5);
-    add("Day 06", "The clock advances", chase.ok ? "The chaser follows the approved schedule and the open evidence is reviewed again." : chase.error, chase);
+    add("Day 06", "Five days pass", chase);
     await wait(1500);
     await advance(4);
     await wait(450);
     const proof = await reply("INV-KW-0301", "We located the transfer and attached the bank record.", "bank");
-    add("Day 10", "Keyway supplies proof", proof.ok ? "New bank evidence is ingested. The agents learn from it and rerun only the linked payment trail." : proof.error, proof);
+    add("Day 10", "Keyway sends a bank record", proof);
     await wait(1500);
     const followUp = await advance(5);
-    add("Day 15", "The loop closes", followUp.ok ? "The workflow updates its recommendation from the latest evidence. The controller sees the revised case, not a stale alert." : followUp.error, followUp);
-    setMessage("15 simulated days completed in about 10 seconds. Every event ran through the same feed and policy rails as the dashboard.");
+    add("Day 15", "Five more days pass", followUp);
+    setMessage("15 simulated days completed. Every step ran through the live feed, the same workflow and the same policy gate as the rest of the dashboard.");
     setRunning(false);
   };
   const makeDecision = async (approve: boolean) => {
@@ -182,6 +188,10 @@ export default function Investigation() {
         </article>)}
       </div>
     </section>
+
+    <LiveReasoning enabled={isLive} />
+
+    <DayTimeline enabled={isLive} version={state.meta.events} />
 
     <section className="investigation-grid">
       <article className={`investigation-stage ${hasEvidenceTrace ? "revealed" : ""}`}>

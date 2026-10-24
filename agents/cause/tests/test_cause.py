@@ -134,3 +134,22 @@ def test_paperwork_hold_ends_when_the_vendor_supplies_it():
     after = CauseAgent(None).classify_cause(line, TrailAgent(None).build_trail(line, docs + [w9]), terms)
     assert before.cause == Cause.paperwork_pending
     assert after.cause == Cause.unexplained
+
+
+def test_claude_rewording_the_trail_cannot_hide_a_data_fact():
+    """Live run found this: Claude's trail wording dropped 'inspection pending', so the holdback
+    guard never fired and Claude's 'unexplained' on scenario 1 got through."""
+    from agents.trail.agent import TrailDraft
+    line, docs = invoice("INV-KW-0101", "keyway")
+    base = TrailAgent(None).build_trail(line, docs)
+    reworded = TrailDraft(entries=[
+        {"source_id": e.citation.source_id, "on": e.on.isoformat() if e.on else None,
+         "claim": "Topline Roofing invoice received" if e.kind == "vendor_invoice" else e.claim}
+        for e in base.entries], reasoning="Bank shows $1,800 of $2,000 paid.")
+    trail = TrailAgent(ScriptedLLM(reworded)).build_trail(line, docs)
+    [inv] = [e for e in trail.entries if e.kind == "vendor_invoice"]
+    assert "Topline Roofing invoice received" in inv.claim and "inspection pending" in inv.claim
+    terms = terms_for(world_rails(), FakeAgents(), "keyway")
+    claude_says = _answer(Cause.unexplained, ("doc-funding-kw-0101",), "10% still unpaid.")
+    f = CauseAgent(ScriptedLLM(claude_says, claude_says)).classify_cause(line, trail, terms)
+    assert f.cause == Cause.authorized_hold                  # guard fired, rules decided

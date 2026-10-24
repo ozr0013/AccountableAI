@@ -126,9 +126,12 @@ def _iso(x) -> str | None:
 class DemoSession:
     def __init__(self, seed: int = 13, n_clean: int = 100, budget: float = 1.0):
         from live import Meter
+        from stream import Hub
         self.seed, self.n_clean = seed, n_clean
         self.meter = Meter(budget)
         self.live = False
+        self.hub = Hub()                       # live decisions for /api/stream
+        self._unwatch = None
         self.build()
 
     # -- setup ----------------------------------------------------------------------------
@@ -153,6 +156,7 @@ class DemoSession:
         self.wf.replay([funding_event(MANAGER, FUNDING, self.world.as_of)])
         self.history: list[dict] = []          # every action, oldest first
         self.actions = 0
+        self._watch()                          # stream decisions from here on (not the replay)
         if self.live:
             self.set_live(True)
 
@@ -182,7 +186,25 @@ class DemoSession:
         deps = Deps(self.rails, agents, verifier, self.approvals)
         workflow = Workflow(deps, checkpointer=self.wf.graph.checkpointer)
         self.deps, self.wf, self.live = deps, workflow, on
+        self._watch()
         return {"ok": True}
+
+    def _watch(self) -> None:
+        """Publish each DecisionRecord of the current workflow to the live stream."""
+        if self._unwatch:
+            self._unwatch()
+        stop_decisions = self.wf.subscribe(
+            lambda r: self.hub.publish({"type": "decision", **r.model_dump(mode="json")}))
+        stop_live = self.wf.subscribe_live(self.hub.publish)     # steps, agent starts, thinking
+
+        def unwatch():
+            stop_decisions()
+            stop_live()
+        self._unwatch = unwatch
+
+    def timeline(self, days: int = 15) -> dict:
+        from workflow.timeline import timeline
+        return timeline(self.rails, days=max(1, min(int(days), 90)))
 
     # -- the loop: every action runs the workflow, then the follow-ups ----------------------
     def _act(self, kind: str, summary: str, events: list[Event], affected: list[str],
@@ -193,6 +215,8 @@ class DemoSession:
         from workflow.run import funding_event
         seq0 = before["meta"]["events"]
         spent0 = self.meter.spent
+        self.hub.publish({"type": "action", "status": "started", "kind": kind, "summary": summary,
+                          "as_of": self.rails.now().isoformat(), "live": self.live})
         runs = [self.wf.handle(e) if appended else self.wf.ingest(e) for e in events]
         self.actions += 1
         n, t = self.actions, (events[-1].learned_at if events else self._clock())
@@ -214,6 +238,9 @@ class DemoSession:
                "cost": round(self.meter.spent - spent0, 4), "live": self.live,
                "state": after}
         self.history.append({k: out[k] for k in ("kind", "summary", "affected", "diff", "responses", "cost")})
+        self.hub.publish({"type": "action", "status": "finished", "kind": kind, "summary": summary,
+                          "as_of": self.rails.now().isoformat(), "cost": out["cost"],
+                          "unexplained": after["headline"]["unexplained"]})
         out["state"]["history"] = self.history
         return out
 
