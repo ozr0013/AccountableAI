@@ -5,7 +5,10 @@ moment, turn what happened into a RunResult, and score it.
     python -m evals.harness --out evals/results.md --save evals/runs
 
 No API key -> Kanishka's agents run in rules mode and the verifier runs its code rules only
-(contracts.fakes.FakeVerifier). With ANTHROPIC_API_KEY set and LIVE=1, both call the model.
+(contracts.fakes.FakeVerifier). With ANTHROPIC_API_KEY set:
+    LIVE=verifier   only the verifier calls the model (cheap: the with/without-verifier comparison)
+    LIVE=1          agents and verifier both call the model (slow, much more expensive)
+--budget caps verifier spend: the run stops before a call once the cap is reached.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import sys
 import time
 from datetime import UTC, datetime
 from datetime import time as dtime
@@ -44,12 +48,17 @@ class ApproveAll:
 
 
 def _live() -> bool:
+    """Verifier calls the model."""
+    return bool(os.getenv("ANTHROPIC_API_KEY")) and os.getenv("LIVE") in ("1", "verifier")
+
+
+def _live_agents() -> bool:
     return bool(os.getenv("ANTHROPIC_API_KEY")) and os.getenv("LIVE") == "1"
 
 
 def _agents():
     from agents import RealAgents
-    if _live():
+    if _live_agents():
         from agents.llm import default_llm
         return RealAgents(default_llm())
     return RealAgents(None)
@@ -64,18 +73,43 @@ def _verifier(system: str):
     return FakeVerifier()
 
 
-class _MeteredVerifier:
-    """Wraps a verifier to add up model tokens for the cost metric."""
+class BudgetExceeded(RuntimeError):
+    pass
 
-    def __init__(self, inner):
-        self.inner, self.cost = inner, 0.0
+
+class Budget:
+    """Spend shared by every system in one harness run."""
+
+    def __init__(self, limit_usd: float, max_calls: int | None = None):
+        self.limit, self.max_calls, self.spent, self.calls = limit_usd, max_calls, 0.0, 0
+
+    def check(self):
+        if self.spent >= self.limit:
+            raise BudgetExceeded(f"budget ${self.limit:.2f} reached after {self.calls} calls")
+        if self.max_calls is not None and self.calls >= self.max_calls:
+            raise BudgetExceeded(f"stopped after {self.calls} calls (--max-calls)")
+
+
+class _MeteredVerifier:
+    """Wraps a verifier to add up model tokens for the cost metric and enforce the budget."""
+
+    def __init__(self, inner, budget: Budget):
+        self.inner, self.budget, self.cost = inner, budget, 0.0
 
     def verify(self, draft, evidence):
+        live = not isinstance(self.inner, (ApproveAll, FakeVerifier))
+        if live:
+            self.budget.check()
         v = self.inner.verify(draft, evidence)
         m = v.meta
         if "input_tokens" in m:
             pin, pout = PRICES.get(m.get("model", ""), (4.0, 20.0))
-            self.cost += (m["input_tokens"] * pin + m["output_tokens"] * pout) / 1e6
+            c = (m["input_tokens"] * pin + m["output_tokens"] * pout) / 1e6
+            self.cost += c
+            self.budget.spent += c
+            self.budget.calls += 1
+            print(f"  verifier call {self.budget.calls}: {v.status.value:8} ${c:.4f} "
+                  f"(total ${self.budget.spent:.4f})", file=sys.stderr, flush=True)
         return v
 
 
@@ -121,10 +155,11 @@ def _moment_events(as_of) -> list[Event]:
     return [reply, fact]
 
 
-def run_system(system: str, n_clean: int = 30, seed: int = 13) -> RunResult:
+def run_system(system: str, n_clean: int = 30, seed: int = 13,
+               budget: Budget | None = None) -> RunResult:
     world = generate(seed, ALL_SCENARIOS, n_clean)
     rails = MemoryRails()
-    verifier = _MeteredVerifier(_verifier(system))
+    verifier = _MeteredVerifier(_verifier(system), budget or Budget(float("inf")))
     agents = _CapturingAgents(_agents())
     wf = Workflow(Deps(rails, agents, verifier, FakeApprovals()))
 
@@ -209,15 +244,29 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--clean", type=int, default=30, help="clean background invoices")
     p.add_argument("--out", type=Path, help="write the markdown table here")
     p.add_argument("--save", type=Path, help="save each RunResult JSON in this folder")
+    p.add_argument("--budget", type=float, default=2.0, help="max verifier spend in USD (live)")
+    p.add_argument("--max-calls", type=int, help="stop after this many model calls (cost probe)")
     a = p.parse_args(argv)
 
-    runs = [run_system(s, a.clean) for s in a.systems]
+    budget = Budget(a.budget, a.max_calls)
+    try:
+        runs = [run_system(s, a.clean, budget=budget) for s in a.systems]
+    except BudgetExceeded as e:
+        print(f"STOPPED: {e}. Spent ${budget.spent:.4f} on {budget.calls} calls "
+              f"(${budget.spent / max(budget.calls, 1):.4f} per call).")
+        return 2
     if a.save:
         a.save.mkdir(parents=True, exist_ok=True)
         for r in runs:
             (a.save / f"{r.system}.json").write_text(r.model_dump_json(indent=2))
     md = to_markdown([score(r) for r in runs])
-    mode = "live model calls" if _live() else "no API key: agents in rules mode, verifier code rules only"
+    if _live_agents():
+        mode = "live: agents and verifier call the model"
+    elif _live():
+        mode = (f"live verifier ({os.getenv('VERIFIER_MODEL', 'default model')}), agents in rules mode; "
+                f"{budget.calls} verifier calls, ${budget.spent:.4f}")
+    else:
+        mode = "no API key: agents in rules mode, verifier code rules only"
     md = md.replace("# Eval results\n", f"# Eval results\n\nMode: {mode}.\n", 1)
     if a.out:
         a.out.write_text(md)
