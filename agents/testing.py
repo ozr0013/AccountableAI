@@ -10,12 +10,16 @@ from contracts.models import Document, LedgerLine
 class ScriptedLLM:
     """Returns the queued answers in order (a model instance, or None for 'call failed')."""
 
-    def __init__(self, *answers):
+    def __init__(self, *answers, thinking: str | None = None, model: str = "scripted"):
         self.answers = list(answers)
         self.prompts: list[str] = []
+        self.thinking, self.model = thinking, model
 
     def __call__(self, schema, system, user):
+        from agents.llm import report_call
         self.prompts.append(user)
+        report_call(model=self.model, thinking=self.thinking or "", input_tokens=100,
+                    output_tokens=50, ms=1)
         if not self.answers:
             return None
         a = self.answers.pop(0)
