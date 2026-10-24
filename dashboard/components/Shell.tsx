@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Building, Gavel, Home, Inbox, ListIcon, Mark, Shield, Spark } from "./Icons";
 import { DemoBar } from "./DemoBar";
@@ -39,10 +40,12 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/ask", label: "Ask about Keyway", icon: Spark },
   ];
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
+  // The aura theme is in review on the overview only; the other pages keep the current look.
+  const aura = path === "/overview";
 
   return (
     <DocProvider>
-      <div className="shell">
+      <div className={aura ? "shell theme-aura" : "shell"}>
         <aside className="side">
           <Link href="/" className="brand" aria-label="AccountableAI home">
             <Mark className="brand-mark" />
@@ -81,6 +84,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <main className="main">
+          {aura && <Aura />}
           <div className="wrap">{children}</div>
         </main>
         <ResponsesPanel />
