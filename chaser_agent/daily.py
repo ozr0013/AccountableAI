@@ -5,11 +5,16 @@ Code decides every step; nothing here calls a model or sends a message.
     1. Find the vendor's rules (SpacetimeDB `agreement_rule`, written by the agreement agent).
        No agreement -> skip. Agreement waiting for the controller -> hold, do not chase.
     2. Deadline = invoice received + `pay_within_days` (calendar or business days).
-    3. Bank shows the invoice paid in full -> hand off to the anomaly agent.
+    3. The bank shows any payment for the invoice -> hand off to the anomaly agent, which checks
+       the amount (including partial payments), recipient and timing.
     4. Not past the deadline -> wait.
-    5. Overdue -> next reminder on the approved ladder (polite -> firm -> escalation), at least
-       five days apart, drafted from a controller-approved template.
-    6. After the escalation reminder -> escalate to the owner and the management company.
+    5. Overdue -> next reminder on the approved ladder (polite -> firm -> escalation). Spacing
+       comes from the agreement's reminder or grace clause (`reminder_cadence`), never below the
+       approved 5-day floor. The polite reminder is queued automatically; firm and escalation
+       reminders wait for controller approval. A declined draft is redrafted after one cadence.
+    6. One cadence after the escalation reminder -> escalate: notify the owner and the
+       management company, propose holding the amount owed from the next funding, and open a
+       controller review.
 """
 from __future__ import annotations
 
@@ -20,9 +25,11 @@ from datetime import date, timedelta
 
 from rails.guards import render
 from rails.guards.policy import policy_check
-from rails.guards.templates import LEVEL_ORDER
+from rails.guards.templates import LEVEL_ORDER, MIN_DAYS_BETWEEN
 
 _SUFFIX = re.compile(r"\b(llc|inc|co|corp|ltd|company|l\.l\.c\.)\b\.?", re.IGNORECASE)
+AUTO_LEVELS = {"polite"}               # sent without approval; firmer levels need the controller
+DELIVERED = {"queued", "approved"}
 
 
 def norm_name(name: str) -> str:
@@ -44,7 +51,7 @@ def add_days(start: date, days: int, basis: str) -> date:
 class Decision:
     invoice_id: str
     vendor_name: str
-    action: str                    # skip | hold | not_due | handoff_anomaly | reminder | escalate | wait
+    action: str          # skip | hold | not_due | handoff_anomaly | reminder | escalate | wait
     reason: str
     level: str | None = None
     due_date: str | None = None
@@ -53,6 +60,8 @@ class Decision:
     message: str | None = None
     rule_id: str | None = None
     rule_quote: str | None = None
+    status: str = "recorded"   # queued | needs_approval | needs_controller | recorded
+    attempt: int = 0
 
     @property
     def recorded(self) -> bool:
@@ -60,11 +69,10 @@ class Decision:
         return self.action in ("reminder", "escalate", "handoff_anomaly", "hold")
 
     def action_id(self) -> str:
-        tail = self.level or self.action
-        return f"{self.invoice_id}:{self.action}:{tail}"
+        return f"{self.invoice_id}:{self.action}:{self.level or self.action}:{self.attempt}"
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return {**asdict(self), "action_id": self.action_id()}
 
 
 def _rules_by_vendor(rule_rows: list[dict]) -> dict[str, list[dict]]:
@@ -73,6 +81,17 @@ def _rules_by_vendor(rule_rows: list[dict]) -> dict[str, list[dict]]:
         out.setdefault(norm_name(r["vendor_name"]), []).append(
             {**r, "params": json.loads(r["params"]) if isinstance(r["params"], str) else r["params"]})
     return out
+
+
+def _cadence(rules: list[dict]) -> tuple[int, str]:
+    rule = next((r for r in rules if r["rule_type"] == "reminder_cadence"
+                 and r["status"] == "active"), None)
+    if rule is None:
+        return MIN_DAYS_BETWEEN, f"approved default of {MIN_DAYS_BETWEEN} days"
+    days = int(rule["params"]["days"])
+    if days < MIN_DAYS_BETWEEN:
+        return MIN_DAYS_BETWEEN, f"agreement says {days} days; approved floor is {MIN_DAYS_BETWEEN}"
+    return days, f"agreement: {rule.get('source_quote') or rule['check']}"
 
 
 def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history: list[dict],
@@ -96,37 +115,66 @@ def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history
     cite = {"rule_id": term["rule_id"], "rule_quote": term.get("source_quote"),
             "due_date": due.isoformat()}
     owed = round(line.amount - line.paid_amount, 2)
-    if owed <= 0:
-        return Decision(**base, **cite, action="handoff_anomaly",
-                        reason=f"bank shows ${line.paid_amount:,.2f} paid on {line.paid_on}; "
-                               "anomaly agent checks amount, recipient and timing")
+    if line.paid_amount > 0:
+        what = "in full" if owed <= 0 else f"of ${line.amount:,.2f} (${owed:,.2f} short)"
+        return Decision(**base, **cite, action="handoff_anomaly", amount_owed=max(owed, 0),
+                        reason=f"bank shows ${line.paid_amount:,.2f} paid {what} on "
+                               f"{line.paid_on}; anomaly agent checks amount, recipient and timing")
     if today <= due:
         return Decision(**base, **cite, action="not_due", amount_owed=owed,
                         reason=f"due {due} ({(due - today).days} days left) under "
                                f"'{term['check']}'")
+    return _chase(base, cite, line, manager_name, rules, history, today, due, owed)
+
+
+def _chase(base, cite, line, manager_name, rules, history, today, due, owed) -> Decision:
     overdue = (today - due).days
-    sent = sorted((h for h in history if h["action"] == "reminder"), key=lambda h: h["as_of"])
-    levels = [h["level"] for h in sent]
-    if levels and levels[-1] == LEVEL_ORDER[-1]:
+    every, why_every = _cadence(rules)
+    common = {**base, **cite, "days_overdue": overdue, "amount_owed": owed}
+    drafts = sorted((h for h in history if h["action"] == "reminder"),
+                    key=lambda h: (h["as_of"], h["action_id"]))
+    if any(h["status"] == "needs_approval" for h in drafts):
+        return Decision(**common, action="wait", reason="reminder draft awaiting controller approval")
+    sent = [h for h in drafts if h["status"] in DELIVERED]
+    since = (today - date.fromisoformat(sent[-1]["as_of"])).days if sent else None
+    if sent and sent[-1]["level"] == LEVEL_ORDER[-1]:
         if any(h["action"] == "escalate" for h in history):
-            return Decision(**base, **cite, action="wait", days_overdue=overdue, amount_owed=owed,
-                            reason="already escalated to the owner and management")
-        return Decision(**base, **cite, action="escalate", days_overdue=overdue, amount_owed=owed,
-                        reason=f"{overdue} days past the {due} deadline after all three "
-                               "reminders; owner and management notified")
-    level = LEVEL_ORDER[LEVEL_ORDER.index(levels[-1]) + 1] if levels else LEVEL_ORDER[0]
-    last = date.fromisoformat(sent[-1]["as_of"]) if sent else None
+            return Decision(**common, action="wait",
+                            reason="escalated; waiting for payment or the controller's decision")
+        if since < every:
+            return Decision(**common, action="wait",
+                            reason=f"escalation reminder sent {since} days ago; escalating "
+                                   f"after {every} ({why_every})")
+        notice = (f"{line.invoice_id} ({base['vendor_name']}): ${owed:,.2f} is {overdue} days past "
+                  f"the {due} deadline after all three reminders. Notified: Oakline (owner) and "
+                  f"{manager_name} (management). Proposed: hold ${owed:,.2f} from the next funding "
+                  f"to {manager_name} until it is paid. Controller decision required.")
+        return Decision(**common, action="escalate", status="needs_controller", message=notice,
+                        reason="escalated to owner and management; hold proposed for the controller")
+    level = LEVEL_ORDER[LEVEL_ORDER.index(sent[-1]["level"]) + 1] if sent else LEVEL_ORDER[0]
+    declined = [h for h in drafts if h["status"] == "rejected"]
+    if declined and declined[-1]["level"] == level:
+        ago = (today - date.fromisoformat(declined[-1]["as_of"])).days
+        if ago < every:
+            return Decision(**common, action="wait",
+                            reason=f"controller declined the {level} reminder {ago} days ago; "
+                                   f"redrafting after {every} days")
+    if since is not None and since < every:
+        return Decision(**common, action="wait",
+                        reason=f"last reminder {since} days ago; next after {every} ({why_every})")
     ok, why = policy_check("send_chase", "chaser", {
-        "template_id": f"tpl-{level}", "prior_levels": levels,
-        "days_since_last": (today - last).days if last else None})
+        "template_id": f"tpl-{level}", "prior_levels": [h["level"] for h in sent],
+        "days_since_last": since})
     if not ok:
-        return Decision(**base, **cite, action="wait", days_overdue=overdue, amount_owed=owed,
-                        reason=f"next reminder not due yet ({why})")
+        return Decision(**common, action="wait", reason=f"next reminder not allowed yet ({why})")
     body = render(f"tpl-{level}", manager_name=manager_name, amount=f"${owed:,.2f}",
-                  vendor_name=vendor_name, invoice_ref=line.invoice_id)
-    return Decision(**base, **cite, action="reminder", level=level, days_overdue=overdue,
-                    amount_owed=owed, message=body,
-                    reason=f"{overdue} days past the {due} deadline; {level} reminder drafted")
+                  vendor_name=base["vendor_name"], invoice_ref=line.invoice_id)
+    auto = level in AUTO_LEVELS
+    return Decision(**common, action="reminder", level=level, message=body,
+                    status="queued" if auto else "needs_approval",
+                    attempt=sum(h["level"] == level for h in drafts),
+                    reason=f"{overdue} days past the {due} deadline; {level} reminder "
+                           + ("queued automatically" if auto else "drafted for controller approval"))
 
 
 def run(rails, rule_rows: list[dict], history_rows: list[dict], today: date,

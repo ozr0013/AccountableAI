@@ -1,14 +1,13 @@
-"""The chaser's daily decisions: deadline from the agreement rule, ladder, hand-off, holds."""
+"""The chaser's daily decisions: agreement deadline and cadence, approvals, escalation, hand-off."""
 from datetime import date
 
 from chaser_agent.daily import add_days, decide, norm_name
 from contracts.models import LedgerLine
 
-RULES = [{"rule_id": "doc:pay_within_days", "rule_type": "pay_within_days", "status": "active",
-          "params": {"days": 30, "basis": "calendar"}, "check": "Pay within 30 days",
-          "source_quote": "Within 30 days of receipt"},
-         {"rule_id": "doc:payee", "rule_type": "payee", "status": "active",
-          "params": {"vendor": "Rio Grande Plumbing LLC"}, "check": "", "source_quote": "x"}]
+DEADLINE = {"rule_id": "doc:pay_within_days", "rule_type": "pay_within_days", "status": "active",
+            "params": {"days": 30, "basis": "calendar"}, "check": "Pay within 30 days",
+            "source_quote": "Within 30 days of receipt"}
+RULES = [DEADLINE]
 
 
 def _line(paid=0.0):
@@ -21,8 +20,9 @@ def _decide(today, history=(), rules=RULES, paid=0.0):
     return decide(_line(paid), "Rio Grande Plumbing", "Keyway", rules, list(history), today)
 
 
-def _sent(level, on):
-    return {"action": "reminder", "level": level, "as_of": on}
+def _row(level, on, status, action="reminder"):
+    return {"action": action, "level": level, "as_of": on, "status": status,
+            "action_id": f"INV-KW-0301:{action}:{level}:{on}"}
 
 
 def test_deadline_comes_from_the_agreement_rule():
@@ -30,29 +30,53 @@ def test_deadline_comes_from_the_agreement_rule():
     assert d.action == "not_due" and d.due_date == "2026-04-02" and d.rule_id == "doc:pay_within_days"
 
 
-def test_overdue_gets_the_polite_reminder_citing_the_rule():
+def test_polite_reminder_is_queued_without_approval():
     d = _decide(date(2026, 4, 22))
-    assert d.action == "reminder" and d.level == "polite" and d.days_overdue == 20
+    assert d.action == "reminder" and d.level == "polite" and d.status == "queued"
     assert "INV-KW-0301" in d.message and d.rule_quote == "Within 30 days of receipt"
 
 
-def test_ladder_climbs_five_days_apart_then_escalates_once():
-    h = [_sent("polite", "2026-04-22")]
-    assert _decide(date(2026, 4, 24), h).action == "wait"
-    assert _decide(date(2026, 4, 27), h).level == "firm"
-    h += [_sent("firm", "2026-04-27"), _sent("escalation", "2026-05-02")]
-    assert _decide(date(2026, 5, 3), h).action == "escalate"
-    h += [{"action": "escalate", "level": None, "as_of": "2026-05-03"}]
+def test_firm_reminder_needs_the_controller_and_blocks_until_decided():
+    h = [_row("polite", "2026-04-22", "queued")]
+    firm = _decide(date(2026, 4, 27), h)
+    assert firm.level == "firm" and firm.status == "needs_approval"
+    h.append(_row("firm", "2026-04-27", "needs_approval"))
+    assert "awaiting controller approval" in _decide(date(2026, 5, 10), h).reason
+
+
+def test_declined_reminder_is_redrafted_after_one_cadence():
+    h = [_row("polite", "2026-04-22", "queued"), _row("firm", "2026-04-27", "rejected")]
+    assert _decide(date(2026, 4, 29), h).action == "wait"
+    again = _decide(date(2026, 5, 2), h)
+    assert again.level == "firm" and again.attempt == 1
+
+
+def test_cadence_comes_from_the_agreement_with_a_five_day_floor():
+    weekly = RULES + [{"rule_id": "doc:reminder_cadence", "rule_type": "reminder_cadence",
+                       "status": "active", "params": {"days": 7}, "check": "",
+                       "source_quote": "reminder every 7 days"}]
+    h = [_row("polite", "2026-04-22", "queued")]
+    assert _decide(date(2026, 4, 28), h, weekly).action == "wait"
+    assert _decide(date(2026, 4, 29), h, weekly).level == "firm"
+    fast = RULES + [{**weekly[-1], "params": {"days": 2}}]
+    assert "approved floor is 5" in _decide(date(2026, 4, 25), h, fast).reason
+
+
+def test_escalation_notifies_both_proposes_a_hold_and_needs_the_controller():
+    h = [_row("polite", "2026-04-22", "queued"), _row("firm", "2026-04-27", "approved"),
+         _row("escalation", "2026-05-02", "approved")]
     assert _decide(date(2026, 5, 4), h).action == "wait"
+    d = _decide(date(2026, 5, 7), h)
+    assert d.action == "escalate" and d.status == "needs_controller"
+    assert "Oakline (owner)" in d.message and "hold $1,240.00" in d.message
+    h.append(_row(None, "2026-05-07", "needs_controller", action="escalate"))
+    assert _decide(date(2026, 5, 8), h).action == "wait"
 
 
-def test_paid_in_full_hands_off_to_the_anomaly_agent():
+def test_any_payment_hands_off_to_the_anomaly_agent():
     assert _decide(date(2026, 4, 22), paid=1240.0).action == "handoff_anomaly"
-
-
-def test_partial_payment_chases_what_is_still_owed():
-    d = _decide(date(2026, 4, 22), paid=1000.0)
-    assert d.action == "reminder" and d.amount_owed == 240.0 and "$240.00" in d.message
+    partial = _decide(date(2026, 4, 22), paid=1000.0)
+    assert partial.action == "handoff_anomaly" and "$240.00 short" in partial.reason
 
 
 def test_agreement_waiting_for_controller_is_held_not_chased():
@@ -65,5 +89,5 @@ def test_no_agreement_is_skipped():
 
 
 def test_business_days_skip_weekends_and_names_match_without_suffixes():
-    assert add_days(date(2026, 4, 24), 2, "business") == date(2026, 4, 28)   # Fri + 2 -> Tue
+    assert add_days(date(2026, 4, 24), 2, "business") == date(2026, 4, 28)
     assert norm_name("Rio Grande Plumbing LLC") == norm_name("Rio Grande Plumbing")

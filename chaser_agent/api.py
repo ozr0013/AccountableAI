@@ -8,13 +8,18 @@ Triggers
                                (default 86400, once a day)
 Reads
     GET  /chaser/actions       every recorded action (reminders, escalations, hand-offs, holds)
+Controller (Authorization: Bearer $CONTROLLER_API_TOKEN)
+    POST /chaser/actions/{action_id}/decide   {"approve": true|false, "note": "..."}
+         approves or declines a firm / escalation reminder, or an escalation and its hold
 Replies
     POST /chaser/reply         a manager's reply: Claude reads it, code checks the proof
 
 In:  invoices and bank payments from PostgreSQL (rails), each vendor's rules from SpacetimeDB
      `agreement_rule`, and earlier actions from `chase_action`.
 Out: one decision per invoice; reminders, escalations, hand-offs and holds are saved to
-     `chase_action`. Reminders are drafts from controller-approved templates: nothing is sent.
+     `chase_action`. The polite reminder is queued automatically; firm and escalation reminders
+     and escalations wait for the controller. Queued messages go to the outbox; no transport is
+     configured, so nothing is actually emailed.
 """
 from __future__ import annotations
 
@@ -26,7 +31,7 @@ from datetime import date
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import daily
@@ -66,12 +71,23 @@ def _rails():
     return RealRails()
 
 
+def history(mirror) -> list[dict]:
+    """Recorded actions with the controller's decision applied to their status."""
+    decided = {d["action_id"]: d for d in mirror.query("SELECT * FROM chase_decision")}
+    out = []
+    for row in mirror.query("SELECT * FROM chase_action"):
+        d = decided.get(row["action_id"])
+        out.append({**row, "status": d["status"], "decided_by": d["decided_by"],
+                    "decision_note": d["note"]} if d else row)
+    return out
+
+
 def run_once(as_of: date | None = None, rails=None, mirror=None) -> dict:
     with _lock:
         rails, mirror = rails or _rails(), mirror or _mirror()
         today = as_of or rails.now()
         decisions = daily.run(rails, mirror.query("SELECT * FROM agreement_rule"),
-                              mirror.query("SELECT * FROM chase_action"), today, MANAGER)
+                              history(mirror), today, MANAGER)
         saved = 0
         for d in decisions:
             if not d.recorded:
@@ -79,9 +95,7 @@ def run_once(as_of: date | None = None, rails=None, mirror=None) -> dict:
             mirror.call("record_chase", [
                 d.action_id(), d.invoice_id, d.vendor_name, d.action, _opt(d.level),
                 _opt(d.due_date), d.days_overdue, float(d.amount_owed), _opt(d.message), d.reason,
-                _opt(d.rule_id), _opt(d.rule_quote),
-                "drafted" if d.action in ("reminder", "escalate") else "recorded",
-                today.isoformat()])
+                _opt(d.rule_id), _opt(d.rule_quote), d.status, today.isoformat()])
             saved += 1
         counts: dict[str, int] = {}
         for d in decisions:
@@ -107,7 +121,7 @@ def run(as_of: date | None = Query(None, description="check as of this day (defa
 
 @app.get("/chaser/actions")
 def actions(invoice_id: str | None = None) -> list[dict]:
-    rows = _mirror().query("SELECT * FROM chase_action")
+    rows = history(_mirror())
     return sorted((r for r in rows if invoice_id in (None, r["invoice_id"])),
                   key=lambda r: (r["as_of"], r["invoice_id"]))
 
@@ -141,6 +155,30 @@ def reply(body: ReplyIn) -> dict:
     return {"invoice_id": body.invoice_id, "claims_paid": reading.claims_paid,
             "proof": [c.source_id for c in reading.proof], "verdict": verdict,
             "read_by": "claude" if llm else "rules"}
+
+
+class DecideIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    approve: bool
+    note: str | None = Field(default=None, max_length=1000)
+
+
+def _controller(authorization: str | None = Header(default=None)) -> str:
+    from agreement_agent.api import controller
+    return controller(authorization)
+
+
+@app.post("/chaser/actions/{action_id}/decide")
+def decide(action_id: str, body: DecideIn, by: str = Depends(_controller)) -> dict:
+    mirror = _mirror()
+    row = next((r for r in history(mirror) if r["action_id"] == action_id), None)
+    if row is None:
+        raise HTTPException(404, "unknown chaser action")
+    if row["status"] not in ("needs_approval", "needs_controller"):
+        raise HTTPException(409, f"action is {row['status']}; nothing to decide")
+    mirror.call("decide_chase", [action_id, "approved" if body.approve else "rejected", by,
+                                 _opt(body.note)])
+    return next(r for r in history(mirror) if r["action_id"] == action_id)
 
 
 def _daily_loop(interval: float, stop: threading.Event) -> None:

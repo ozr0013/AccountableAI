@@ -8,6 +8,7 @@ required term that is missing becomes a blocking rule: no payment until the owne
     amount            invoice / payment amount matches the agreed fee or rate
     payee             the bank payment names this vendor
     pay_to_account    the bank payment goes to this bank, routing and account
+    reminder_cadence  days between payment reminders, from a grace or reminder clause
     hold_payment      a required term is missing or unclear: do not pay yet
 """
 from __future__ import annotations
@@ -109,6 +110,9 @@ def rules_for(review: Review) -> list[dict]:
             rules.append(_rule(review, f, "pay_to_account", acct,
                                f"Payments must go to {where}; any change needs controller "
                                "approval and identity checks."))
+    if (f := found.get("reminder_terms")) and (days := _days(f"{f.value} {f.quote or ''}")):
+        rules.append(_rule(review, f, "reminder_cadence", {"days": days},
+                           f"Follow up on a late payment every {days} days."))
     for name in REQUIRED:
         f = by.get(name)
         if not f or f.status != "found":

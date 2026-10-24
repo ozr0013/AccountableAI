@@ -27,6 +27,9 @@ AGREEMENT = [
     Spec("payment_amount", "Payment amount or rate", "the price, fee or rate: '$4,800', '$95 per hour'"),
     Spec("payment_info", "Payment information", "how to pay: ACH/wire with bank, routing and account, check payable to, remit-to address"),
     Spec("effective_date", "Effective date", "when the agreement starts", required=False),
+    Spec("reminder_terms", "Reminder or grace terms",
+         "how long to wait before following up on a late payment: 'grace period of N days', "
+         "'reminder every N days', 'late fee after N days'", required=False),
     Spec("signatures", "Signatures", "signed by both parties: 'By:', 'Signature', 'Name/Title/Date'", required=False),
 ]
 INVOICE = [
@@ -118,6 +121,9 @@ def find(name: str, p: Parsed) -> list[tuple[str, str]]:
         return out
     if name == "effective_date":
         return _first(r"(?:effective|dated|made (?:and entered into )?(?:as of|on))\s*(?:date\s*)?(?:as of\s*)?:?\s*(" + _DATE + ")", t)
+    if name == "reminder_terms":
+        return _first(r"((?:grace period|reminders?|follow[- ]?ups?|late (?:fee|charge))[^.]{0,80}?"
+                      r"\b(?:\w+ \()?\d+\)? (?:business |calendar )?days?\b[^.]{0,40})", t)
     if name == "signatures":
         # "By: Dana Ortiz, Controller ..." counts; "By: ________" is a blank signature line
         hits = [(v, q) for v, q in _first(r"\b(?i:by|signature|signed)\s*:\s*([A-Z][A-Za-z.'\-]+(?: [A-Z][A-Za-z.'\-]+)+)", t, 0)]

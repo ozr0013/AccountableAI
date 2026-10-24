@@ -132,6 +132,16 @@ const spacetimedb = schema({
       createdAt: t.timestamp(),
     }
   ),
+  chaseDecision: table(
+    { name: 'chase_decision', public: true },
+    {
+      actionId: t.string().primaryKey(),
+      status: t.string(),
+      decidedBy: t.string(),
+      note: t.option(t.string()),
+      decidedAt: t.timestamp(),
+    }
+  ),
   dependency: table(
     { name: 'dependency', public: true },
     {
@@ -365,3 +375,25 @@ export const recordChase = spacetimedb.reducer(
     });
   }
 );
+
+// A controller's decision on a chaser draft (approve / reject); one decision per action.
+export const decideChase = spacetimedb.reducer(
+  { actionId: t.string(), status: t.string(), decidedBy: t.string(), note: t.option(t.string()) },
+  (ctx, args) => {
+    requireWriter(ctx);
+    if (!ctx.db.chaseAction.actionId.find(args.actionId)) {
+      throw new SenderError('unknown chaser action');
+    }
+    if (ctx.db.chaseDecision.actionId.find(args.actionId)) {
+      throw new SenderError('this action was already decided');
+    }
+    ctx.db.chaseDecision.insert({ ...args, note: args.note ?? undefined, decidedAt: ctx.timestamp });
+  }
+);
+
+// Development reset: clear the chaser's actions and decisions (agreements and rules stay).
+export const clearChaser = spacetimedb.reducer(ctx => {
+  requireWriter(ctx);
+  for (const row of [...ctx.db.chaseDecision.iter()]) ctx.db.chaseDecision.actionId.delete(row.actionId);
+  for (const row of [...ctx.db.chaseAction.iter()]) ctx.db.chaseAction.actionId.delete(row.actionId);
+});
