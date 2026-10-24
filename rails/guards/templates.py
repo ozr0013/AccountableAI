@@ -1,4 +1,7 @@
-"""Controller-approved reminder templates. A reminder to a middleman can only be one of these."""
+"""Controller-approved reminder templates. A reminder to a middleman can only be one of these.
+
+Ids match the stand-in chaser in contracts/fakes (`tpl-<level>`).
+"""
 
 from __future__ import annotations
 
@@ -7,19 +10,19 @@ import string
 from .wording import banned_terms_in
 
 APPROVED_TEMPLATES: dict[str, dict] = {
-    "chase-polite-v1": {
+    "tpl-polite": {
         "level": "polite",
         "body": ("Hello {manager_name}, a friendly reminder: Oakline Homes funded {amount} for "
                  "{vendor_name} (invoice {invoice_ref}) and we have not yet seen the vendor payment "
                  "confirmed. Could you share the payment details or the vendor's confirmation?"),
     },
-    "chase-firm-v1": {
+    "tpl-firm": {
         "level": "firm",
         "body": ("Hello {manager_name}, following up on our earlier note about {amount} funded for "
                  "{vendor_name} (invoice {invoice_ref}). We still have no bank record or vendor "
                  "confirmation of payment. Please send one, or tell us what is holding it up."),
     },
-    "chase-escalation-v1": {
+    "tpl-escalation": {
         "level": "escalation",
         "body": ("Hello {manager_name}, this item is still unexplained: {amount} funded for "
                  "{vendor_name} (invoice {invoice_ref}) with no bank record or vendor confirmation. "

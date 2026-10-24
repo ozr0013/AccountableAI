@@ -32,17 +32,17 @@ def test_memory_postgres_skips_mirror(schema, monkeypatch):
 
 
 @pytest.mark.skipif(not neo4j_up(), reason="neo4j not running (docker compose up -d neo4j)")
-def test_mirror_agrees_with_postgres_and_links_sources(schema):
+def test_mirror_agrees_with_postgres_and_links_sources(schema, monkeypatch):
+    monkeypatch.setenv("MEMORY", "neo4j")
     r = RealRails(schema=schema)
     r.load(generate(scenarios=(3, 5), n_clean=5).events())
     assert r.sync_memory() is True
     m = Neo4jMirror()
     try:
         m.driver.session().run("RETURN 1").consume()
-        mine = {l.invoice_id for m_ in ("keyway", "sunbelt", "peachtree") for l in r.ledger(m_)}
         for key in ("invoice:INV-KW-0402.received", "invoice:INV-KW-0301.payment",
                     "terms:keyway.vendor_payment_days"):
-            assert [i for i in m.dependents(key) if i in mine] == r.dependents_of(key), key
+            assert m.dependents(key) == r.dependents_of(key), key
         docs = {s["doc_id"] for s in m.sources_for("INV-KW-0301")}
         assert {"doc-inv-kw-0301", "doc-bank-kw-2026-03", "doc-stmt-kw-2026-03"} <= docs
         r.sync_memory()          # idempotent

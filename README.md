@@ -128,7 +128,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
-2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (final target: Oakline, 3 managers, ~40 vendors, 6 months of funded repairs)
+2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (built: Oakline, 3 managers, 40 vendors, all 9 scenarios; 6 months of history for Sunbelt and Peachtree, Keyway from Jan 2026 to match the sample fixture)
 3. [x] Funding ledger: per manager and vendor invoice, amount Oakline funded, amount paid to the vendor, due date (from confirmed terms)
 4. [x] Matcher: vendor payments in the manager's bank records vs statement lines vs vendor confirmations; duplicate detection (scenario 8)
 5. [x] Source-trust rules (bank > manager statement; vendor confirmation > manager "paid" claim)

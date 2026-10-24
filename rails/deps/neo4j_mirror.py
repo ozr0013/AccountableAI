@@ -1,7 +1,7 @@
 """Neo4j mirror of the dependency table, for memory and the briefing view.
 
 One-way and best-effort: Postgres stays the source of truth and `dependents_of()` never reads
-this graph, so selective recheck works with Neo4j down. Sync is idempotent (MERGE everywhere).
+this graph, so selective recheck works with Neo4j down. Sync is a full replace of the mirror (the graph is derived), so it never carries stale data.
 
 Graph:  (Manager)<-[:OF]-(Invoice)-[:BILLED_BY]->(Vendor)
         (Invoice)-[:DEPENDS_ON]->(Fact)<-[:SETS]-(Source {event_id, doc_id, kind})
@@ -40,6 +40,8 @@ class Neo4jMirror:
         src = {e.id: {"event_id": e.id, "doc_id": e.payload.get("id"), "kind": e.payload.get("kind", e.type)}
                for e in events}
         with self.driver.session() as s:
+            s.run("MATCH (n) WHERE n:Invoice OR n:Manager OR n:Vendor OR n:Fact OR n:Source "
+                  "DETACH DELETE n")
             s.run("UNWIND $rows AS r MERGE (i:Invoice {id: r.id}) SET i.amount = r.amount "
                   "MERGE (m:Manager {id: r.manager}) MERGE (v:Vendor {id: r.vendor}) "
                   "MERGE (i)-[:OF]->(m) MERGE (i)-[:BILLED_BY]->(v)", rows=list(inv.values()))

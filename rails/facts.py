@@ -60,7 +60,8 @@ def fact_keys(e: Event) -> set[str]:
     if e.type == "terms_confirmed":
         return {f"terms:{e.manager_id}.{a}" for a in TERMS_ATTRS}
     if e.type == "chase_reply":
-        return {f"invoice:{i}.payment" for i in e.payload.get("invoice_ids", [])}
+        ids = e.payload.get("invoice_ids") or ([e.invoice_id] if e.invoice_id else [])
+        return {f"invoice:{i}.payment" for i in ids}
     if e.type != "document_ingested":
         return set()
     kind, iid = e.payload.get("kind"), d.get("invoice_id")

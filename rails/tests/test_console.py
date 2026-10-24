@@ -103,3 +103,27 @@ def test_http_api(con, monkeypatch):
     assert r.status_code == 200 and r.json()["affected"] == ["INV-KW-0402"]
     r = client.post("/text", json={"text": "nonsense"})
     assert r.status_code == 422 and r.json()["detail"]["suggestions"]
+
+
+@pytest.fixture
+def demo(schema):
+    """The exact world `python -m rails.load` builds for the demo."""
+    from world.generator import ALL_SCENARIOS
+    r = RealRails(schema=schema)
+    r.load(generate(13, ALL_SCENARIOS, 100).events())
+    return JudgeConsole(r)
+
+
+def test_every_example_sentence_and_preset_default_works_on_the_demo_world(demo):
+    from rails.console import PRESETS
+    from rails.console.parse import EXAMPLES
+    for text in EXAMPLES:
+        demo.apply_text(text, manager_id=None if "Keyway" in text or "Rio" in text or "Spark" in text
+                        else "keyway")
+    for p in PRESETS:
+        demo.apply_preset(p.id)
+
+
+def test_moment_on_the_demo_world_selects_only_the_electrician(demo):
+    r = demo.apply_text("The electrician's invoice only arrived Apr 1", manager_id="keyway")
+    assert r.affected == ["INV-KW-0402"]

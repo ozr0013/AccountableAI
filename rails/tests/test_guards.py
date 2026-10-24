@@ -61,16 +61,16 @@ def test_proposer_cannot_approve_and_agents_cannot_approve_or_hold():
 # -- outbound -----------------------------------------------------------------------------
 
 def test_reminders_only_from_approved_templates_on_schedule():
-    assert ok("send_chase", "chaser", {"template_id": "chase-polite-v1"})
+    assert ok("send_chase", "chaser", {"template_id": "tpl-polite"})
     assert not ok("send_chase", "chaser", {"template_id": "made-up"})
-    assert not ok("send_chase", "chaser", {"template_id": "chase-firm-v1"})                 # skipped polite
-    assert not ok("send_chase", "chaser", {"template_id": "chase-firm-v1",
+    assert not ok("send_chase", "chaser", {"template_id": "tpl-firm"})                 # skipped polite
+    assert not ok("send_chase", "chaser", {"template_id": "tpl-firm",
                                            "prior_levels": ["polite"], "days_since_last": 2})
-    assert ok("send_chase", "chaser", {"template_id": "chase-firm-v1",
+    assert ok("send_chase", "chaser", {"template_id": "tpl-firm",
                                        "prior_levels": ["polite"], "days_since_last": 5})
-    assert not ok("send_chase", "chaser", {"template_id": "chase-polite-v1",
+    assert not ok("send_chase", "chaser", {"template_id": "tpl-polite",
                                            "prior_levels": ["polite"], "days_since_last": 9})  # repeat
-    assert ok("send_chase", "chaser", {"template_id": "chase-escalation-v1",
+    assert ok("send_chase", "chaser", {"template_id": "tpl-escalation",
                                        "prior_levels": ["polite", "firm"], "days_since_last": 6})
 
 
@@ -91,7 +91,7 @@ def test_any_other_outbound_needs_approval_of_that_exact_draft():
 
 def test_templates_never_accuse_and_render():
     assert all(not banned_terms_in(t["body"]) for t in APPROVED_TEMPLATES.values())
-    text = render("chase-escalation-v1", manager_name="Keyway", amount="$1,240.00",
+    text = render("tpl-escalation", manager_name="Keyway", amount="$1,240.00",
                   vendor_name="Rio Grande Plumbing", invoice_ref="KW-0301")
     assert "unexplained" in text and "fraud" not in text.lower()
 

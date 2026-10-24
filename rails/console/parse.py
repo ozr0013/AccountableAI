@@ -52,8 +52,8 @@ def _resolve_invoice(text: str, c: JudgeConsole, manager_id: str | None,
            if info["name"].lower() in low or info["trade"] in low}
     cands = [d for d in invs if d.vendor_id in hit and (scope is None or d.manager_id == scope)]
     if len(cands) > 1 and prefer_open:      # a "paid" claim is only about something still open
-        still_open = {l.invoice_id for l in c.rails.ledger(scope) if l.paid_amount < l.amount} \
-            if scope else set()
+        still_open = {l.invoice_id for m in {d.manager_id for d in cands}
+                      for l in c.rails.ledger(m) if l.paid_amount < l.amount}
         cands = [d for d in cands if d.data["invoice_id"] in still_open] or cands
     if len(cands) == 1:
         return cands[0].data["invoice_id"]

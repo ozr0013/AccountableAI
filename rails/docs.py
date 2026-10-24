@@ -18,7 +18,7 @@ def documents_from_events(events: list[Event]) -> list[Document]:
             docs.append(Document(**e.payload))
         elif e.type == "chase_reply":
             p = e.payload
-            for iid in p.get("invoice_ids", []):
+            for iid in p.get("invoice_ids") or ([e.invoice_id] if e.invoice_id else []):
                 docs.append(Document(
                     id=f"{p.get('id', e.id)}:{iid}", kind=SourceKind.manager_reply,
                     manager_id=e.manager_id or p.get("manager_id"), dated=e.valid_from.date(),
