@@ -131,3 +131,8 @@ def test_every_example_sentence_and_preset_default_works_on_the_demo_world(demo)
 def test_moment_on_the_demo_world_selects_only_the_electrician(demo):
     r = demo.apply_text("The electrician's invoice only arrived Apr 15", manager_id="keyway")
     assert r.affected == ["INV-KW-0402"]
+
+
+def test_old_preset_name_still_works(con):
+    r = con.apply_preset("invoice_arrived")
+    assert r.affected == ["INV-KW-0402"] and due(con, "INV-KW-0402") == date(2026, 4, 25)
