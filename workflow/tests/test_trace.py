@@ -125,3 +125,63 @@ def test_timeline_tells_the_moment_day_by_day():
                for o in today["outcomes"])
     assert (today["unexplained_start"], today["unexplained_end"]) == (3140.0, 2240.0)
     assert any(d["agent"] == "cause" and d["invoice_id"] == "INV-KW-0402" for d in today["decisions"])
+
+
+class _FakeStreamingChat:
+    """Stands in for ChatAnthropic: streams thinking in pieces, then the JSON answer."""
+
+    def __init__(self, thinking: list[str], answer: str):
+        self.thinking, self.answer, self.bound = thinking, answer, None
+
+    def bind(self, **kw):
+        self.bound = kw
+        return self
+
+    def stream(self, messages):
+        from langchain_core.messages import AIMessageChunk
+        for i, piece in enumerate(self.thinking):
+            yield AIMessageChunk(content=[{"type": "thinking", "thinking": piece, "index": 0}])
+        yield AIMessageChunk(content=[{"type": "text", "text": self.answer, "index": 1}],
+                             usage_metadata={"input_tokens": 900, "output_tokens": 120,
+                                             "total_tokens": 1020},
+                             response_metadata={"model_name": "claude-sonnet-5-5"})
+
+
+def test_claude_thinking_streams_piece_by_piece_before_the_decision():
+    from agents.llm import AnthropicLLM
+    llm = AnthropicLLM.__new__(AnthropicLLM)
+    llm.model, llm.last = "claude-sonnet-5-5", {}
+    answer = ('{"cause": "unexplained", "confidence": 0.86, "explanation": "Funded Mar 5, '
+              'unpaid; the bank and the vendor both say so.", "citations": '
+              '[{"source_id": "doc-funding-kw-0305", "locator": null}]}')
+    llm.chat = _FakeStreamingChat(["Checking the bank record… ", "no payment to Rio Grande. ",
+                                   "Vendor says past due; no hold or W-9 issue."], answer)
+    tracer, live, decisions = Tracer(None), [], []
+    tracer.subscribe_live(live.append)
+    tracer.subscribe(decisions.append)
+    with tracer.run(TRIGGER):
+        TracedAgents(RealAgents(llm), tracer).classify_cause(*_cause_inputs())
+    assert llm.chat.bound["output_config"]["format"]["type"] == "json_schema"
+    kinds = [m["type"] for m in live]
+    assert kinds == ["agent_started", "thinking", "thinking", "thinking"]
+    assert live[0]["agent"] == "cause" and live[0]["invoice_id"] == "INV-KW-0301"
+    assert "".join(m["text"] for m in live[1:]).startswith("Checking the bank record… no payment")
+    [rec] = decisions
+    assert rec.mode == "llm" and rec.model == "claude-sonnet-5-5" and rec.tokens_in == 900
+    [thinking] = [s for s in rec.steps if s.kind == "thinking"]
+    assert "Vendor says past due" in thinking.text
+
+
+def test_workflow_announces_each_step_as_it_finishes(world):
+    rails, wf = world
+    live = []
+    stop = wf.subscribe_live(live.append)
+    try:
+        res = JudgeConsole(rails).apply_preset("manager_replies_paid", {"invoice_id": "INV-KW-0901"})
+        wf.handle(res.events[0])
+    finally:
+        stop()
+    steps = [m["step"] for m in live if m["type"] == "step"]
+    assert steps[:2] == ["route", "read_reply"] and steps[-1] == "finish"
+    started = [m["agent"] for m in live if m["type"] == "agent_started"]
+    assert started[0] == "chaser" and "trail" in started and "cause" in started

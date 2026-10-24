@@ -74,6 +74,24 @@ class Workflow:
         """Call fn with each DecisionRecord as it is made. Returns an unsubscribe function."""
         return self.tracer.subscribe(fn)
 
+    def subscribe_live(self, fn: Callable[[dict], None]) -> Callable[[], None]:
+        """Call fn with in-progress signals: a workflow step finishing, an agent starting,
+        Claude's thinking pieces. Returns an unsubscribe function."""
+        return self.tracer.subscribe_live(fn)
+
+    def _run(self, inp, cfg) -> dict:
+        """graph.invoke, step by step: each finished node is announced as it completes."""
+        for chunk in self.graph.stream(inp, cfg, stream_mode="updates"):
+            for node, update in chunk.items():
+                if node != "__interrupt__":
+                    notes = update.get("trace", []) if isinstance(update, dict) else []
+                    self.tracer.live({"type": "step", "step": node, "notes": notes})
+        st = self.graph.get_state(cfg)
+        out = dict(st.values)
+        if st.interrupts:
+            out["__interrupt__"] = st.interrupts
+        return out
+
     def stream(self, event: Event, ingest: bool = True) -> Iterator[DecisionRecord | RunResult]:
         """Yield this event's DecisionRecords live, then its RunResult."""
         q: queue.Queue = queue.Queue()
@@ -111,7 +129,7 @@ class Workflow:
             return RunResult(event.id, route=getattr(st.values.get("route"), "value", None),
                              waiting=st.interrupts[0].value)
         with self.tracer.run(event):
-            result = self._result(event.id, self.graph.invoke(None if st.next else {"event": event}, cfg))
+            result = self._result(event.id, self._run(None if st.next else {"event": event}, cfg))
             self._record_run(event, result)
         if event.type == "terms_confirmed" and event.manager_id:
             self._settle_terms(event.manager_id)
@@ -140,7 +158,7 @@ class Workflow:
             v = self.graph.get_state(self._cfg(eid)).values
             if v.get("manager_id") == manager_id and v.get("terms") is not None:
                 with self.tracer.run(v["event"]):
-                    self.graph.invoke(Command(resume={}), self._cfg(eid))
+                    self._run(Command(resume={}), self._cfg(eid))
 
     def resume(self, event_id: str, decision: dict) -> RunResult:
         """Continue a run paused for a human, e.g. {"approve": True, "by": "controller.dana"}."""
@@ -148,7 +166,7 @@ class Workflow:
         if not self.graph.get_state(cfg).next:
             raise ValueError(f"no paused run for {event_id}")
         with self.tracer.run(self.graph.get_state(cfg).values["event"]):
-            return self._result(event_id, self.graph.invoke(Command(resume=decision), cfg))
+            return self._result(event_id, self._run(Command(resume=decision), cfg))
 
     def waiting(self) -> list[str]:
         """Event ids of runs paused for a human (latest state of each thread)."""

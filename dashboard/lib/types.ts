@@ -109,6 +109,11 @@ export type Decision = {
   citations: Citation[]; model: string | null; tokens_in: number | null; tokens_out: number | null; ms: number;
 };
 
+export type LiveSignal =
+  | { type: "step"; step: string; notes: string[]; trigger: string | null }
+  | { type: "agent_started"; agent: string; invoice_id: string | null; question: string; trigger: string | null }
+  | { type: "thinking"; agent: string; invoice_id: string | null; text: string; trigger: string | null };
+
 export type StreamAction = { type: "action"; status: "started" | "finished"; kind: string; summary: string; as_of: string; unexplained?: number; cost?: number };
 
 // GET /api/timeline (workflow/timeline.py)

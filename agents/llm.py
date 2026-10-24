@@ -33,6 +33,18 @@ DEFAULT_MODEL = "claude-sonnet-5-5"     # README: Sonnet for agreement/trail/cau
 THINKING = {"type": "adaptive", "display": "summarized"}   # a readable summary, never raw
 
 _ATTEMPTS: ContextVar[list[dict] | None] = ContextVar("llm_attempts", default=None)
+_THINKING_SINK: ContextVar[Callable[[str], None] | None] = ContextVar("thinking_sink", default=None)
+
+
+@contextmanager
+def stream_thinking(sink: Callable[[str], None]) -> Iterator[None]:
+    """While active, Claude is streamed and each piece of its (summarized) thinking is passed to
+    sink as it arrives, so a viewer can watch it think. Without it, calls aren't streamed."""
+    token = _THINKING_SINK.set(sink)
+    try:
+        yield
+    finally:
+        _THINKING_SINK.reset(token)
 
 
 @contextmanager
@@ -77,17 +89,23 @@ class AnthropicLLM:
 
     def __call__(self, schema: type[T], system: str, user: str) -> T | None:
         start = time.monotonic()
+        messages = [("system", system), ("human", user)]
+        sink = _THINKING_SINK.get()
         try:
-            runnable = self.chat.with_structured_output(schema, method="json_schema",
-                                                        include_raw=True)
-            out = runnable.invoke([("system", system), ("human", user)])
+            if sink is not None:
+                parsed, raw, error = self._stream(schema, messages, sink)
+            else:
+                runnable = self.chat.with_structured_output(schema, method="json_schema",
+                                                            include_raw=True)
+                out = runnable.invoke(messages)
+                parsed, raw = out.get("parsed"), out.get("raw")
+                error = str(out.get("parsing_error"))[:300] if out.get("parsing_error") else None
         except Exception as e:      # noqa: BLE001 - any LLM failure falls back to rules
             log.warning("LLM call failed (%s): %s", schema.__name__, e)
             self.last = {"model": self.model, "error": f"{type(e).__name__}: {e}"[:300],
                          "ms": int((time.monotonic() - start) * 1000)}
             report_call(**self.last)
             return None
-        raw, parsed = out.get("raw"), out.get("parsed")
         usage = getattr(raw, "usage_metadata", None) or {}
         meta = getattr(raw, "response_metadata", None) or {}
         self.last = {"model": meta.get("model_name") or meta.get("model") or self.model,
@@ -95,10 +113,29 @@ class AnthropicLLM:
                      "input_tokens": usage.get("input_tokens"),
                      "output_tokens": usage.get("output_tokens"),
                      "stop_reason": meta.get("stop_reason"),
-                     "ms": int((time.monotonic() - start) * 1000),
-                     "error": str(out.get("parsing_error"))[:300] if out.get("parsing_error") else None}
+                     "ms": int((time.monotonic() - start) * 1000), "error": error}
         report_call(**self.last)
         return parsed if isinstance(parsed, schema) else None
+
+    def _stream(self, schema: type[T], messages, sink: Callable[[str], None]):
+        """Same request as with_structured_output(method="json_schema"), streamed: thinking
+        pieces go to sink as they arrive; the finished JSON is validated against schema."""
+        from langchain_anthropic.chat_models import _convert_to_anthropic_output_config_format
+        bound = self.chat.bind(output_config={
+            "format": _convert_to_anthropic_output_config_format(schema)})
+        full = None
+        for chunk in bound.stream(messages):
+            for block in chunk.content if isinstance(chunk.content, list) else []:
+                if isinstance(block, dict) and block.get("type") == "thinking" and block.get("thinking"):
+                    sink(block["thinking"])
+            full = chunk if full is None else full + chunk
+        content = getattr(full, "content", "")
+        text = content if isinstance(content, str) else "".join(
+            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+        try:
+            return schema.model_validate_json(text), full, None
+        except Exception as e:      # noqa: BLE001 - a malformed answer is a rejected answer
+            return None, full, f"could not parse the answer: {e}"[:300]
 
 
 def default_llm() -> StructuredLLM | None:

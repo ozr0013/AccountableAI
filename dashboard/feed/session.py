@@ -193,8 +193,14 @@ class DemoSession:
         """Publish each DecisionRecord of the current workflow to the live stream."""
         if self._unwatch:
             self._unwatch()
-        self._unwatch = self.wf.subscribe(
+        stop_decisions = self.wf.subscribe(
             lambda r: self.hub.publish({"type": "decision", **r.model_dump(mode="json")}))
+        stop_live = self.wf.subscribe_live(self.hub.publish)     # steps, agent starts, thinking
+
+        def unwatch():
+            stop_decisions()
+            stop_live()
+        self._unwatch = unwatch
 
     def timeline(self, days: int = 15) -> dict:
         from workflow.timeline import timeline

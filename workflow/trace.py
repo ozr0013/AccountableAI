@@ -25,7 +25,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from agents.llm import capture_attempts
+from agents.llm import capture_attempts, stream_thinking
 from contracts.models import Citation, Event
 
 log = logging.getLogger(__name__)
@@ -68,6 +68,7 @@ class Tracer:
     def __init__(self, rails=None):
         self.rails = rails
         self._subs: list[Callable[[DecisionRecord], None]] = []
+        self._live: list[Callable[[dict], None]] = []
 
     @contextmanager
     def run(self, event: Event) -> Iterator[None]:
@@ -80,6 +81,22 @@ class Tracer:
     def subscribe(self, fn: Callable[[DecisionRecord], None]) -> Callable[[], None]:
         self._subs.append(fn)
         return lambda: self._subs.remove(fn) if fn in self._subs else None
+
+    def subscribe_live(self, fn: Callable[[dict], None]) -> Callable[[], None]:
+        """In-progress signals (not kept): a step or agent starting, Claude's thinking pieces."""
+        self._live.append(fn)
+        return lambda: self._live.remove(fn) if fn in self._live else None
+
+    def live(self, message: dict) -> None:
+        if not self._live:
+            return
+        ctx = _RUN.get()
+        msg = {**message, "trigger": ctx["event"].id if ctx else None}
+        for fn in list(self._live):
+            try:
+                fn(msg)
+            except Exception:
+                log.exception("live subscriber failed")
 
     def record(self, **fields) -> DecisionRecord:
         ctx = _RUN.get()
@@ -151,28 +168,38 @@ class TracedAgents:
     def __getattr__(self, name):
         return getattr(self.inner, name)
 
-    def _call(self, fn, *args):
+    def _call(self, agent: str, invoice_id: str | None, question: str, fn, *args):
         start = time.monotonic()
-        with capture_attempts() as attempts:
+        self.tracer.live({"type": "agent_started", "agent": agent, "invoice_id": invoice_id,
+                          "question": question})
+
+        def thinking(piece: str) -> None:
+            self.tracer.live({"type": "thinking", "agent": agent, "invoice_id": invoice_id,
+                              "text": piece})
+
+        with capture_attempts() as attempts, stream_thinking(thinking):
             out = fn(*args)
         model_steps, mode, usage = _model_steps(attempts)
         return out, model_steps, mode, usage, int((time.monotonic() - start) * 1000)
 
     def extract_terms(self, agreement):
-        t, ms_steps, mode, usage, ms = self._call(self.inner.extract_terms, agreement)
+        q = f"What does {agreement.id} require?"
+        t, ms_steps, mode, usage, ms = self._call("agreement", None, q, self.inner.extract_terms, agreement)
         terms = [(n, getattr(t, n)) for n in ("vendor_payment_days", "holdback_pct",
                                               "holdback_condition", "approval_limit") if getattr(t, n)]
         steps = [ReasonStep(kind="evidence", text=f"Clause {v.citation.locator}: “{v.citation.quote}”",
                             citations=[v.citation]) for _, v in terms]
         steps += ms_steps + [ReasonStep(kind="result", text="Proposed terms (a controller must confirm): "
                                         + ", ".join(f"{n}={v.value}" for n, v in terms))]
-        self.tracer.record(agent="agreement", question=f"What does {agreement.id} require?",
+        self.tracer.record(agent="agreement", question=q,
                            steps=steps, answer={n: v.value for n, v in terms}, mode=mode,
                            citations=[v.citation for _, v in terms], ms=ms, **usage)
         return t
 
     def build_trail(self, line, docs):
-        trail, ms_steps, mode, usage, ms = self._call(self.inner.build_trail, line, docs)
+        q = f"What really happened to the payment for {line.invoice_id}?"
+        trail, ms_steps, mode, usage, ms = self._call("trail", line.invoice_id, q,
+                                                      self.inner.build_trail, line, docs)
         steps = [ReasonStep(kind="evidence", text=f"{e.on or 'undated'} · {e.claim}",
                             citations=[e.citation]) for e in trail.entries]
         steps.append(ReasonStep(kind="rule", text="Source-trust rules: bank record > vendor "
@@ -182,7 +209,7 @@ class TracedAgents:
         steps.append(ReasonStep(kind="result", text=f"Winner: {trail.winning_claim}"
                                 + (" (sources disagree)" if trail.conflict else "")))
         self.tracer.record(agent="trail", invoice_id=line.invoice_id,
-                           question=f"What really happened to the payment for {line.invoice_id}?",
+                           question=q,
                            steps=steps, answer={"winning_claim": trail.winning_claim,
                                                 "conflict": trail.conflict},
                            mode=mode, citations=trail.winning_sources, ms=ms, **usage)
@@ -190,7 +217,9 @@ class TracedAgents:
 
     def classify_cause(self, line, trail, terms):
         from agents.cause.rules import hard_facts
-        f, ms_steps, mode, usage, ms = self._call(self.inner.classify_cause, line, trail, terms)
+        q = f"Why is {line.invoice_id} delayed, and whose side is it on?"
+        f, ms_steps, mode, usage, ms = self._call("cause", line.invoice_id, q,
+                                                  self.inner.classify_cause, line, trail, terms)
         facts = hard_facts(line, trail, terms)
         days = terms.vendor_payment_days
         steps = [
@@ -209,13 +238,16 @@ class TracedAgents:
         steps.append(ReasonStep(kind="result", text=f"Cause: {f.cause.value.replace('_', ' ')}. "
                                 f"{f.explanation}", citations=f.citations))
         self.tracer.record(agent="cause", invoice_id=line.invoice_id,
-                           question=f"Why is {line.invoice_id} delayed, and whose side is it on?",
+                           question=q,
                            steps=steps, answer={"cause": f.cause.value}, confidence=f.confidence,
                            mode=mode, citations=f.citations, ms=ms, **usage)
         return f
 
     def draft_chase(self, manager_id, alerts, prior):
-        msg, ms_steps, mode, usage, ms = self._call(self.inner.draft_chase, manager_id, alerts, prior)
+        q = f"Which reminder should {manager_id} get next?"
+        invoices = sorted({i for a in alerts for i in a.draft.invoice_ids})
+        msg, ms_steps, mode, usage, ms = self._call("chaser", (invoices or [None])[0], q,
+                                                    self.inner.draft_chase, manager_id, alerts, prior)
         sent = [p.level for p in prior if p.sent_at]
         steps = [ReasonStep(kind="fact", text=f"Earlier reminders for {', '.join(msg.invoice_ids)}: "
                                               f"{', '.join(sent) or 'none'}"),
@@ -224,13 +256,15 @@ class TracedAgents:
                  *ms_steps,
                  ReasonStep(kind="result", text=f"Next: {msg.level} reminder ({msg.template_id})")]
         self.tracer.record(agent="chaser", invoice_id=(msg.invoice_ids or [None])[0],
-                           question=f"Which reminder should {manager_id} get next?", steps=steps,
+                           question=q, steps=steps,
                            answer={"level": msg.level, "template_id": msg.template_id,
                                    "invoice_ids": msg.invoice_ids}, mode=mode, ms=ms, **usage)
         return msg
 
     def read_reply(self, reply_text, manager_id, docs):
-        r, ms_steps, mode, usage, ms = self._call(self.inner.read_reply, reply_text, manager_id, docs)
+        q = "Does the manager's reply prove payment?"
+        r, ms_steps, mode, usage, ms = self._call("chaser", None, q, self.inner.read_reply,
+                                                  reply_text, manager_id, docs)
         steps = [ReasonStep(kind="evidence", text=f"{manager_id} wrote: “{reply_text}”"),
                  ReasonStep(kind="rule", text="A reply is never proof by itself. Only a bank record "
                                               "or the vendor's confirmation showing the payment counts."),
@@ -241,13 +275,15 @@ class TracedAgents:
                      "Claims payment with no vendor or bank proof: holding position"
                      if r.claims_paid else "Does not claim payment"), citations=r.proof)]
         self.tracer.record(agent="chaser", invoice_id=(r.invoice_ids or [None])[0],
-                           question="Does the manager's reply prove payment?", steps=steps,
+                           question=q, steps=steps,
                            answer={"claims_paid": r.claims_paid, "proof": [c.source_id for c in r.proof]},
                            mode=mode, citations=r.proof, ms=ms, **usage)
         return r
 
     def build_case(self, manager_id, alerts):
-        case, ms_steps, mode, usage, ms = self._call(self.inner.build_case, manager_id, alerts)
+        q = f"How much of the next funding to {manager_id} should be held?"
+        case, ms_steps, mode, usage, ms = self._call("case", None, q, self.inner.build_case,
+                                                     manager_id, alerts)
         held = [a for a in alerts if a.draft.id in case.alerts]
         steps = [ReasonStep(kind="fact", text=f"{a.draft.invoice_ids[0]}: ${a.draft.amount:,.2f} "
                                               "funded and still unpaid, unexplained",
@@ -257,8 +293,7 @@ class TracedAgents:
                                                   "unexplained items. Agents only recommend."))
         steps += ms_steps
         steps.append(ReasonStep(kind="result", text=case.summary))
-        self.tracer.record(agent="case", question=f"How much of the next funding to {manager_id} "
-                                                  "should be held?", steps=steps,
+        self.tracer.record(agent="case", question=q, steps=steps,
                            answer={"proposed_hold": case.proposed_hold, "alerts": case.alerts},
                            mode=mode, citations=case.evidence, ms=ms, **usage)
         return case
@@ -275,6 +310,9 @@ class TracedVerifier:
 
     def verify(self, draft, evidence):
         start = time.monotonic()
+        q = f"Does the alert “{draft.headline}” survive scrutiny?"
+        self.tracer.live({"type": "agent_started", "agent": "verifier",
+                          "invoice_id": (draft.invoice_ids or [None])[0], "question": q})
         v = self.inner.verify(draft, evidence)
         meta = v.meta or {}
         steps = [ReasonStep(kind="evidence", text=f"Claim: {c.text}", citations=c.citations)
@@ -285,7 +323,7 @@ class TracedVerifier:
         steps.append(ReasonStep(kind="result", text=f"Verdict: {v.status.value}",
                                 citations=v.counter_evidence))
         self.tracer.record(agent="verifier", invoice_id=(draft.invoice_ids or [None])[0],
-                           question=f"Does the alert “{draft.headline}” survive scrutiny?",
+                           question=q,
                            steps=steps, answer={"alert_id": draft.id, "status": v.status.value},
                            mode="llm" if meta.get("stage") == "model" else "rules",
                            model=meta.get("model"), tokens_in=meta.get("input_tokens"),

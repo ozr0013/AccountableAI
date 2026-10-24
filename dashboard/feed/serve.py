@@ -131,8 +131,10 @@ def timeline(days: int = 15):
 
 @app.get("/api/stream")
 async def stream(request: Request):
-    """Server-Sent Events: each agent decision (reasoning steps, mode, Claude's thinking) and
-    each action's start/finish, as they happen. Connect directly to this server (not through
+    """Server-Sent Events, as they happen: `step` (a workflow step finished), `agent_started`
+    (which agent runs next, on which invoice), `thinking` (a piece of Claude's summarized
+    thinking, streamed), `decision` (the finished record: reasoning steps, mode, citations),
+    and `action` (an action's start/finish). Connect directly to this server (not through
     the Next.js dev proxy, which may buffer the stream)."""
     hub = session().hub
     q = hub.add()
