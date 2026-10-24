@@ -94,6 +94,16 @@ class _CapturingAgents:
         return f
 
 
+def _cause_for_paid(rails, agents, manager_id: str, invoice_id: str):
+    from workflow.terms import terms_for
+    line = next((l for l in rails.ledger(manager_id) if l.invoice_id == invoice_id), None)
+    terms = terms_for(rails, agents, manager_id)
+    if line is None or terms is None:
+        return None
+    trail = agents.build_trail(line, rails.documents(manager_id, invoice_id))
+    return agents.classify_cause(line, trail, terms)
+
+
 def _moment_events(as_of) -> list[Event]:
     """The judge moment, as the Judge Console would emit it: first a bare 'we paid the
     electrician' reply (must not change anything), then the real fact (invoice arrived Apr 1)."""
@@ -146,7 +156,8 @@ def run_system(system: str, n_clean: int = 30, seed: int = 13) -> RunResult:
             # Manager-wide pattern alerts list their invoices as context; they belong to scenario 4.
             alerts = [a for a in all_alerts if inv in a.draft.invoice_ids
                       and a.draft.kind != AlertKind.recurring_pattern]
-            mgr = mgr or next((a.draft.manager_id for a in alerts), None)
+            mgr = mgr or next((m.id for m in world.managers
+                               if any(l.invoice_id == inv for l in rails.ledger(m.id))), None)
         else:
             alerts = [a for a in all_alerts if a.draft.manager_id == mgr
                       and a.draft.kind == AlertKind.recurring_pattern]
@@ -161,6 +172,11 @@ def run_system(system: str, n_clean: int = 30, seed: int = 13) -> RunResult:
         if inv in bank_held:
             actions += ["hold_for_identity_verification", "require_controller_approval"]
         finding = agents.findings.get(inv) if inv and status.get(inv) == "delayed" else None
+        if inv and finding is None and status.get(inv) == "paid":
+            # The workflow doesn't ask the cause agent about invoices that are already paid on
+            # time (nothing to explain). To grade cause accuracy on every planted item, ask the
+            # same agent here, with the same evidence the workflow would give it.
+            finding = _cause_for_paid(rails, agents, mgr, inv)
         recon = rails.reconcile(mgr) if mgr else {"diff": 0.0}
         scenarios.append(ScenarioResult(
             scenario_id=t["scenario"],
