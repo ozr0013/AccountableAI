@@ -2,7 +2,8 @@
 
     python -m agreement_agent.api            # http://127.0.0.1:8772/docs
 
-POST /review  (multipart file, optional ?model=true for Claude, about $0.03 per document)
+POST /review  (multipart file; Claude drives the tools, about $0.03 per document;
+              ?model=false runs the free fixed rules instead)
   in:  a PDF or .txt agreement or invoice
   out: Review: kind, every required field (found / missing / unclear, with the verbatim quote
        and where it is), complete, and a drafted escalation to the owner if anything is missing.
@@ -14,10 +15,15 @@ import os
 from datetime import UTC, datetime
 from hashlib import sha256
 
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 
 from .graph import review
 from .models import Review, SourceDoc
+
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=False)
 
 MAX_BYTES = 10 * 1024 * 1024
 ALLOWED = {"application/pdf", "text/plain"}
@@ -32,7 +38,7 @@ def health() -> dict:
 
 @app.post("/review", response_model=Review)
 async def review_document(file: UploadFile = File(...),
-                          model: bool = Query(False, description="Let Claude drive the tools")) -> Review:
+                          model: bool = Query(True, description="Claude drives the tools; false runs the fixed rules")) -> Review:
     data = await file.read()
     mime = file.content_type or "application/octet-stream"
     if file.filename and file.filename.lower().endswith(".txt"):
@@ -42,7 +48,7 @@ async def review_document(file: UploadFile = File(...),
     if not data or len(data) > MAX_BYTES:
         raise HTTPException(413, "file must be between 1 byte and 10 MB")
     if model and not os.getenv("ANTHROPIC_API_KEY"):
-        raise HTTPException(400, "model mode needs ANTHROPIC_API_KEY; omit ?model=true for rules")
+        raise HTTPException(400, "Claude mode needs ANTHROPIC_API_KEY; pass ?model=false for the free rules")
     doc = SourceDoc(id=sha256(data).hexdigest()[:16], source="upload",
                     filename=file.filename or "upload", mime=mime, data=data,
                     received_at=datetime.now(UTC))

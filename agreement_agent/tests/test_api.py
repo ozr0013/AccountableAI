@@ -10,7 +10,7 @@ client = TestClient(app)
 
 
 def _upload(name, data, mime):
-    return client.post("/review", files={"file": (name, data, mime)})
+    return client.post("/review?model=false", files={"file": (name, data, mime)})
 
 
 def test_complete_agreement_has_every_field_and_no_escalation():
@@ -37,7 +37,7 @@ def test_rejects_unsupported_and_empty_uploads():
     assert _upload("x.txt", b"", "text/plain").status_code == 413
 
 
-def test_model_mode_needs_a_key(monkeypatch):
+def test_claude_is_the_default_and_needs_a_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    r = client.post("/review?model=true", files={"file": ("a.txt", b"Agreement", "text/plain")})
+    r = client.post("/review", files={"file": ("a.txt", b"Agreement", "text/plain")})
     assert r.status_code == 400
