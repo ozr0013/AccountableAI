@@ -16,7 +16,9 @@ from contracts import registry
 from contracts.models import (
     AlertDraft,
     AlertKind,
+    Case,
     Cause,
+    Citation,
     Claim,
     Document,
     Event,
@@ -361,7 +363,58 @@ class Steps:
         return {"invoice_ids": ids,
                 "trace": [f"terms confirmed by {by}; rechecking {len(ids)} invoice(s)"]}
 
-    # -- not built yet (README task 6) ---------------------------------------------
+    # -- bank-detail change (scenario 7): hold, verify identity, controller decides --------
+    def bank_change(self, s: WorkflowState) -> dict:
+        """A vendor asks to change where it gets paid. Never applied automatically: the payment
+        is held, identity must be verified through a known contact, and a controller approves.
+        No step here (or anywhere) can change bank details or move money."""
+        e, p = s.event, s.event.payload
+        doc = Document(**p) if e.type == "document_ingested" else Document(
+            id=e.id, kind=SourceKind.judge, dated=e.valid_from.date(),
+            text=f"Vendor {p.get('vendor_id')} asked to change its bank details.",
+            data={"invoice_id": e.invoice_id, "vendor_id": p.get("vendor_id")})
+        vendor = doc.vendor_id or doc.data.get("vendor_id")
+        iid = doc.data.get("invoice_id") or e.invoice_id
+        line = self._line(iid) if iid else None
+        manager = doc.manager_id or (line.manager_id if line else None) or s.manager_id
+        _, why = self.d.rails.policy_check("request_bank_change", "workflow", {})
+        at_stake = round(line.amount - line.paid_amount, 2) if line else 0.0
+        claim = Claim(text=f"Vendor {vendor} asked to change its bank details"
+                           + (f" before a ${at_stake:,.2f} payment on {iid}." if line else "."),
+                      citations=[Citation(source_id=doc.id, kind=doc.kind)])
+        draft = AlertDraft(
+            id=alert_id(AlertKind.bank_detail_change.value, manager or "?", [iid or vendor]),
+            kind=AlertKind.bank_detail_change, manager_id=manager or "", invoice_ids=[iid] if iid else [],
+            amount=at_stake, headline=f"Bank-detail change request from {vendor}: payment held",
+            claims=[claim], recommended_action=(
+                "Hold the payment. Verify the request through the vendor's known contact "
+                "(not the details in the request), then a controller approves or declines."))
+        verdict = self.d.verifier.verify(draft, [doc])
+        self.d.rails.append_event(wf_event("alert_raised", draft.id, e, {
+            "draft": draft.model_dump(mode="json"), "verdict": verdict.model_dump(mode="json"),
+            "state": "open", "withdrawn_reason": None}, manager, iid))
+        case = Case(id=f"case-bankchange-{digest(draft.id)}", manager_id=manager or "",
+                    alerts=[draft.id], proposed_hold=at_stake, evidence=claim.citations,
+                    summary=f"{vendor} asked to change bank details. Hold "
+                            f"${at_stake:,.2f} until identity is verified and a controller "
+                            "approves the change.")
+        approval = self.d.approvals.request(case)
+        self.d.rails.append_event(wf_event("bank_change_held", draft.id, e, {
+            "vendor_id": vendor, "invoice_id": iid, "held_amount": at_stake, "policy": why,
+            "approval_id": approval, "requires": ["identity_verification", "controller_approval"]},
+            manager, iid))
+        return {"raised": [draft.id], "case_id": case.id,
+                "trace": [f"bank-detail change from {vendor}: {why}; "
+                          f"${at_stake:,.2f} held pending approval {approval}"]}
+
+    def _line(self, invoice_id: str) -> LedgerLine | None:
+        for d in self.d.rails.documents():
+            if d.kind == SourceKind.vendor_invoice and d.data.get("invoice_id") == invoice_id:
+                return next((l for l in self.d.rails.ledger(d.manager_id)
+                             if l.invoice_id == invoice_id), None)
+        return None
+
+    # -- not built yet ----------------------------------------------------------------------
     def pending(self, s: WorkflowState) -> dict:
         return {"trace": [f"{s.route.value}: step not implemented yet, event recorded only"]}
 
