@@ -1,0 +1,97 @@
+"""Live Claude agents for the dashboard session, metered against an estimated spending threshold.
+
+The demo world is always replayed in rules mode (free). Switching live on only changes how the
+*next* events are handled: Kanishka's agents call Sonnet (structured output) and the verifier
+calls its model stage. Usage is estimated after each response; once the threshold is reached, further calls
+fall back to rules. A final call can exceed the threshold, and provider billing may differ.
+"""
+
+from __future__ import annotations
+
+import logging
+import os
+import threading
+
+log = logging.getLogger(__name__)
+
+PRICES = {"claude-opus-5-5": (4.0, 20.0), "claude-sonnet-5-5": (2.0, 10.0),
+          "claude-haiku-5-5": (0.10, 0.50)}
+
+
+class Meter:
+    def __init__(self, limit_usd: float):
+        self.limit, self.spent, self.calls = limit_usd, 0.0, 0
+        self.log: list[dict] = []          # newest last: {who, model, cost, in, out}
+        self._lock = threading.Lock()
+
+    @property
+    def left(self) -> float:
+        return max(0.0, self.limit - self.spent)
+
+    def ok(self) -> bool:
+        return self.spent < self.limit
+
+    def add(self, who: str, model: str, tin: int, tout: int) -> float:
+        pin, pout = PRICES.get(model, PRICES.get(model.rsplit("-", 1)[0], (4.0, 20.0)))
+        c = (tin * pin + tout * pout) / 1e6
+        with self._lock:
+            self.spent += c
+            self.calls += 1
+            self.log.append({"who": who, "model": model, "cost": round(c, 5),
+                             "input_tokens": tin, "output_tokens": tout})
+        return c
+
+    def to_json(self) -> dict:
+        return {"limit": self.limit, "spent": round(self.spent, 4), "calls": self.calls,
+                "recent": self.log[-12:]}
+
+
+class MeteredLLM:
+    """agents.llm.StructuredLLM: (schema, system, user) -> instance | None, priced and capped."""
+
+    def __init__(self, meter: Meter, model: str | None = None):
+        import anthropic
+        self.anthropic = anthropic
+        self.client = anthropic.Anthropic(timeout=120, max_retries=2)
+        self.model = model or os.getenv("AGENT_MODEL", "claude-sonnet-5-5")
+        self.meter, self.cache = meter, {}
+
+    def __call__(self, schema, system, user):
+        key = (schema.__name__, system, user)
+        if key in self.cache:
+            return self.cache[key]
+        if not self.meter.ok():
+            return None                     # budget spent: the agent uses its rules
+        try:
+            resp = self.client.messages.parse(model=self.model, max_tokens=8000, system=system,
+                                              messages=[{"role": "user", "content": user}],
+                                              output_format=schema)
+        except self.anthropic.APIError as e:
+            log.warning("agent call failed (%s): %s", schema.__name__, e)
+            return None
+        self.meter.add(schema.__name__, resp.model, resp.usage.input_tokens, resp.usage.output_tokens)
+        out = resp.parsed_output if resp.stop_reason != "refusal" else None
+        self.cache[key] = out
+        return out
+
+
+class MeteredVerifier:
+    """The verifier's model stage while the budget lasts; its code checks after that."""
+
+    def __init__(self, meter: Meter, fallback):
+        from agents.verifier.verifier import LLMVerifier
+        self.inner, self.meter, self.fallback = LLMVerifier(), meter, fallback
+
+    def verify(self, draft, evidence):
+        if not self.meter.ok():
+            return self.fallback.verify(draft, evidence)
+        v = self.inner.verify(draft, evidence)
+        m = v.meta or {}
+        if "input_tokens" in m:
+            self.meter.add("Verifier", m.get("model", "claude-haiku-5-5"),
+                           m["input_tokens"], m.get("output_tokens", 0))
+        return v
+
+
+def available() -> bool:
+    return bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN"))

@@ -161,6 +161,12 @@ class Steps:
         paid_late = (not unpaid and line.paid_on and line.due_date and line.paid_on > line.due_date)
         if not unpaid and not paid_late and not explain:
             return Assessment(**base, status="paid")
+        if not unpaid and not explain:
+            # Paid in full, just late: nothing is owed, so there is no cause to find and no item
+            # alert to raise. The recurring-pattern alert tracks lateness; skipping the cause
+            # agent and the verifier here saves two model calls per late-but-paid invoice.
+            return Assessment(**base, status="paid",
+                              note=f"paid {(line.paid_on - line.due_date).days} days late")
         if unpaid and (line.due_date is None or now <= line.due_date):
             return Assessment(**base, status="not_due", note=f"due {line.due_date}")
         terms = terms_for(self.d.rails, self.d.agents, line.manager_id)
@@ -203,7 +209,8 @@ class Steps:
                 patterned.discard(s.manager_id)
         for a in s.assessments:
             if a.status == "skipped" and a.note.startswith("duplicate of"):
-                if (line := self._line(a.invoice_id)) and (d := patterns.duplicate_draft(self.d.rails, line)):
+                if (line := self._line(a.invoice_id)) and (
+                        d := patterns.duplicate_draft(self.d.rails, line, s.now)):
                     drafts.append(d)
                 continue
             kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding and a.status == "delayed" else None
@@ -265,7 +272,14 @@ class Steps:
             target.append(draft.id)
             notes.append(f"{draft.id}: verifier {verdict.status.value}"
                          + (" (refreshed with new evidence)" if old and ok else ""))
-        withdrawn = self._withdraw_stale(s, book, {d.id for d in s.drafts})
+        still = {d.id for d in s.drafts}
+        # A refreshed alert that failed verification for an invoice that is now paid in full
+        # (for example "paid 40 days late" blocked by the verifier) must not leave the old
+        # "unpaid" alert open. Only then: a refreshed alert for something still owed that is
+        # refuted must never withdraw the original.
+        still -= {d.id for d in s.drafts if d.id in rejected and d.invoice_ids
+                  and self._is_paid(d.invoice_ids[0])}
+        withdrawn = self._withdraw_stale(s, book, still)
         withdrawn += self._fold_into_pattern(s, {d.id for d in s.drafts})
         notes += [f"{aid}: withdrawn ({why})" for aid, why in withdrawn]
         return {"raised": raised, "refreshed": refreshed, "rejected": rejected,
@@ -282,7 +296,7 @@ class Steps:
                 if al.draft.invoice_ids != [a.invoice_id] or al.draft.id in still \
                         or al.draft.kind not in ITEM_KINDS:
                     continue
-                why = self._why_not(a)
+                why = (self._paid_reason(a) if a.status == "delayed" else None) or self._why_not(a)
                 self.d.rails.append_event(wf_event(
                     "alert_withdrawn", al.draft.id, s.event,
                     {"alert_id": al.draft.id, "reason": why, "invoice_id": a.invoice_id},
@@ -313,6 +327,22 @@ class Steps:
                 s.manager_id, (al.draft.invoice_ids or [None])[0]))
         return out
 
+    def _is_paid(self, invoice_id: str) -> bool:
+        line = self._line(invoice_id)
+        return bool(line) and _cents(line.paid_amount) >= _cents(line.amount) > 0
+
+    def _paid_reason(self, a: Assessment) -> str | None:
+        """If the invoice is now paid in full, say so (and how late), whatever the cause agent
+        made of it: lateness is tracked by the recurring-pattern alert, not by an item alert."""
+        line = self._line(a.invoice_id)
+        if not line or _cents(line.paid_amount) < _cents(line.amount):
+            return None
+        late = (line.paid_on - line.due_date).days if line.paid_on and line.due_date else 0
+        when = f" on {line.paid_on}" if line.paid_on else ""
+        tail = (f"it was paid {late} days after the due date, which the lateness pattern tracks"
+                if late > 0 else "it was on time under the agreement terms")
+        return f"payment is now proven by bank or vendor records{when}; {tail}"
+
     @staticmethod
     def _why_not(a: Assessment) -> str:
         if a.status == "delayed" and a.finding and a.finding.cause == Cause.unexplained:
@@ -333,22 +363,33 @@ class Steps:
         wanted = set(s.raised)
         if s.route == Route.scan:
             wanted |= {a.draft.id for a in book.open_alerts(s.manager_id)}
-        by_mgr: dict[str, list] = {}
+        # The reminder ladder is per invoice: an item's history is only the earlier reminders
+        # that covered that same invoice. Items at the same point on their ladders (same
+        # earlier reminders) share one message.
+        groups: dict[tuple, list] = {}
+        histories: dict[tuple, list] = {}
         for aid in sorted(wanted):
             a = book.alerts[aid]
-            if aid in book.open_ids and a.draft.kind == AlertKind.unexplained_unpaid \
-                    and a.draft.amount > 0:
-                by_mgr.setdefault(a.draft.manager_id, []).append(a)
+            if aid not in book.open_ids or a.draft.kind != AlertKind.unexplained_unpaid \
+                    or a.draft.amount <= 0:
+                continue
+            mgr = a.draft.manager_id
+            prior = [c for c in book.chases.get(mgr, [])
+                     if set(c.invoice_ids) & set(a.draft.invoice_ids)]
+            key = (mgr, tuple(c.id for c in prior))
+            groups.setdefault(key, []).append(a)
+            histories[key] = prior
         sent, notes = [], []
-        for mgr, alerts in sorted(by_mgr.items()):
-            prior = book.chases.get(mgr, [])
+        for (mgr, ladder), alerts in sorted(groups.items()):
+            prior = histories[(mgr, ladder)]
             msg = self.d.agents.draft_chase(mgr, alerts, prior)
             last = prior[-1].sent_at.date() if prior and prior[-1].sent_at else None
             ok, why = self.d.rails.policy_check("send_chase", "chaser", {
                 "template_id": msg.template_id, "prior_levels": [p.level for p in prior],
                 "days_since_last": (s.now - last).days if last else None})
             if not ok and ("off schedule" in why or "already sent" in why):
-                notes.append(f"{mgr}: next reminder not due yet ({why})")
+                notes.append(f"{mgr}: next reminder for {', '.join(msg.invoice_ids)} "
+                             f"not due yet ({why})")
                 continue
             key = f"{mgr}|{msg.template_id}|{','.join(sorted(msg.invoice_ids))}"
             msg = msg.model_copy(update={"id": f"chase-{digest(key, s.event.id)}",
@@ -357,7 +398,8 @@ class Steps:
                 "chase_sent" if ok else "chase_held", key, s.event,
                 {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
             sent.append(msg.id)
-            notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why}")
+            notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why} "
+                         f"({', '.join(msg.invoice_ids)})")
         return {"chases": sent, "trace": notes}
 
     # -- reply: read it (proof only from bank/vendor records), then reassess ---------------

@@ -20,6 +20,15 @@ from .recon import reconcile as _reconcile
 log = logging.getLogger(__name__)
 
 
+class WorldMismatch(RuntimeError):
+    """The database holds a world generated with different settings."""
+
+
+def _recipe(meta: dict) -> str:
+    keys = ("seed", "scenarios", "n_clean", "moment", "as_of")
+    return ", ".join(f"{k}={meta[k]}" for k in keys if k in meta)
+
+
 class RealRails:
     def __init__(self, schema: str | None = None):
         self.store = EventStore(conn=connect(schema))
@@ -27,13 +36,16 @@ class RealRails:
 
     # -- time -----------------------------------------------------------------------------
     def now(self) -> date:
-        """The world's "today": WORLD_AS_OF, else the world_meta event, else the newest event.
-        Never the wall clock, so demos and evals are reproducible."""
+        """The world's "today": WORLD_AS_OF, else the latest `clock_advanced` event or the
+        world_meta date (whichever is later), else the newest event. Never the wall clock, so
+        demos and evals are reproducible. Time only moves forward."""
         if env := os.getenv("WORLD_AS_OF"):
             return date.fromisoformat(env)
         meta = self.store.events(type="world_meta")
         if meta:
-            return date.fromisoformat(meta[-1].payload["as_of"])
+            days = [date.fromisoformat(e.payload["as_of"])
+                    for e in meta + self.store.events(type="clock_advanced")]
+            return max(days)
         evs = self.store.events()
         return max((e.valid_from.date() for e in evs), default=date(2026, 1, 1))
 
@@ -107,6 +119,15 @@ class RealRails:
 
     # -- loading a generated world --------------------------------------------------------
     def load(self, events: list[Event]) -> int:
+        """Append a generated world. The log is append-only, so loading a *different* world on
+        top of an existing one is refused with a clear message instead of a half-load."""
+        incoming = next((e for e in events if e.type == "world_meta"), None)
+        existing = self.store.get("ev-world-meta")
+        if incoming and existing and existing.payload != incoming.payload:
+            raise WorldMismatch(
+                f"Postgres already holds a different world ({_recipe(existing.payload)}); this "
+                f"one is ({_recipe(incoming.payload)}). Reset it with `python -m rails.load "
+                f"--fresh` plus the same --scenarios/--clean, or run without RAILS=real.")
         new = sum(self.store.append(e) for e in events)
         self.deps.rebuild(self.store.events())
         self.sync_memory()

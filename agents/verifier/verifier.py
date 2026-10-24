@@ -21,10 +21,12 @@ DEFAULT_MODEL = "claude-opus-5-5"
 # Models that accept the server-side refusal fallback on the Claude API.
 _FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"}
 
-SYSTEM = """You are the verifier for AccountableAI. Oakline Homes funds property managers, \
-who must pay vendors from that money. Other agents draft alerts saying a manager has not paid \
-a vendor without explanation. Your job is to try to prove each alert WRONG, using only the \
-evidence documents provided. You defend the manager whenever the evidence supports them.
+
+SYSTEM = """You are the verifier for AccountableAI. Oakline Homes funds a property manager, \
+who must pay vendors from that money. Other agents draft alerts for Oakline's controller. Your \
+job is to try to prove each alert WRONG, using only the evidence documents provided. Alerts come \
+in several kinds; each states what it asserts and what would refute it. Judge the alert only \
+against its own assertion. Defend the manager whenever the evidence supports them.
 
 Source-trust rules:
 - Manager bank records beat the manager's monthly statement.
@@ -32,18 +34,41 @@ Source-trust rules:
 - A manager's reply saying "paid" is not proof unless a bank record or vendor confirmation backs it.
 - The management agreement is the source of truth for deadlines, holdbacks and approval limits.
 
-An alert is refuted if the evidence shows any of:
-- the vendor was in fact paid (bank record or vendor confirmation);
-- the unpaid amount is an authorized holdback the agreement allows;
-- the payment is not yet due under the agreement (e.g. within N days of invoice receipt);
-- paperwork the vendor owes (W-9, complete invoice) is missing;
-- the owner (Oakline) never funded it or has not approved it (e.g. above the approval limit).
-
-Also check each claim: is it actually supported by the documents it cites? A claim is \
-unsupported if its cited documents do not say what the claim says.
+Check each claim: is its central assertion supported by the documents it cites? Supporting \
+details (an amount, a due date, an invoice number) may come from any evidence document provided. \
+A claim is unsupported only if its cited documents do not back its central assertion, or the \
+evidence contradicts it.
 
 Rules for your own answer: cite only documents by their exact id. Do not invent facts. \
 If the evidence does not refute the alert, say so; do not refute on speculation."""
+
+# What each alert kind asserts, and what evidence would refute it.
+KIND_RULES = {
+    "unexplained_unpaid": (
+        "The manager has not paid a funded vendor invoice past its due date, with no valid reason.",
+        "the vendor was in fact paid (bank record or vendor confirmation); the unpaid amount is an "
+        "authorized holdback; the payment is not yet due under the agreement; paperwork the vendor "
+        "owes is missing; or Oakline never funded or approved it."),
+    "paperwork_request": (
+        "A vendor is unpaid because paperwork it owes (e.g. a W-9 or complete invoice) is missing; "
+        "the recommended action is to request it. This is not an accusation against the manager.",
+        "the paperwork was in fact received, or the vendor was paid."),
+    "owner_pending_approval": (
+        "An invoice is unpaid because Oakline itself has not funded or approved it (e.g. above the "
+        "approval limit). This flags Oakline's own pending action, not the manager.",
+        "Oakline did fund or approve it, or the amount is within the manager's approval limit."),
+    "bank_detail_change": (
+        "A vendor asked to change its bank details, so the payment is held until identity is "
+        "verified and a controller approves. This is a safety hold, not an accusation.",
+        "no such request exists in the evidence."),
+    "recurring_pattern": (
+        "The manager paid vendors late, beyond the agreement's payment window, in the months listed.",
+        "the evidence shows payments in those months were within the agreement's window, or the "
+        "agreement allows a longer window than stated."),
+    "duplicate_billing": (
+        "The same work was billed and funded twice under two invoice numbers.",
+        "the two invoices are for different work, periods or amounts, or only one was funded."),
+}
 
 
 class _CounterEvidence(BaseModel):
@@ -88,9 +113,16 @@ def _render_draft(draft: AlertDraft) -> str:
     return "\n".join(lines)
 
 
+def _kind_rule(draft: AlertDraft) -> str:
+    asserts, refutes = KIND_RULES.get(draft.kind.value, KIND_RULES["unexplained_unpaid"])
+    return (f"This {draft.kind.value} alert asserts: {asserts}\n"
+            f"It is refuted only if the evidence shows: {refutes}")
+
+
 class LLMVerifier:
     def __init__(self, client: anthropic.Anthropic | None = None, model: str | None = None):
-        self.client = client or anthropic.Anthropic()
+        # A stuck call must not hang the workflow: fail closed within about a minute.
+        self.client = client or anthropic.Anthropic(timeout=60, max_retries=2)
         self.model = model or os.getenv("VERIFIER_MODEL", DEFAULT_MODEL)
 
     def verify(self, draft: AlertDraft, evidence: list[Document]) -> Verdict:
@@ -131,6 +163,7 @@ class LLMVerifier:
                 "role": "user",
                 "content": f"<evidence>\n{_render_evidence(evidence)}\n</evidence>\n\n"
                            f"<alert>\n{_render_draft(draft)}\n</alert>\n\n"
+                           f"{_kind_rule(draft)}\n\n"
                            "Try to refute this alert. Check every claim.",
             }],
             output_format=_Refutation,
@@ -138,14 +171,19 @@ class LLMVerifier:
         )
 
     def _decide(self, draft, evidence, out: _Refutation, meta) -> Verdict:
-        kinds = {d.id: d.kind for d in evidence}
+        docs = {d.id: d for d in evidence}
+        kinds = {i: d.kind for i, d in docs.items()}
         unsupported = [draft.claims[c.index].text for c in out.claim_checks
                        if not c.supported and 0 <= c.index < len(draft.claims)]
         why_unsupported = [f"claim {c.index} unsupported: {c.why}" for c in out.claim_checks
                            if not c.supported]
+        # Same rule the drafts get: counter-evidence must be a real document, and a quote must
+        # actually be in it. A refutation resting on an invented quote doesn't count.
         counter = [Citation(source_id=c.source_id, kind=kinds[c.source_id],
                             locator=c.locator or None, quote=c.quote or None)
-                   for c in out.counter_evidence if c.source_id in kinds]
+                   for c in out.counter_evidence if c.source_id in docs
+                   and (not c.quote or rules._norm(c.quote) in rules._norm(docs[c.source_id].text))]
+        unchecked = sorted(set(range(len(draft.claims))) - {c.index for c in out.claim_checks})
 
         if out.refuted and counter:
             return Verdict(alert_id=draft.id, status=VerdictStatus.refuted,
@@ -153,11 +191,16 @@ class LLMVerifier:
         if unsupported:
             return Verdict(alert_id=draft.id, status=VerdictStatus.blocked,
                            reasons=why_unsupported, uncited_claims=unsupported, meta=meta)
+        if unchecked:
+            # A skipped check is not a pass: fail closed, like every other gap.
+            return Verdict(alert_id=draft.id, status=VerdictStatus.blocked, meta=meta,
+                           reasons=[f"verifier didn't check claim(s) {unchecked}; held for review"],
+                           uncited_claims=[draft.claims[i].text for i in unchecked])
 
         reasons = ["survived refutation: " + out.refutation]
         if out.refuted:
             # The verifier holds itself to the same rule: no refutation without a valid source.
-            reasons.append("refutation ignored: it cited no known evidence")
+            reasons.append("refutation ignored: it cited no known evidence (or misquoted it)")
         return Verdict(alert_id=draft.id, status=VerdictStatus.approved, reasons=reasons, meta=meta)
 
     def _fail_closed(self, draft, reason, meta=None) -> Verdict:

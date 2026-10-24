@@ -65,10 +65,10 @@ def test_moment_is_idempotent(world):
 
 def test_terms_change_rechecks_the_whole_manager(world):
     rails, wf = world
-    res = JudgeConsole(rails).apply_preset("terms_changed", {"manager_id": "keyway", "days": "30"})
+    res = JudgeConsole(rails).apply_preset("terms_changed", {"manager_id": "keyway", "days": "45"})
     [r] = [wf.handle(e) for e in res.events]
     assert PLUMBER in res.affected and len(res.affected) > 2
-    assert PLUMBER in _open(rails)                     # Mar 3 + 30 days is still past due on Apr 22
+    assert PLUMBER in _open(rails)                     # Mar 3 + 45 days (Apr 17) is still past due on Apr 22
     assert ELECTRICIAN in r.withdrawn or ELECTRICIAN not in _open(rails)
 
 

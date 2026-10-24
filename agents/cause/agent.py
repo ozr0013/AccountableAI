@@ -51,6 +51,12 @@ def fact_problems(ans: CauseAnswer, facts: dict) -> list[str]:
         p.append("payment is held for the vendor's bank-detail change; it is not unexplained")
     if facts["paid_on_time"] and ans.cause == Cause.unexplained:
         p.append("the invoice was paid on time under the agreement; it is not unexplained")
+    if ans.cause == Cause.unexplained and facts["within_holdback"] and facts["inspection_pending"]:
+        p.append("the unpaid amount is within the agreement's holdback while inspection is "
+                 "pending; it is an authorized hold, not unexplained")
+    if ans.cause == Cause.unexplained and facts.get("paperwork_hold"):
+        p.append("the manager's statement shows this payment on hold for missing vendor "
+                 "paperwork; it is paperwork pending, not unexplained")
     if ans.cause == Cause.authorized_hold and not facts["within_holdback"]:
         p.append("the unpaid amount is larger than the agreement's holdback allows")
     if ans.cause == Cause.unexplained and facts["trust_rules_winner"] == "paid" \

@@ -87,6 +87,7 @@ class World:
     terms: list[dict] = field(default_factory=list)   # human-confirmed agreement terms per manager
     facts: list[Event] = field(default_factory=list)  # facts read off documents (fact_recorded)
     moment: dict | None = None                         # the judge moment, when planted
+    recipe: dict = field(default_factory=dict)         # how it was generated (scenarios, n_clean)
 
     def events(self) -> list[Event]:
         """Everything as events, in the order a real system would learn it."""
@@ -104,7 +105,7 @@ class World:
                 evs.append(Event(id=f"ev-{kind}-{r.id}", type="entity_registered", valid_from=start,
                                  learned_at=start, payload={"kind": kind, **r.model_dump()}))
         evs.append(Event(id="ev-world-meta", type="world_meta", valid_from=start, learned_at=start,
-                         payload={"as_of": self.as_of.isoformat(), "seed": self.seed}))
+                         payload={"as_of": self.as_of.isoformat(), "seed": self.seed, **self.recipe}))
         return sorted(evs, key=lambda e: (e.learned_at, e.id))
 
     def meta(self) -> dict:
@@ -467,9 +468,11 @@ def generate(seed: int = 13, scenarios: tuple[int, ...] = (3,), n_clean: int = 1
                                 manager_id="keyway", dated=date(2026, 1, 1), text=_AGREEMENT, data={}))
     w.terms = [{"manager_id": "keyway", "vendor_payment_days": PAY_DAYS,
                 "holdback_pct": HOLDBACK_PCT, "approval_limit": APPROVAL_LIMIT}]
+    w.recipe = {"scenarios": sorted(scenarios), "n_clean": n_clean}
     _clean_invoices(w, rng, n_clean, LATE_MONTHS["keyway"] if 4 in scenarios else set())
     for s in sorted(scenarios):
         SCENARIOS[s](w, rng)
     if moment if moment is not None else set(ALL_SCENARIOS) <= set(scenarios):
         plant_moment(w)
+    w.recipe["moment"] = w.moment is not None
     return w

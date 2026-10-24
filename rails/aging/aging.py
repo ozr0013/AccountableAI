@@ -12,6 +12,7 @@ from datetime import date
 
 from contracts.models import Event
 
+from ..docs import documents_from_events
 from ..facts import current_terms
 from ..ledger import build_ledger
 from ..recon import breakdown
@@ -49,6 +50,11 @@ def _days_past_window(events: list[Event], manager_id: str, as_of: date) -> dict
     funded invoice appears, so on-time months show up as empty.
     """
     owed = {r.invoice_id: r.owed for r in breakdown(events, manager_id)}
+    # A payment held for a vendor's bank-detail change is held by our own safety check, so it
+    # does not count as the manager paying late.
+    held = {d.data["invoice_id"] for d in documents_from_events(events)
+            if d.data.get("status") == "bank_change_request" and d.data.get("invoice_id")}
+    held |= {e.invoice_id for e in events if e.type == "bank_change_requested" and e.invoice_id}
     months: dict[str, dict[str, int]] = {}
     for l in build_ledger(events):
         if l.manager_id != manager_id or not l.invoice_received or l.duplicate_of:
@@ -60,7 +66,7 @@ def _days_past_window(events: list[Event], manager_id: str, as_of: date) -> dict
             continue
         if l.paid_on is not None and l.paid_on > l.due_date:
             m[l.invoice_id] = (l.paid_on - l.due_date).days
-        elif owed.get(l.invoice_id, 0) > 0 and as_of > l.due_date:
+        elif owed.get(l.invoice_id, 0) > 0 and as_of > l.due_date and l.invoice_id not in held:
             m[l.invoice_id] = (as_of - l.due_date).days
     return months
 

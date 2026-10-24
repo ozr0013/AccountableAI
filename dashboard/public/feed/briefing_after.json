@@ -1,0 +1,1190 @@
+{
+ "What's open with Keyway?": {
+  "manager_id": "keyway",
+  "question": "What's open with Keyway?",
+  "answer": "Keyway has 2 unexplained unpaid vendor item(s) totaling $2,240.00. keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026). 1 duplicate billing item(s) flagged. 3 open item(s) are not the manager's fault: INV-KW-0701 (payment held for a vendor bank-detail check); INV-KW-0601 (Oakline's own approval or funding is pending); INV-KW-0201 (waiting on vendor paperwork).",
+  "claims": [
+   {
+    "text": "Bank-detail change request from v-summit: payment held",
+    "citations": [
+     {
+      "source_id": "doc-notice-summit-bank",
+      "kind": "vendor_notice",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0802 repeats INV-KW-0801 (same vendor invoice); $320.00 funded twice",
+    "citations": [
+     {
+      "source_id": "doc-inv-kw-0801",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-funding-kw-0801",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-02-dup",
+      "kind": "manager_statement",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-inv-kw-0802",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-funding-kw-0802",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-03-dup",
+      "kind": "manager_statement",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0601 (v-coolair): $8,400.00 unpaid, 25 days past due (owner side)",
+    "citations": [
+     {
+      "source_id": "doc-inv-kw-0601",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "8.1",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0201 (v-tidyhome): $650.00 unpaid, 13 days past due (paperwork pending)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0201",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-04-hold",
+      "kind": "manager_statement",
+      "locator": "L9",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026)",
+    "citations": [
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0901 (v-brightside): $1,000.00 unpaid, 34 days past due (unexplained)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0901",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-reply-kw-0901",
+      "kind": "manager_reply",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0301 (v-riogrande): $1,240.00 unpaid, 40 days past due (unexplained)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0305",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-03",
+      "kind": "manager_statement",
+      "locator": "L14",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-notice-riogrande-0420",
+      "kind": "vendor_notice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   }
+  ],
+  "prior_rulings": [
+   "INV-KW-0201 (v-tidyhome): $650.00 unpaid, 3 days past due (unexplained) -> withdrawn: now paperwork pending: The manager's statement shows the payment on hold for missing vendor paperwork; a document request to the vendor is the next step.",
+   "INV-KW-1081 (v-topline): $3,480.10 paid 14 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-1060 (v-summit): $2,033.95 paid 10 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-1080 (v-tidyhome): $3,271.00 paid 11 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-0801 (v-greenedge): $320.00 unpaid, 8 days past due (unexplained) -> withdrawn: now vendor side: Paid 2026-02-20 against a due date of 2026-02-20 (10 days from receipt, clause 7.2): on time under the agreement.",
+   "INV-KW-0402 (v-sparkline): $900.00 unpaid, 15 days past due (unexplained) -> withdrawn: not due yet under the current facts (due 2026-04-25)",
+   "INV-KW-1008 (v-breezeway): $2,896.85 paid 11 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert"
+  ],
+  "meta": {
+   "mode": "code"
+  }
+ },
+ "Why are we holding money from Keyway?": {
+  "manager_id": "keyway",
+  "question": "Why are we holding money from Keyway?",
+  "answer": "Keyway has 2 unexplained unpaid vendor item(s) totaling $2,240.00. keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026). 1 duplicate billing item(s) flagged. 3 open item(s) are not the manager's fault: INV-KW-0701 (payment held for a vendor bank-detail check); INV-KW-0601 (Oakline's own approval or funding is pending); INV-KW-0201 (waiting on vendor paperwork).",
+  "claims": [
+   {
+    "text": "Bank-detail change request from v-summit: payment held",
+    "citations": [
+     {
+      "source_id": "doc-notice-summit-bank",
+      "kind": "vendor_notice",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0802 repeats INV-KW-0801 (same vendor invoice); $320.00 funded twice",
+    "citations": [
+     {
+      "source_id": "doc-inv-kw-0801",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-funding-kw-0801",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-02-dup",
+      "kind": "manager_statement",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-inv-kw-0802",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-funding-kw-0802",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-03-dup",
+      "kind": "manager_statement",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0601 (v-coolair): $8,400.00 unpaid, 25 days past due (owner side)",
+    "citations": [
+     {
+      "source_id": "doc-inv-kw-0601",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "8.1",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0201 (v-tidyhome): $650.00 unpaid, 13 days past due (paperwork pending)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0201",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-04-hold",
+      "kind": "manager_statement",
+      "locator": "L9",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026)",
+    "citations": [
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0901 (v-brightside): $1,000.00 unpaid, 34 days past due (unexplained)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0901",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-reply-kw-0901",
+      "kind": "manager_reply",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0301 (v-riogrande): $1,240.00 unpaid, 40 days past due (unexplained)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0305",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-03",
+      "kind": "manager_statement",
+      "locator": "L14",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-notice-riogrande-0420",
+      "kind": "vendor_notice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   }
+  ],
+  "prior_rulings": [
+   "INV-KW-0201 (v-tidyhome): $650.00 unpaid, 3 days past due (unexplained) -> withdrawn: now paperwork pending: The manager's statement shows the payment on hold for missing vendor paperwork; a document request to the vendor is the next step.",
+   "INV-KW-1081 (v-topline): $3,480.10 paid 14 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-1060 (v-summit): $2,033.95 paid 10 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-1080 (v-tidyhome): $3,271.00 paid 11 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-0801 (v-greenedge): $320.00 unpaid, 8 days past due (unexplained) -> withdrawn: now vendor side: Paid 2026-02-20 against a due date of 2026-02-20 (10 days from receipt, clause 7.2): on time under the agreement.",
+   "INV-KW-0402 (v-sparkline): $900.00 unpaid, 15 days past due (unexplained) -> withdrawn: not due yet under the current facts (due 2026-04-25)",
+   "INV-KW-1008 (v-breezeway): $2,896.85 paid 11 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert"
+  ],
+  "meta": {
+   "mode": "code"
+  }
+ },
+ "Is any of this not Keyway's fault?": {
+  "manager_id": "keyway",
+  "question": "Is any of this not Keyway's fault?",
+  "answer": "Keyway has 2 unexplained unpaid vendor item(s) totaling $2,240.00. keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026). 1 duplicate billing item(s) flagged. 3 open item(s) are not the manager's fault: INV-KW-0701 (payment held for a vendor bank-detail check); INV-KW-0601 (Oakline's own approval or funding is pending); INV-KW-0201 (waiting on vendor paperwork).",
+  "claims": [
+   {
+    "text": "Bank-detail change request from v-summit: payment held",
+    "citations": [
+     {
+      "source_id": "doc-notice-summit-bank",
+      "kind": "vendor_notice",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0802 repeats INV-KW-0801 (same vendor invoice); $320.00 funded twice",
+    "citations": [
+     {
+      "source_id": "doc-inv-kw-0801",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-funding-kw-0801",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-02-dup",
+      "kind": "manager_statement",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-inv-kw-0802",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-funding-kw-0802",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-03-dup",
+      "kind": "manager_statement",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0601 (v-coolair): $8,400.00 unpaid, 25 days past due (owner side)",
+    "citations": [
+     {
+      "source_id": "doc-inv-kw-0601",
+      "kind": "vendor_invoice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "8.1",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0201 (v-tidyhome): $650.00 unpaid, 13 days past due (paperwork pending)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0201",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-04-hold",
+      "kind": "manager_statement",
+      "locator": "L9",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026)",
+    "citations": [
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0901 (v-brightside): $1,000.00 unpaid, 34 days past due (unexplained)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0901",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-01-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-02-dup",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-02-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-reply-kw-0901",
+      "kind": "manager_reply",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   },
+   {
+    "text": "INV-KW-0301 (v-riogrande): $1,240.00 unpaid, 40 days past due (unexplained)",
+    "citations": [
+     {
+      "source_id": "doc-funding-kw-0305",
+      "kind": "funding",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-stmt-kw-2026-03",
+      "kind": "manager_statement",
+      "locator": "L14",
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03-hold",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-03-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-03",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-s5",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-notice-riogrande-0420",
+      "kind": "vendor_notice",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-kw-2026-04-0901",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-bank-keyway-2026-04-ops",
+      "kind": "manager_bank",
+      "locator": null,
+      "quote": null
+     },
+     {
+      "source_id": "doc-agreement-keyway",
+      "kind": "agreement",
+      "locator": "7.2",
+      "quote": null
+     }
+    ]
+   }
+  ],
+  "prior_rulings": [
+   "INV-KW-0201 (v-tidyhome): $650.00 unpaid, 3 days past due (unexplained) -> withdrawn: now paperwork pending: The manager's statement shows the payment on hold for missing vendor paperwork; a document request to the vendor is the next step.",
+   "INV-KW-1081 (v-topline): $3,480.10 paid 14 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-1060 (v-summit): $2,033.95 paid 10 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-1080 (v-tidyhome): $3,271.00 paid 11 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert",
+   "INV-KW-0801 (v-greenedge): $320.00 unpaid, 8 days past due (unexplained) -> withdrawn: now vendor side: Paid 2026-02-20 against a due date of 2026-02-20 (10 days from receipt, clause 7.2): on time under the agreement.",
+   "INV-KW-0402 (v-sparkline): $900.00 unpaid, 15 days past due (unexplained) -> withdrawn: not due yet under the current facts (due 2026-04-25)",
+   "INV-KW-1008 (v-breezeway): $2,896.85 paid 11 days late (unexplained) -> withdrawn: late payment now covered by the manager's recurring-pattern alert"
+  ],
+  "meta": {
+   "mode": "code"
+  }
+ }
+}

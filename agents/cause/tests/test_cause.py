@@ -73,6 +73,25 @@ def test_llm_cannot_blame_manager_for_unfunded_invoice():
     assert "must be owner_side" in llm.prompts[1]
 
 
+def test_llm_cannot_call_an_allowed_holdback_unexplained():
+    """Scenario 1: $1,800 of $2,000 paid, 10% held until inspection. A live model once called
+    this 'unexplained'; the guard now rejects that and the retry gets the problem spelled out."""
+    cites = ("doc-agreement-keyway", "doc-funding-kw-0101")
+    bad = _answer(Cause.unexplained, cites, "Funded and not fully paid.")
+    good = _answer(Cause.authorized_hold, cites, "Within the 10% holdback until inspection.")
+    llm = ScriptedLLM(bad, good)
+    f = CauseAgent(llm).classify_cause(*case("INV-KW-0101", "keyway"))
+    assert f.cause == Cause.authorized_hold and f.explanation.startswith("Within the 10%")
+    assert "authorized hold, not unexplained" in llm.prompts[1]
+
+
+def test_llm_stuck_on_unexplained_for_an_allowed_holdback_falls_back_to_the_rules():
+    cites = ("doc-agreement-keyway", "doc-funding-kw-0101")
+    bad = _answer(Cause.unexplained, cites, "Funded and not fully paid.")
+    f = CauseAgent(ScriptedLLM(bad, bad)).classify_cause(*case("INV-KW-0101", "keyway"))
+    assert f.cause == Cause.authorized_hold                   # rules fallback, never "unexplained"
+
+
 def test_llm_cannot_call_a_too_large_gap_a_holdback():
     llm = ScriptedLLM(_answer(Cause.authorized_hold, ("doc-funding-kw-0305",)),
                       _answer(Cause.unexplained, ("doc-funding-kw-0305",), "Funded, unpaid."))
@@ -84,3 +103,17 @@ def test_llm_unknown_citation_rejected():
     llm = ScriptedLLM(_answer(Cause.unexplained, ("doc-nope",)), None)
     f = CauseAgent(llm).classify_cause(*case("INV-KW-0301", "keyway"))
     assert f.cause == Cause.unexplained and "doc-nope" not in {c.source_id for c in f.citations}
+
+
+def test_llm_cannot_call_a_paperwork_hold_unexplained():
+    """Scenario 2: the manager's statement says the payment is on hold for a missing W-9. A cheap
+    model once called this 'unexplained' and the headline hold came out wrong."""
+    cites = ("doc-funding-kw-0201",)
+    bad = _answer(Cause.unexplained, cites, "Funded and still unpaid.")
+    good = _answer(Cause.paperwork_pending, cites, "On hold for a missing W-9.")
+    llm = ScriptedLLM(bad, good)
+    f = CauseAgent(llm).classify_cause(*case("INV-KW-0201", "keyway"))
+    assert f.cause == Cause.paperwork_pending
+    assert "paperwork pending, not unexplained" in llm.prompts[1]
+    f = CauseAgent(ScriptedLLM(bad, bad)).classify_cause(*case("INV-KW-0201", "keyway"))
+    assert f.cause == Cause.paperwork_pending                 # rules fallback

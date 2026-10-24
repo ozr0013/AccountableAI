@@ -151,50 +151,17 @@ git push -u origin omar/verifier     # open a PR on GitHub
 
 Each list starts with work that needs nobody. **NEEDS** items wait for a checkpoint.
 
-### Progress (Fri night)
+### Progress (Sat)
 
 | Person | Done | What's in `main` |
 |---|---|---|
 | Shared | Phase 0 | `contracts/` (models, step signatures, registry, stand-ins, scenario 3 fixture), `docker-compose.yml`, `.env.example`, `pyproject.toml` |
-| Aaryan | 10 / 10 before Checkpoint A | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22) |
-| Omar | 4 / 6 before Checkpoint B | answer key, verifier, scorer + `evals.run`, prohibited-action tests (pass against the fakes and the real policy gate) |
-| Kanishka | 3 / 7 | `workflow/` (LangGraph graph, runner, replay), payment-trail agent, delay-cause agent (LLM with rules fallback) |
-| Audrey | 0 / 8 | not started in the repo |
+| Aaryan | 11 / 11 | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22), plus the live loop in `rails/live/` (see **Live loop** below) |
+| Omar | 8 / 8 | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
+| Kanishka | 10 / 10 | `workflow/` (LangGraph graph, runner, replay, recheck), all five judgment agents, bank-detail path, sealed commit-reveal eval |
+| Audrey | 9 / 10 | `dashboard/`: Next.js app on the live feed (`dashboard/feed/serve.py`, real workflow + Judge Console + approvals) with replay fallback; overview, open items + payment timeline, case queue, Keyway view, guardrails, Judge Console, briefing |
 
-Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the first live verifier run, the agreement / chaser / case agents, and an adapter from the workflow's output to the scorer's `RunResult`.
-
-### Switching to the one-middleman world (Sat)
-
-The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo world**). Nothing in `contracts/` or the rails API changed; only world data did, so this is test and id updates in your own folder. The old preset name `invoice_arrived` still works (alias of `invoice_received_correction`). Every planted item, with ids, amounts and dates, is in `world/scenario_spec.json`.
-
-| Old | New |
-|---|---|
-| `INV-SB-0101`, `INV-PT-0201`, `INV-PT-0601`, `INV-SB-0701`, `INV-SB-0801`, `INV-SB-0802`, `INV-PT-0901` | `INV-KW-0101`, `INV-KW-0201`, `INV-KW-0601`, `INV-KW-0701`, `INV-KW-0801`, `INV-KW-0802`, `INV-KW-0901` |
-| manager `sunbelt` / `peachtree` | `keyway` (the only manager) |
-| `doc-agreement-sunbelt`, `doc-funding-sb-0101`, `doc-funding-pt-0201`, `doc-reply-pt-0901` | `doc-agreement-keyway`, `doc-funding-kw-0101`, `doc-funding-kw-0201`, `doc-reply-kw-0901` |
-| scenario 7 vendor `v-voltwise` | `v-summit` (Summit Heating & Air, still $4,800) |
-| `INV-KW-0402` = electrician paid Apr 8 | `INV-KW-0402` = the moment's **unpaid** Sparkline electrician ($900). The paid-on-time electrician (scenario 5) is `INV-KW-0501` (AmperPro, `doc-bank-kw-2026-04-s5`, `doc-conf-kw-0501`) |
-| `MOMENT["value"]` `2026-04-01`, new due date Apr 11 | `2026-04-15`, new due date Apr 25 |
-| moment keeps 1 alert | keeps 2: `INV-KW-0301` ($1,240) and `INV-KW-0901` ($1,000) |
-| Keyway recon `diff == 0` | `diff == 320`: the flagged scenario 8 duplicate is on Keyway now (`diff - duplicate_funded == 0`) |
-| scenario 4 pattern on `sunbelt` | on `keyway`: late Jan, Feb, Mar; April on time |
-
-**Kanishka** (`agents/`, `workflow/`):
-- [x] `agents/cause/tests/test_cause.py`: ids and managers in the per-scenario table and the scenario 1 / 6 citation tests. `test_scenario_5_after_moment_is_vendor_side`: test vendor-side on `INV-KW-0501` (paid Apr 8, due Apr 11); `INV-KW-0402` is unpaid now
-- [x] `agents/chaser/tests/test_chaser.py`: `INV-PT-0201` / `INV-PT-0901` with `peachtree` → `INV-KW-0201` / `INV-KW-0901` with `keyway`; the proof test uses `INV-KW-0501`
-- [x] `agents/trail/tests/test_trail.py`: scenario 9 → `INV-KW-0901` / `doc-reply-kw-0901`; the paid-invoice test → `INV-KW-0501`
-- [x] `workflow/tests/test_scenarios.py`: ids; chases only for `keyway`; the scenario 4 pattern alert is for `keyway`
-- [x] `workflow/tests/test_bank_change.py`: `INV-KW-0701`, vendor `v-summit`
-- [x] `workflow/tests/test_memrails.py`: the paid-Apr-8 electrician is `INV-KW-0501`; Keyway recon check becomes `diff - duplicate_funded == 0`
-- [x] `workflow/tests/test_moment.py`: the withdrawal reason's new due date is `2026-04-25`; two alerts kept
-- [x] `workflow/run.py`: `--moment` help text says Apr 1 → Apr 15
-
-**Omar** (`evals/`, `pyproject.toml`):
-- [ ] `evals/answer_key.json` moment: `keep_count` 1 → 2 and update `_doc` (three items, $3,140 → $2,240, receipt Apr 15). Check the scenarios against `world/scenario_spec.json`
-- [ ] `evals/test_harness.py::test_judge_moment` passes once `keep_count` is 2
-- [ ] `pyproject.toml`: add `"world"` to `testpaths`
-
-**Audrey** (`dashboard/`): one manager in the UI; preset id `invoice_received_correction`; demo numbers $3,140 → $2,240.
+The scored evaluation artifacts, strong-model baseline, adversarial verifier study, guided live investigation, and Devpost draft are in the repository. The remaining deployment work is durable checkpointing and an authenticated production approval service; the hackathon demo intentionally uses a resettable in-memory session.
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
@@ -207,7 +174,7 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 8. [x] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
 9. [x] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
 10. [x] Judge Console backend: presets + free text → events
-11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
+11. [x] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`. Rails side verified: on the full demo world, `RAILS=real AGENTS=real VERIFIER=fake python -m workflow.run --scenario 1 2 3 4 5 6 7 8 9 --clean 100 --funding keyway:18400` gives the 8 expected alerts and the $3,140 hold; `RAILS=real pytest evals/test_prohibited.py` passes; the workflow's in-memory rails answer exactly like Postgres (parity test). Omar: done (`python -m evals.harness --rails real`: 9/9 in rules mode; live Sonnet agents + Haiku verifier on Postgres in `evals/results_live_real.md`; `RAILS=real pytest evals/test_prohibited.py` passes). Left: Kanishka runs his flows on `RAILS=real` (load the matching world first: `python -m rails.load --fresh --scenarios … --clean …`) and tick this
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
 1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Scored end to end by `evals/harness.py`. Still to do: Postgres checkpointer (in-memory today)
@@ -218,30 +185,30 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 5b. [x] Case agent: evidence pack and proposed hold amount for the controller
 6. [x] Bank-detail change path (scenario 7)
 7. [x] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)
-8. [ ] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
+8. [x] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
 9. [x] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed
 
 ### Omar: verification, evals, memory (`agents/verifier/`, `agents/briefing/`, `evals/`)
 1. [x] Answer key for all 9 scenarios (start here; it's the spec) → `evals/answer_key.json`
-2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed; live run not yet done)
+2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed). Live (Haiku): 9/9 on the demo world; catches 8/8 planted bad drafts (`evals/adversarial.py`) vs 0/8 without it, $0.015
 3. [x] Scorer: cause accuracy, alert precision/recall, citation rate, prohibited actions, withdrawal correctness, recon differences, cost/latency → `evals/scorer.py`; runs report in the `evals/schema.py` `RunResult` shape
-4. [ ] Baselines: single strong model with all documents; system without the verifier
+4. [x] Baselines: single strong model with all documents (`evals/baseline.py`, `evals/baseline_results.md`); system without the verifier (`no_verifier` column in `evals.harness` and `evals.adversarial`)
 5. [x] Prohibited-action tests (outbound send, money move, accusation, self-approval all blocked) → `evals/test_prohibited.py`; they run against whatever `RAILS`/`VERIFIER`/`APPROVALS` selects, so real rails must pass them too
-6. [ ] Briefing agent: "What's open with Keyway?" with citations and prior rulings
-7. [ ] **NEEDS** Checkpoint B: first full score → `evals/results.md`
-8. [ ] **NEEDS** Checkpoint C: final numbers to Audrey
+6. [x] Briefing agent: "What's open with Keyway?" with citations and prior rulings → `agents/briefing/` (`python -m agents.briefing`; free code briefing, or `--model` for one Sonnet call, ~$0.04; uncited or accusatory claims dropped; `registry.briefer()`, `BRIEFING=real`)
+7. [x] Checkpoint B: full scored run → `evals/results.md`; current free rules-mode re-run is 9/9 with 100% cause / precision / recall / citations
+8. [x] Checkpoint C: final numbers surfaced in dashboard `/proof`, `evals/`, and `docs/DEVPOST.md`
 
 ### Audrey: dashboard and pitch (`dashboard/`, `docs/`)
-1. [ ] Figma skeleton of every screen (start now)
-2. [ ] Next.js app on the replay feed (`contracts/fixtures/sample/`): headline numbers, Keyway's open items sorted by vendor money still owed
-3. [ ] Payment timeline (one lane per source; trusted source marked)
-4. [ ] Case queue: evidence pack, Approve / Decline, audit trail, blocked outbound send visible
-5. [ ] Keyway view: funded vs paid vs owed, and the chase log
-6. [ ] Judge Console UI showing what changed and what didn't
-7. [ ] Ask-about-Keyway briefing panel
-8. [ ] Seats line, Devpost visuals
-9. [ ] **NEEDS** Checkpoint A: `NEXT_PUBLIC_FEED=live`
-10. [ ] **NEEDS** Checkpoint C: record the video opening with the moment
+1. [ ] Figma skeleton of every screen (skipped: built straight in code)
+2. [x] Next.js app on the replay feed (`dashboard/public/feed/`, baked by `python dashboard/feed/export.py`): headline numbers, Keyway's open items sorted by vendor money still owed
+3. [x] Payment timeline (one lane per source; trusted source marked, overruled claims struck) → `/items/[id]`
+4. [x] Case queue: evidence pack, Approve / Decline (rails policy gate), audit trail, blocked outbound send visible → `/cases`, `/guardrails`
+5. [x] Keyway view: funded vs paid vs owed, lateness by month, terms, aging, and the chase log → `/keyway`
+6. [x] Judge Console UI showing what changed and what didn't (presets + free text; $3,140 → $2,240) → `/console`
+7. [x] Ask-about-Keyway briefing panel → `/ask`
+8. [x] Seats line, proof/evaluation visual, and Devpost draft → `/proof`, `docs/DEVPOST.md`
+9. [x] **NEEDS** Checkpoint A: `NEXT_PUBLIC_FEED=live` (default; falls back to replay if the feed isn't running)
+10. [x] Demo/video script → `docs/DEMO_SCRIPT.md` (recording remains a human presentation task)
 
 ### Phase 2 sponsors (after Checkpoint B only)
 
@@ -280,8 +247,34 @@ python -m rails.console.moment                      # replay the moment: $3,140 
 pytest -q world                                     # world tests (not in testpaths yet)
 python -m evals.run evals/runs/full.json evals/runs/no_verifier.json --out evals/results.md
 RAILS=real pytest evals/test_prohibited.py          # guardrails against the real rails
-cd dashboard && npm install && npm run dev     # Audrey sets this up (Next.js)
+python dashboard/feed/serve.py                      # live feed for the dashboard (free, rules mode)
+cd dashboard && npm install && npm run dev          # dashboard on :3000 (see dashboard/README.md)
 ```
+
+## Live loop: the system reacts by itself
+
+`rails/live/` turns a fact into a reaction with no one pressing "run": a Judge Console fact is recorded at once, the workflow runs on it in the background, and what the system did is on the record. It is separate from the replay feed in `dashboard/feed/serve.py` and runs on Postgres.
+
+```bash
+python -m rails.load --fresh                    # the demo world (366 events, demo date Apr 22)
+python -m rails.live warm                       # process what is there, once, before the demo
+DEMO_TOKEN=... CORS_ORIGINS=http://localhost:3000 \
+  uvicorn rails.console.api:app --port 8001     # ONE worker: the workflow runs one event at a time
+```
+
+| Endpoint | What it does |
+|---|---|
+| `POST /presets/{id}`, `POST /text` | A fact arrives (receipt date, bank line, a reply, ...). Recorded before the response; the workflow then runs in the background (`?wait=true` runs it first). |
+| `POST /clock/advance` | Moves the demo clock to the **next deadline** (a reminder due or an invoice becoming overdue), or `{"days": n}` / `{"to": "YYYY-MM-DD"}`. Time only moves forward. |
+| `POST /funding-review` | "Oakline is about to fund Keyway": the case agent proposes a hold ($3,140 of $18,400). |
+| `GET /approvals`, `POST /approvals/{id}/decide` | The one human touch. The proposer and non-controllers are refused. |
+| `GET /feed`, `GET /stats`, `GET /jobs/{id}` | What the system did and why, with citations; automatic actions vs human decisions; job status. Header `X-Demo-Token` when `DEMO_TOKEN` is set. |
+
+Things to know before demoing:
+- **Reminders are recorded as issued; nothing is emailed.** The clock is a demo clock (like a test clock): time moves only when asked.
+- **Answers to identical model questions are reused** (`answer_cache` in Postgres), so a repeated "advance time" takes under a second instead of minutes. A fresh cache takes about 16 minutes to warm (30 invoices, live models); `TRUNCATE answer_cache;` gives a cold run.
+- **Rehearse once, then reset:** `python -m rails.live script` plays the whole demo with timings, but it uses up the demo state (the moment is applied and the clock ends at Apr 27). Then `python -m rails.load --fresh` and `python -m rails.live warm` before the real demo. Never run `warm` or `script` while the API server is up.
+- Agents and verifier follow `AGENTS` / `VERIFIER` (`real` = models, needs `ANTHROPIC_API_KEY`); `/stats` reports the mode.
 
 ## Rules
 

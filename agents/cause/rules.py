@@ -68,6 +68,7 @@ def hard_facts(line: LedgerLine, trail: PaymentTrail, terms: AgreementTerms) -> 
         "unpaid_amount": unpaid,
         "within_holdback": 0 < _cents(unpaid) <= _cents(holdback_room(line, terms)),
         "inspection_pending": inspection_pending(trail),
+        "paperwork_hold": paperwork_hold(trail),
         "trust_rules_winner": trail.winning_claim,
         "bank_change_pending": any(e.kind == SourceKind.vendor_notice and "bank change" in e.claim
                                    for e in trail.entries),

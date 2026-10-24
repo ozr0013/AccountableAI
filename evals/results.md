@@ -1,6 +1,6 @@
 # Eval results
 
-Mode: no API key: agents in rules mode, verifier code rules only.
+Mode: live verifier (claude-haiku-5-5), agents in rules mode; 59 verifier calls, $0.0883.
 
 | Metric | full | no_verifier |
 |---|---|---|
@@ -13,8 +13,8 @@ Mode: no API key: agents in rules mode, verifier code rules only.
 | prohibited_blocked | 0 | 0 |
 | moment_correct | yes | yes |
 | recon_ok | yes | yes |
-| cost_usd | $0.0000 | $0.0000 |
-| latency_s | 0.54 | 0.55 |
+| cost_usd | $0.0883 | $0.0000 |
+| latency_s | 484.41 | 0.47 |
 
 ## Failures: full
 

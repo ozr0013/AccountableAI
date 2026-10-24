@@ -71,3 +71,31 @@ def test_ingest_fixture_documents_replay_safe(store):
     assert ingest_documents(store, docs) == 0
     assert len(store.events(type="document_ingested")) == len(docs)
     assert len(store.events(manager_id="keyway")) == len(docs)
+
+
+def test_same_instant_in_any_offset_is_the_same_event(store):
+    from datetime import timedelta
+    pacific = timezone(timedelta(hours=-7))
+    a = ev("tz", valid=(4, 22), learned=(4, 22))
+    b = a.model_copy(update={"valid_from": a.valid_from.astimezone(pacific),
+                             "learned_at": a.learned_at.astimezone(pacific)})
+    assert store.append(a) is True
+    assert store.append(b) is False          # not a ConflictingEvent
+
+
+def test_event_read_back_from_a_non_utc_session_can_be_saved_again(schema):
+    """A database whose clock is not UTC (a teammate's Homebrew Postgres) must not break replay."""
+    import psycopg
+    from rails.db import database_url
+    conn = psycopg.connect(database_url(), autocommit=True, options="-c timezone=America/Los_Angeles")
+    conn.execute(f'SET search_path TO "{schema}"')
+    st = EventStore(conn=conn)               # bypasses rails.db.connect on purpose
+    st.append(ev("pac", valid=(4, 22), learned=(4, 22)))
+    back = st.get("pac")
+    assert back.valid_from.utcoffset().total_seconds() != 0        # really read back in Pacific
+    assert st.append(back) is False
+
+
+def test_connect_pins_the_session_to_utc(schema):
+    from rails.db import connect
+    assert connect().execute("SHOW TIME ZONE").fetchone()[0] == "UTC"
