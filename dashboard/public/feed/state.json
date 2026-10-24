@@ -33,7 +33,7 @@
    "v-yardpro": "YardPro Landscaping",
    "keyway": "Keyway Property Management"
   },
-  "generated_at": "2026-10-24T05:57:11"
+  "generated_at": "2026-10-24T06:41:11"
  },
  "headline": {
   "funded": 243709.65,
@@ -5836,7 +5836,7 @@
    "proposed_by": "case_agent",
    "recommendation": null,
    "funding_amount": null,
-   "requested_at": "2026-10-24T12:57:11.433630+00:00",
+   "requested_at": "2026-10-24T13:41:11.004779+00:00",
    "status": "pending",
    "decided_by": null,
    "decided_at": null
@@ -5959,7 +5959,7 @@
    "proposed_by": "case_agent",
    "recommendation": "Recommend holding $3,140.00 of the $18,400.00 funding. keyway still owes 3 vendor invoice(s) totalling $3,140.00 from money Oakline already funded (INV-KW-0901, INV-KW-0301, INV-KW-0402), with no bank record or vendor confirmation of payment. Recommend holding $3,140.00 of the next funding until payment is shown. Chased 6 time(s).",
    "funding_amount": 18400.0,
-   "requested_at": "2026-10-24T12:57:11.508524+00:00",
+   "requested_at": "2026-10-24T13:41:11.078769+00:00",
    "status": "pending",
    "decided_by": null,
    "decided_at": null
@@ -6125,7 +6125,7 @@
   {
    "seq": 803,
    "id": "ev-appr-case-keyway-403e1ff20f-requested",
-   "at": "2026-10-24T12:57:11.508524+00:00",
+   "at": "2026-10-24T13:41:11.078769+00:00",
    "type": "approval_requested",
    "actor": "case_agent",
    "what": "asked the controller to decide appr-case-keyway-403e1ff20f",
@@ -6377,7 +6377,7 @@
   {
    "seq": 763,
    "id": "ev-appr-case-bankchange-b08385e120ac-requested",
-   "at": "2026-10-24T12:57:11.433630+00:00",
+   "at": "2026-10-24T13:41:11.004779+00:00",
    "type": "approval_requested",
    "actor": "case_agent",
    "what": "asked the controller to decide appr-case-bankchange-b08385e120ac",
