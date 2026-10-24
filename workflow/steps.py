@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+from langgraph.types import interrupt
+
 from contracts import registry
 from contracts.models import (
     AlertDraft,
@@ -23,6 +25,7 @@ from contracts.models import (
     VerdictStatus,
 )
 from contracts.steps import Agents, Approvals, Rails, Verifier
+from rails.facts import current_terms
 
 from .book import WF_TYPES, WorkflowBook, alert_id, digest, done_event, wf_event
 from .state import Assessment, Route, WorkflowState
@@ -54,6 +57,11 @@ class Deps:
     def from_registry(cls, rails: Rails | None = None) -> Deps:
         return cls(rails or registry.rails(), registry.agents(), registry.verifier(),
                    registry.approvals())
+
+
+def _term_values(t) -> dict:
+    return {k: getattr(t, k).value for k in ("vendor_payment_days", "holdback_pct", "approval_limit")
+            if getattr(t, k) is not None}
 
 
 def _cents(x: float) -> int:
@@ -319,7 +327,41 @@ class Steps:
         return {"case_id": case.id,
                 "trace": [f"{rec} (case {case.id}, approval {approval or 'not needed'})"]}
 
-    # -- not built yet (README tasks 2, 6) ---------------------------------------------
+    # -- agreement: agent extracts terms, a controller confirms (LangGraph interrupt) ------
+    def extract_terms(self, s: WorkflowState) -> dict:
+        doc = Document(**s.event.payload)
+        terms = self.d.agents.extract_terms(doc)
+        self.d.rails.append_event(wf_event("terms_proposed", doc.id, s.event,
+                                           {"terms": terms.model_dump(mode="json")}, s.manager_id))
+        return {"terms": terms, "trace": [f"terms proposed for {s.manager_id}: "
+                                          + ", ".join(f"{k}={v}" for k, v in _term_values(terms).items())]}
+
+    def confirm_terms(self, s: WorkflowState) -> dict:
+        """Pause until a controller confirms. Identical to what's already confirmed -> no pause."""
+        vals = _term_values(s.terms)
+        current = current_terms(self.d.rails.events(s.manager_id)).get(s.manager_id) or {}
+        if current and all(current.get(k) == v for k, v in vals.items()):
+            return {"trace": ["matches the confirmed terms; nothing to confirm"]}
+        decision = interrupt({"manager_id": s.manager_id, "proposed": vals, "current": current,
+                              "clauses": {k: getattr(s.terms, k).citation.locator
+                                          for k in vals if getattr(s.terms, k)}})
+        by, approve = decision.get("by", ""), bool(decision.get("approve"))
+        ok, why = self.d.rails.policy_check("approve", by, {"proposed_by": "agreement_agent"})
+        if not approve or not ok:
+            return {"trace": [f"terms not confirmed ({why if approve else 'declined by ' + by})"]}
+        final = {**vals, **{k: v for k, v in (decision.get("edits") or {}).items() if k in vals}}
+        prev = [e for e in self.d.rails.events(s.manager_id) if e.type == "terms_confirmed"]
+        ev = Event(id=f"ev-terms-confirmed-{s.manager_id}-{digest(str(sorted(final.items())), s.event.id)}",
+                   type="terms_confirmed", manager_id=s.manager_id, valid_from=s.event.valid_from,
+                   learned_at=s.event.learned_at, supersedes=prev[-1].id if prev else None,
+                   payload={"manager_id": s.manager_id, **final, "confirmed_by": by},
+                   source=s.terms.vendor_payment_days.citation)
+        self.d.rails.append_event(ev)
+        ids = sorted(i for i in self.d.rails.dependents_of(ev.id) if i.startswith("INV-"))
+        return {"invoice_ids": ids,
+                "trace": [f"terms confirmed by {by}; rechecking {len(ids)} invoice(s)"]}
+
+    # -- not built yet (README task 6) ---------------------------------------------
     def pending(self, s: WorkflowState) -> dict:
         return {"trace": [f"{s.route.value}: step not implemented yet, event recorded only"]}
 

@@ -24,11 +24,13 @@ class RealAgents:
     def __init__(self, llm=None, names=None):
         from contracts.fakes import FakeAgents
 
+        from .agreement import AgreementAgent
         from .case import CaseAgent
         from .cause import CauseAgent
         from .chaser import ChaserAgent
         from .trail import TrailAgent
         self._stand_in = FakeAgents()
+        self.agreement = AgreementAgent(llm)
         self.trail = TrailAgent(llm)
         self.cause = CauseAgent(llm)
         self.case = CaseAgent(llm)
@@ -39,7 +41,7 @@ class RealAgents:
         self.chaser.names = names
 
     def extract_terms(self, agreement: Document) -> AgreementTerms:
-        return self._stand_in.extract_terms(agreement)
+        return self.agreement.extract_terms(agreement)
 
     def build_trail(self, line: LedgerLine, docs: list[Document]) -> PaymentTrail:
         return self.trail.build_trail(line, docs)
