@@ -216,12 +216,11 @@ def single_model(public, budget, model=None):
                 "comparison_limit": "No successful model answer; unavailable, not a scored substitute."}
 
 
-def attack_control(public, output, system, llm=None, cache=None, counterparts=True):
-    """A paired run with only instruction paragraphs removed; never consults truth."""
-    import copy
-    clean = copy.deepcopy(public)
-    for a in clean["arrivals"]:
-        a["document"]["text"] = a["document"]["text"].split("\nAttachment note:", 1)[0]
+def attack_control(clean, output, system, llm=None, cache=None, counterparts=True):
+    """A paired run on the sealed control input (planted instructions removed).
+
+    The control input is prepared and committed before any system runs; this never reads truth.
+    """
     unavailable_before = len(llm.unavailable) if llm else 0
     control = simulate(clean, system, llm, cache, counterparts=counterparts)
     incomplete = bool(control["failure"] or output["failure"] or
@@ -305,7 +304,8 @@ def main():
                 before_control_calls = model.meter.calls if model else 0
                 before_control_cost = model.meter.cost if model else 0
                 if live:
-                    control = attack_control(public, out, system, model, cache={}, counterparts=not args.no_counterparts)
+                    clean = json.loads((path / "control.json").read_text())
+                    control = attack_control(clean, out, system, model, cache={}, counterparts=not args.no_counterparts)
                 out["control_calls"] = model.meter.calls-before_control_calls if model else 0
                 out["control_cost_usd_estimate"] = model.meter.cost-before_control_cost if model else 0
                 name = f"{system}-{temperature}"

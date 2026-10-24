@@ -21,7 +21,9 @@ def main():
     public = json.loads((args.path / "input.json").read_text())
     output = simulate(public, args.system, regression_dir=args.path / "regressions" / args.system,
                       counterparts=not args.no_counterparts)
-    control = attack_control(public, output, args.system, counterparts=not args.no_counterparts)
+    # The sealed control input is read only after the main output is complete.
+    clean = json.loads((args.path / "control.json").read_text())
+    control = attack_control(clean, output, args.system, counterparts=not args.no_counterparts)
     output.update(evidence_isolation="separate_process_guard", blocked_answer_accesses=list(_attempts))
     (args.path / f"{args.name}.json").write_text(canonical(output)+"\n")
     (args.path / f"{args.name}.sha256").write_text(digest(output)+"\n")

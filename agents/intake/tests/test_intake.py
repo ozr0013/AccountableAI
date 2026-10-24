@@ -114,3 +114,46 @@ def test_vendor_paperwork_receipt_is_a_checked_claim():
                       text="From: Rio Grande Plumbing\nRe: INV-KW-0301\nW-9 provided and received")
     r = intake.process(notice, DAY)
     assert r.documents[0].data == {"invoice_id": "INV-KW-0301", "status": "paperwork_received"}
+
+
+def test_checks_read_common_date_and_sign_formats_but_not_identifiers():
+    from agents.intake.engine import dates_in, numbers_in
+    assert dates_in("03/17/2026; logged March 5, 2026; 2026-04-01; 02/30/2026") == {
+        date(2026, 3, 17), date(2026, 3, 5), date(2026, 4, 1)}
+    assert numbers_in("03/17/2026;G LAND INV-KW-000473 pt1;TX-1;-473.07") == [
+        Decimal("3"), Decimal("17"), Decimal("2026"), Decimal("473.07")]
+
+
+def test_reformatted_bank_row_from_a_model_passes_only_when_quoted():
+    doc = Document(id="bank2", kind=SourceKind.manager_bank, manager_id="keyway", dated=date(2026, 3, 5),
+                   text="Keyway PM, account activity\nPosted;Description;Reference;Amount\n"
+                        "03/05/2026;Rio Grande Plbg LLC INV-KW-0301 pt1;TX-9;-40.00")
+    row = "03/05/2026;Rio Grande Plbg LLC INV-KW-0301 pt1;TX-9;-40.00"
+    c = Candidate(role="payment", invoice_id="INV-KW-0301", vendor_id="v-riogrande", amount=40,
+                  on=date(2026, 3, 5), transaction_id="TX-9", payer="keyway", payee="v-riogrande",
+                  quotes={k: row for k in ("invoice_id", "amount", "on", "transaction_id", "payer")}
+                  | {"vendor_id": "Rio Grande Plbg LLC", "payee": "Rio Grande Plbg LLC"}, confidence=.95)
+    known = {"INV-KW-0301": {"vendor_id": "v-riogrande"}}
+    assert not parse(doc, VENDORS, known).candidates
+    assert problems(c, doc, VENDORS, known, DAY) == ["payer: entity not in quote"]
+    c = c.model_copy(update={"quotes": {**c.quotes, "payer": "Keyway PM"}})
+    assert problems(c, doc, VENDORS, known, DAY) == []
+    wrong = c.model_copy(update={"on": date(2026, 3, 6)})
+    assert "on: date not in quote" in problems(wrong, doc, VENDORS, known, DAY)
+
+
+@pytest.mark.parametrize("status,quote,ok", [
+    ("paid", "Funds were released to them on Monday.", True),
+    ("paid", "Our balance is still outstanding; nothing was released.", False),
+    ("not_received", "Second notice: past due, nothing received.", True),
+    ("hold_missing_w9", "Still waiting on a W9 before we cut the check.", True),
+    ("hold_missing_w9", "We sent the W-9 last week.", False),
+    ("bank_change_requested", "We've moved banks.", True),
+])
+def test_status_needs_supporting_wording(status, quote, ok):
+    doc = Document(id="r", kind=SourceKind.manager_reply, manager_id="keyway", dated=DAY,
+                   text=f"From: Keyway\nRe: INV-KW-0301\n{quote}")
+    c = Candidate(role="claim", invoice_id="INV-KW-0301", status=status,
+                  quotes={"invoice_id": "INV-KW-0301", "status": quote}, confidence=.95)
+    found = [p for p in problems(c, doc, VENDORS, {"INV-KW-0301": {}}, DAY) if "status" in p]
+    assert (not found) == ok

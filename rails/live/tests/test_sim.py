@@ -7,7 +7,7 @@ from agents.intake.tests.test_intake import BANK, INVOICE, VENDORS
 from rails.live.scoring import score
 from rails.live.sim import attack_control, simulate
 from rails.live.sim_system import SimSystem
-from world.messy import Noise, generate
+from world.messy import Noise, control_input, generate
 
 
 def clean_noise():
@@ -20,7 +20,7 @@ def test_full_stream_and_replay_and_adversarial_control():
     assert output["failure"] is None
     assert output["simulated_days"] == 112
     assert output["replay_extra_events"] == 0
-    control = attack_control(public, output, "ours")
+    control = attack_control(control_input(public, truth), output, "ours")
     assert control["failure"] is None
     assert output["adversarial_changed_decisions"] == 0
     metrics = score(public, truth, output)

@@ -17,6 +17,7 @@ from .schema import Candidate, Extraction
 MONEY = r"\$([\d,]+\.\d{2})(?!\d)"
 IID = r"INV-[A-Z0-9-]+"
 DATE = r"202[0-9]-\d{2}-\d{2}"
+INSTRUCTION_MARKERS = ("Attachment note:", "Note to processor:")
 
 
 def resolve_vendor(text, vendors):
@@ -40,7 +41,8 @@ def resolve_vendor(text, vendors):
 
 def parse(doc: Document, vendors: list[dict], invoices: dict[str, dict]) -> Extraction:
     # Ignore instructions only by the grammar's business-line boundaries, not by obeying them.
-    text = doc.text.split("\nAttachment note:", 1)[0]
+    text = "\n".join(line for line in doc.text.split("\nAttachment note:", 1)[0].splitlines()
+                     if not line.startswith(INSTRUCTION_MARKERS))
     quotes = {}
     def match(key, pattern, group=1, flags=re.IGNORECASE):
         m = re.search(pattern, text, flags)
@@ -66,11 +68,11 @@ def parse(doc: Document, vendors: list[dict], invoices: dict[str, dict]) -> Extr
         args.update(role="terms", vendor_payment_days=10, holdback_pct=10, approval_limit=5000)
         quotes.update(vendor_payment_days="ten (10) days", holdback_pct="ten percent (10%)", approval_limit="$5,000")
     elif kind == "vendor_invoice":
-        supplier = re.search(r"Supplier: ([^\n]+)", text)
+        supplier = re.search(r"(?:Supplier|From): ([^\n]+)", text)
         label = supplier.group(1) if supplier else text.splitlines()[0]
         vendor = resolve_vendor(label, vendors)
         quotes["vendor_id"] = label
-        amount = money("amount", r"(?:Amount due: \$|TOTAL USD |Total \$)([\d,]+\.\d{2})")
+        amount = money("amount", r"(?:Amount due: \$|TOTAL USD |Total \$|Balance due: \$)([\d,]+\.\d{2})")
         rec = day("received", rf"(?:Received: |receipt date |received )({DATE})")
         ref = match("vendor_ref", r"vendor reference: ([A-Za-z0-9-]+)")
         period = match("service_period", r"Service period: (\d{4}-\d{2})")
@@ -137,7 +139,7 @@ def parse(doc: Document, vendors: list[dict], invoices: dict[str, dict]) -> Extr
         status = ("bank_change_requested" if "bank change requested" in body.lower() else
                   "paperwork_received" if re.search(r"w-9 (provided|received|attached)", body, re.IGNORECASE) else
                   "not_received" if "not received" in body.lower() or "remains unpaid" in body.lower() else
-                  "paid" if re.fullmatch(r"paid|cheque went out Friday", body, re.IGNORECASE) or (kind == "vendor_confirmation" and re.search(r"payment received|confirms receipt", body, re.IGNORECASE)) else "claim")
+                  "paid" if re.fullmatch(r"paid|cheque went out \w+|payment was sent[^.\n]*\.?", body, re.IGNORECASE) or (kind == "vendor_confirmation" and re.search(r"payment received|confirms receipt", body, re.IGNORECASE)) else "claim")
         quotes["status"] = body
         args.update(role="claim", status=status)
         if kind == "vendor_confirmation" and status == "paid":

@@ -34,3 +34,39 @@ def test_invalid_knobs_and_scale_rejected():
         Noise(typos=1.1)
     with pytest.raises(ValueError):
         generate(instances=0)
+
+
+def test_held_out_seeds_and_wording_are_reserved(tmp_path):
+    from world.messy import HELD_OUT_SEEDS, held_out_noise
+    from world.messy.phrasing import DEV, HELD_OUT
+    with pytest.raises(ValueError, match="reserved"):
+        generate(HELD_OUT_SEEDS.start)
+    with pytest.raises(ValueError, match="reserved"):
+        generate(13, split="held_out")
+    public, _ = generate(HELD_OUT_SEEDS.start, split="held_out", noise=held_out_noise())
+    text = "\n".join(a["document"]["text"] for a in public["arrivals"])
+    dev_only = {s for k in DEV for s in DEV[k]} - {s for k in HELD_OUT for s in HELD_OUT[k]}
+    assert not [s for s in dev_only if "{" not in s and len(s) > 12 and s in text]
+    assert "-----Original Message-----" in text and "Posted;Description;Reference;Amount" in text
+    pool = tmp_path / "pool.json"
+    pool.write_text('{"reply_paid": ["Judge wording: the money left our account."]}')
+    public, _ = generate(HELD_OUT_SEEDS.start, split="held_out", pool_file=pool,
+                         noise=held_out_noise(nuanced_replies=1))
+    assert any("Judge wording" in a["document"]["text"] for a in public["arrivals"])
+    pool.write_text('{"unknown_key": ["x"]}')
+    with pytest.raises(ValueError, match="pool"):
+        generate(HELD_OUT_SEEDS.start, split="held_out", pool_file=pool)
+
+
+def test_sealed_control_removes_only_planted_instructions(tmp_path):
+    from world.messy import control_input
+    public, truth = generate(13, noise=Noise(adversarial=1))
+    control = control_input(public, truth)
+    assert truth["adversarial_pairs"]
+    for a, c in zip(public["arrivals"], control["arrivals"]):
+        did = a["document"]["id"]
+        assert c["document"]["text"] == truth["adversarial_pairs"].get(did, a["document"]["text"])
+    seal(tmp_path, public, truth)
+    (tmp_path / "control.json").write_text(canonical(public) + "\n")
+    with pytest.raises(ValueError, match="commitment"):
+        verify(tmp_path)
