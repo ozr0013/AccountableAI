@@ -9,7 +9,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from contracts.models import AlertDraft, CauseFinding, Event, PaymentTrail
+from contracts.models import AgreementTerms, AlertDraft, CauseFinding, Event, PaymentTrail
 
 
 class Route(str, Enum):
@@ -47,4 +47,6 @@ class WorkflowState(BaseModel):
     rejected: list[str] = Field(default_factory=list)     # alert ids the verifier stopped
     withdrawn: list[str] = Field(default_factory=list)    # alerts the new facts no longer support
     chases: list[str] = Field(default_factory=list)       # chase ids sent or held
+    case_id: str | None = None
+    terms: AgreementTerms | None = None                   # proposed by the agreement agent                            # case proposed to the controller
     trace: Annotated[list[str], operator.add] = Field(default_factory=list)  # the "why" log

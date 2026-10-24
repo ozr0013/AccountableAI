@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from contracts.models import Alert, ChaseMessage, Event
 
 WF_TYPES = {"workflow_done", "alert_raised", "alert_rejected", "alert_withdrawn",
-            "chase_sent", "chase_held", "case_proposed", "terms_proposed", "bank_change_held"}
+            "chase_sent", "chase_held", "case_proposed", "terms_proposed", "bank_change_held", "reply_read"}
 
 
 def digest(*parts: str) -> str:
