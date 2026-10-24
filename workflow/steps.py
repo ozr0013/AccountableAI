@@ -333,22 +333,33 @@ class Steps:
         wanted = set(s.raised)
         if s.route == Route.scan:
             wanted |= {a.draft.id for a in book.open_alerts(s.manager_id)}
-        by_mgr: dict[str, list] = {}
+        # The reminder ladder is per invoice: an item's history is only the earlier reminders
+        # that covered that same invoice. Items at the same point on their ladders (same
+        # earlier reminders) share one message.
+        groups: dict[tuple, list] = {}
+        histories: dict[tuple, list] = {}
         for aid in sorted(wanted):
             a = book.alerts[aid]
-            if aid in book.open_ids and a.draft.kind == AlertKind.unexplained_unpaid \
-                    and a.draft.amount > 0:
-                by_mgr.setdefault(a.draft.manager_id, []).append(a)
+            if aid not in book.open_ids or a.draft.kind != AlertKind.unexplained_unpaid \
+                    or a.draft.amount <= 0:
+                continue
+            mgr = a.draft.manager_id
+            prior = [c for c in book.chases.get(mgr, [])
+                     if set(c.invoice_ids) & set(a.draft.invoice_ids)]
+            key = (mgr, tuple(c.id for c in prior))
+            groups.setdefault(key, []).append(a)
+            histories[key] = prior
         sent, notes = [], []
-        for mgr, alerts in sorted(by_mgr.items()):
-            prior = book.chases.get(mgr, [])
+        for (mgr, ladder), alerts in sorted(groups.items()):
+            prior = histories[(mgr, ladder)]
             msg = self.d.agents.draft_chase(mgr, alerts, prior)
             last = prior[-1].sent_at.date() if prior and prior[-1].sent_at else None
             ok, why = self.d.rails.policy_check("send_chase", "chaser", {
                 "template_id": msg.template_id, "prior_levels": [p.level for p in prior],
                 "days_since_last": (s.now - last).days if last else None})
             if not ok and ("off schedule" in why or "already sent" in why):
-                notes.append(f"{mgr}: next reminder not due yet ({why})")
+                notes.append(f"{mgr}: next reminder for {', '.join(msg.invoice_ids)} "
+                             f"not due yet ({why})")
                 continue
             key = f"{mgr}|{msg.template_id}|{','.join(sorted(msg.invoice_ids))}"
             msg = msg.model_copy(update={"id": f"chase-{digest(key, s.event.id)}",
@@ -357,7 +368,8 @@ class Steps:
                 "chase_sent" if ok else "chase_held", key, s.event,
                 {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
             sent.append(msg.id)
-            notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why}")
+            notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why} "
+                         f"({', '.join(msg.invoice_ids)})")
         return {"chases": sent, "trace": notes}
 
     # -- reply: read it (proof only from bank/vendor records), then reassess ---------------
