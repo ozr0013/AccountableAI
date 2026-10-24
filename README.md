@@ -127,16 +127,16 @@ git push -u origin omar/verifier     # open a PR on GitHub
 Each list starts with work that needs nobody. **NEEDS** items wait for a checkpoint.
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
-1. [ ] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
-2. [ ] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (final target: Oakline, 3 managers, ~40 vendors, 6 months of funded repairs)
-3. [ ] Funding ledger: per manager and vendor invoice, amount Oakline funded, amount paid to the vendor, due date (from confirmed terms)
-4. [ ] Matcher: vendor payments in the manager's bank records vs statement lines vs vendor confirmations; duplicate detection (scenario 8)
-5. [ ] Source-trust rules (bank > manager statement; vendor confirmation > manager "paid" claim)
-6. [ ] Reconciliation per manager: money funded = paid to vendors + authorized holds + still owed
-7. [ ] Aging, per-manager patterns (scenario 4)
-8. [ ] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
-9. [ ] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
-10. [ ] Judge Console backend: presets + free text → events
+1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
+2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (built: Oakline, 3 managers, 40 vendors, all 9 scenarios; 6 months of history for Sunbelt and Peachtree, Keyway from Jan 2026 to match the sample fixture)
+3. [x] Funding ledger: per manager and vendor invoice, amount Oakline funded, amount paid to the vendor, due date (from confirmed terms)
+4. [x] Matcher: vendor payments in the manager's bank records vs statement lines vs vendor confirmations; duplicate detection (scenario 8)
+5. [x] Source-trust rules (bank > manager statement; vendor confirmation > manager "paid" claim)
+6. [x] Reconciliation per manager: money funded = paid to vendors + authorized holds + still owed
+7. [x] Aging, per-manager patterns (scenario 4)
+8. [x] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
+9. [x] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
+10. [x] Judge Console backend: presets + free text → events
 11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
