@@ -1,0 +1,288 @@
+"""Workflow steps. Plain code decides what runs; agents (via contracts.steps.Agents) judge.
+
+Each public method is one LangGraph node: it takes the WorkflowState and returns a dict of
+updates. Dependencies come from contracts.registry, so every step runs on stand-ins today and
+on real rails / agents / verifier once their env var says "real".
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import date
+
+from contracts import registry
+from contracts.models import (
+    AlertDraft,
+    AlertKind,
+    Cause,
+    Claim,
+    Document,
+    Event,
+    LedgerLine,
+    SourceKind,
+    VerdictStatus,
+)
+from contracts.steps import Agents, Approvals, Rails, Verifier
+
+from .book import WF_TYPES, WorkflowBook, alert_id, done_event, wf_event
+from .state import Assessment, Route, WorkflowState
+from .terms import terms_for
+
+ALERT_FOR_CAUSE = {
+    Cause.unexplained: AlertKind.unexplained_unpaid,
+    Cause.paperwork_pending: AlertKind.paperwork_request,
+    Cause.owner_side: AlertKind.owner_pending_approval,
+}
+ACTION_FOR_KIND = {
+    AlertKind.unexplained_unpaid: "Chase the manager for bank or vendor proof of payment.",
+    AlertKind.paperwork_request: "Draft a request for the missing vendor paperwork (needs approval).",
+    AlertKind.owner_pending_approval: "Oakline's own approval/funding is pending; no manager action.",
+}
+ITEM_KINDS = set(ALERT_FOR_CAUSE.values())
+_IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed"}
+
+
+@dataclass(frozen=True)
+class Deps:
+    rails: Rails
+    agents: Agents
+    verifier: Verifier
+    approvals: Approvals
+
+    @classmethod
+    def from_registry(cls, rails: Rails | None = None) -> Deps:
+        return cls(rails or registry.rails(), registry.agents(), registry.verifier(),
+                   registry.approvals())
+
+
+def _cents(x: float) -> int:
+    return round(x * 100)
+
+
+class Steps:
+    def __init__(self, deps: Deps):
+        self.d = deps
+
+    # -- routing (code only) ---------------------------------------------------------------
+    def route(self, s: WorkflowState) -> dict:
+        e, now = s.event, s.event.learned_at.date()
+        route = self._route_for(e)
+        ids: list[str] = []
+        if route in (Route.assess, Route.reply):
+            ids = self._affected_invoices(e)
+        elif route == Route.scan:
+            ids = [l.invoice_id for l in self.d.rails.ledger(e.manager_id) if not l.duplicate_of]
+        return {"now": now, "route": route, "manager_id": e.manager_id, "invoice_ids": ids,
+                "trace": [f"{e.type} {e.id} -> {route.value} ({len(ids)} invoice(s))"]}
+
+    @staticmethod
+    def _route_for(e: Event) -> Route:
+        if e.type in _IGNORED:
+            return Route.ignore
+        if e.type == "document_ingested":
+            kind, data = e.payload.get("kind"), e.payload.get("data", {})
+            if kind == SourceKind.agreement:
+                return Route.agreement
+            if data.get("status") == "bank_change_request":
+                return Route.bank_change
+            return Route.assess
+        return {
+            "fact_corrected": Route.assess, "terms_confirmed": Route.assess,
+            "chase_reply": Route.reply, "bank_change_requested": Route.bank_change,
+            "scan_requested": Route.scan, "funding_review_requested": Route.funding_review,
+        }.get(e.type, Route.ignore)
+
+    def _affected_invoices(self, e: Event) -> list[str]:
+        """Invoices whose facts this event touched, per rails.dependents_of, plus any it names."""
+        named = {e.invoice_id, *e.payload.get("invoice_ids", []),
+                 e.payload.get("data", {}).get("invoice_id")} - {None}
+        return sorted(set(self.d.rails.dependents_of(e.id)) | named)
+
+    # -- assess: payment trail + delay cause per invoice ----------------------------------
+    def assess(self, s: WorkflowState) -> dict:
+        lines = {l.invoice_id: l for l in self._lines(s)}
+        out, notes = [], []
+        for iid in s.invoice_ids:
+            line = lines.get(iid)
+            if line is None:
+                notes.append(f"{iid}: not on a ledger yet")
+                continue
+            a = self._assess_one(line, s.now)
+            out.append(a)
+            notes.append(f"{iid}: {a.status}" + (f", cause {a.finding.cause.value}" if a.finding else "")
+                         + (f" ({a.note})" if a.note else ""))
+        return {"assessments": out, "trace": notes}
+
+    def _lines(self, s: WorkflowState) -> list[LedgerLine]:
+        managers = {s.manager_id} if s.manager_id else set()
+        if not managers:   # e.g. a fact correction without manager: find the invoice's manager
+            managers = {d.manager_id for d in self.d.rails.documents()
+                        if d.kind == SourceKind.vendor_invoice and d.data.get("invoice_id") in s.invoice_ids}
+        return [l for m in sorted(x for x in managers if x) for l in self.d.rails.ledger(m)]
+
+    def _assess_one(self, line: LedgerLine, now: date) -> Assessment:
+        base = {"invoice_id": line.invoice_id, "manager_id": line.manager_id}
+        if line.duplicate_of:
+            return Assessment(**base, status="skipped", note=f"duplicate of {line.duplicate_of}")
+        unpaid = _cents(line.paid_amount) < _cents(line.amount)
+        paid_late = (not unpaid and line.paid_on and line.due_date and line.paid_on > line.due_date)
+        if not unpaid and not paid_late:
+            return Assessment(**base, status="paid")
+        if unpaid and (line.due_date is None or now <= line.due_date):
+            return Assessment(**base, status="not_due", note=f"due {line.due_date}")
+        terms = terms_for(self.d.rails, self.d.agents, line.manager_id)
+        if terms is None:
+            return Assessment(**base, status="skipped", note="no agreement terms on file")
+        docs = self._evidence(line.manager_id, [line.invoice_id], now)
+        trail = self.d.agents.build_trail(line, docs)
+        finding = self.d.agents.classify_cause(line, trail, terms)
+        end = line.paid_on if not unpaid else now
+        return Assessment(**base, status="delayed", days_late=(end - line.due_date).days,
+                          trail=trail, finding=finding)
+
+    def _evidence(self, manager_id: str, invoice_ids: list[str], now: date | None) -> list[Document]:
+        seen: dict[str, Document] = {}
+        for iid in invoice_ids:
+            for d in self.d.rails.documents(manager_id, iid):
+                if now is None or d.dated is None or d.dated <= now:
+                    seen.setdefault(d.id, d)
+        return list(seen.values())
+
+    # -- alerts: draft (code) -> verifier -> record ----------------------------------------
+    def draft_alerts(self, s: WorkflowState) -> dict:
+        drafts = []
+        for a in s.assessments:
+            kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding else None
+            if kind is None:
+                continue
+            drafts.append(self._draft(a, kind))
+        return {"drafts": drafts, "trace": [f"draft {d.id} ({d.kind.value})" for d in drafts]}
+
+    def _draft(self, a: Assessment, kind: AlertKind) -> AlertDraft:
+        line = next(l for l in self.d.rails.ledger(a.manager_id) if l.invoice_id == a.invoice_id)
+        owed = round(line.amount - line.paid_amount, 2)
+        if owed > 0:
+            state = f"${owed:,.2f} unpaid, {a.days_late} days past due" if a.days_late > 0 \
+                else f"${owed:,.2f} unpaid"
+        else:
+            state = f"${line.amount:,.2f} paid {a.days_late} days late"
+        claims = [Claim(text=a.finding.explanation, citations=a.finding.citations)]
+        if a.trail and a.trail.winning_sources:
+            # Cite every source that spoke to payment, winners and overruled ones alike.
+            payment = {SourceKind.manager_statement, SourceKind.manager_bank,
+                       SourceKind.vendor_confirmation, SourceKind.vendor_notice,
+                       SourceKind.manager_reply}
+            cites = {c.source_id: c for c in a.trail.winning_sources}
+            for e in a.trail.entries:
+                if e.kind in payment:
+                    cites.setdefault(e.citation.source_id, e.citation)
+            claims.append(Claim(text=a.trail.reasoning, citations=list(cites.values())))
+        return AlertDraft(
+            id=alert_id(kind.value, a.manager_id, [a.invoice_id]), kind=kind,
+            manager_id=a.manager_id, invoice_ids=[a.invoice_id],
+            amount=owed,
+            headline=f"{a.invoice_id} ({line.vendor_id}): {state} "
+                     f"({a.finding.cause.value.replace('_', ' ')})",
+            claims=claims, recommended_action=ACTION_FOR_KIND[kind])
+
+    def verify(self, s: WorkflowState) -> dict:
+        """New drafts -> verifier -> alert_raised / alert_rejected. An open alert whose evidence
+        changed is re-verified and refreshed; one that no longer holds is withdrawn, with why."""
+        book = WorkflowBook.load(self.d.rails)
+        raised, refreshed, rejected, notes = [], [], [], []
+        for draft in s.drafts:
+            old = book.alerts.get(draft.id) if draft.id in book.open_ids else None
+            if old and old.draft == draft:
+                notes.append(f"{draft.id}: still holds, unchanged")
+                continue
+            evidence = self._evidence(draft.manager_id, draft.invoice_ids, s.now)
+            verdict = self.d.verifier.verify(draft, evidence)
+            ok = verdict.status == VerdictStatus.approved
+            payload = {"draft": draft.model_dump(mode="json"),
+                       "verdict": verdict.model_dump(mode="json"),
+                       "state": "open", "withdrawn_reason": None}
+            self.d.rails.append_event(wf_event("alert_raised" if ok else "alert_rejected",
+                                               draft.id, s.event, payload, draft.manager_id,
+                                               draft.invoice_ids[0]))
+            target = rejected if not ok else refreshed if old else raised
+            target.append(draft.id)
+            notes.append(f"{draft.id}: verifier {verdict.status.value}"
+                         + (" (refreshed with new evidence)" if old and ok else ""))
+        withdrawn = self._withdraw_stale(s, book, {d.id for d in s.drafts})
+        notes += [f"{aid}: withdrawn ({why})" for aid, why in withdrawn]
+        return {"raised": raised, "refreshed": refreshed, "rejected": rejected,
+                "withdrawn": [aid for aid, _ in withdrawn], "trace": notes}
+
+    def _withdraw_stale(self, s: WorkflowState, book: WorkflowBook,
+                        still: set[str]) -> list[tuple[str, str]]:
+        """Open item alerts on an invoice we just reassessed that the new facts don't support."""
+        out = []
+        for a in s.assessments:
+            if a.status == "skipped":
+                continue
+            for al in book.open_alerts(a.manager_id):
+                if al.draft.invoice_ids != [a.invoice_id] or al.draft.id in still \
+                        or al.draft.kind not in ITEM_KINDS:
+                    continue
+                why = self._why_not(a)
+                self.d.rails.append_event(wf_event(
+                    "alert_withdrawn", al.draft.id, s.event,
+                    {"alert_id": al.draft.id, "reason": why, "invoice_id": a.invoice_id},
+                    a.manager_id, a.invoice_id))
+                out.append((al.draft.id, why))
+        return out
+
+    @staticmethod
+    def _why_not(a: Assessment) -> str:
+        if a.finding:
+            return f"now {a.finding.cause.value.replace('_', ' ')}: {a.finding.explanation}"
+        if a.status == "paid":
+            return "payment is now proven by bank or vendor records, on time under the terms"
+        if a.status == "not_due":
+            return f"not due yet under the current facts ({a.note})"
+        return a.note or a.status
+
+    # -- chase: approved-template reminder, gated by policy --------------------------------
+    def chase(self, s: WorkflowState) -> dict:
+        book = WorkflowBook.load(self.d.rails)
+        by_mgr: dict[str, list] = {}
+        for aid in s.raised:
+            a = book.alerts[aid]
+            if a.draft.kind == AlertKind.unexplained_unpaid and a.draft.amount > 0:
+                by_mgr.setdefault(a.draft.manager_id, []).append(a)
+        sent, notes = [], []
+        for mgr, alerts in sorted(by_mgr.items()):
+            prior = book.chases.get(mgr, [])
+            msg = self.d.agents.draft_chase(mgr, alerts, prior)
+            last = prior[-1].sent_at.date() if prior and prior[-1].sent_at else None
+            ok, why = self.d.rails.policy_check("send_chase", "chaser", {
+                "template_id": msg.template_id, "prior_levels": [p.level for p in prior],
+                "days_since_last": (s.now - last).days if last else None})
+            key = f"{mgr}|{msg.template_id}|{','.join(sorted(msg.invoice_ids))}"
+            msg = msg.model_copy(update={"id": f"chase-{wf_event('x', key, s.event, {}).id[-12:]}",
+                                         "sent_at": s.event.learned_at if ok else None})
+            kind = "chase_sent" if ok else "chase_held"
+            self.d.rails.append_event(wf_event(kind, key, s.event,
+                                               {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
+            sent.append(msg.id)
+            notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why}")
+        return {"chases": sent, "trace": notes}
+
+    # -- reply: read it, then reassess the invoices it covers ------------------------------
+    def read_reply(self, s: WorkflowState) -> dict:
+        p = s.event.payload
+        docs = self._evidence(s.manager_id, s.invoice_ids, None)
+        reply = self.d.agents.read_reply(p.get("text", ""), s.manager_id, docs)
+        proof = "with proof" if reply.proof else "no vendor or bank proof"
+        return {"trace": [f"reply read: claims_paid={reply.claims_paid}, {proof}"]}
+
+    # -- not built yet (README tasks 2, 5b, 6) ---------------------------------------------
+    def pending(self, s: WorkflowState) -> dict:
+        return {"trace": [f"{s.route.value}: step not implemented yet, event recorded only"]}
+
+    # -- finish: mark the event processed (replay guard) ----------------------------------
+    def finish(self, s: WorkflowState) -> dict:
+        self.d.rails.append_event(done_event(s.event, {
+            "route": s.route.value if s.route else None, "raised": s.raised,
+            "rejected": s.rejected, "chases": s.chases}))
+        return {"trace": ["done"]}
