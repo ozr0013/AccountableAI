@@ -151,50 +151,17 @@ git push -u origin omar/verifier     # open a PR on GitHub
 
 Each list starts with work that needs nobody. **NEEDS** items wait for a checkpoint.
 
-### Progress (Fri night)
+### Progress (Sat)
 
 | Person | Done | What's in `main` |
 |---|---|---|
 | Shared | Phase 0 | `contracts/` (models, step signatures, registry, stand-ins, scenario 3 fixture), `docker-compose.yml`, `.env.example`, `pyproject.toml` |
-| Aaryan | 10 / 10 before Checkpoint A | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22) |
-| Omar | 5 / 6 before Checkpoint B | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
-| Kanishka | 3 / 7 | `workflow/` (LangGraph graph, runner, replay), payment-trail agent, delay-cause agent (LLM with rules fallback) |
-| Audrey | 0 / 8 | not started in the repo |
+| Aaryan | 11 / 11 | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22) |
+| Omar | 5 / 8 | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
+| Kanishka | 10 / 10 | `workflow/` (LangGraph graph, runner, replay, recheck), all five judgment agents, bank-detail path, sealed commit-reveal eval |
+| Audrey | 0 / 10 | no `dashboard/` or `docs/` in the repo yet |
 
-Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the first live verifier run, the agreement / chaser / case agents, and an adapter from the workflow's output to the scorer's `RunResult`.
-
-### Switching to the one-middleman world (Sat)
-
-The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo world**). Nothing in `contracts/` or the rails API changed; only world data did, so this is test and id updates in your own folder. The old preset name `invoice_arrived` still works (alias of `invoice_received_correction`). Every planted item, with ids, amounts and dates, is in `world/scenario_spec.json`.
-
-| Old | New |
-|---|---|
-| `INV-SB-0101`, `INV-PT-0201`, `INV-PT-0601`, `INV-SB-0701`, `INV-SB-0801`, `INV-SB-0802`, `INV-PT-0901` | `INV-KW-0101`, `INV-KW-0201`, `INV-KW-0601`, `INV-KW-0701`, `INV-KW-0801`, `INV-KW-0802`, `INV-KW-0901` |
-| manager `sunbelt` / `peachtree` | `keyway` (the only manager) |
-| `doc-agreement-sunbelt`, `doc-funding-sb-0101`, `doc-funding-pt-0201`, `doc-reply-pt-0901` | `doc-agreement-keyway`, `doc-funding-kw-0101`, `doc-funding-kw-0201`, `doc-reply-kw-0901` |
-| scenario 7 vendor `v-voltwise` | `v-summit` (Summit Heating & Air, still $4,800) |
-| `INV-KW-0402` = electrician paid Apr 8 | `INV-KW-0402` = the moment's **unpaid** Sparkline electrician ($900). The paid-on-time electrician (scenario 5) is `INV-KW-0501` (AmperPro, `doc-bank-kw-2026-04-s5`, `doc-conf-kw-0501`) |
-| `MOMENT["value"]` `2026-04-01`, new due date Apr 11 | `2026-04-15`, new due date Apr 25 |
-| moment keeps 1 alert | keeps 2: `INV-KW-0301` ($1,240) and `INV-KW-0901` ($1,000) |
-| Keyway recon `diff == 0` | `diff == 320`: the flagged scenario 8 duplicate is on Keyway now (`diff - duplicate_funded == 0`) |
-| scenario 4 pattern on `sunbelt` | on `keyway`: late Jan, Feb, Mar; April on time |
-
-**Kanishka** (`agents/`, `workflow/`):
-- [ ] `agents/cause/tests/test_cause.py`: ids and managers in the per-scenario table and the scenario 1 / 6 citation tests. `test_scenario_5_after_moment_is_vendor_side`: test vendor-side on `INV-KW-0501` (paid Apr 8, due Apr 11); `INV-KW-0402` is unpaid now
-- [ ] `agents/chaser/tests/test_chaser.py`: `INV-PT-0201` / `INV-PT-0901` with `peachtree` → `INV-KW-0201` / `INV-KW-0901` with `keyway`; the proof test uses `INV-KW-0501`
-- [ ] `agents/trail/tests/test_trail.py`: scenario 9 → `INV-KW-0901` / `doc-reply-kw-0901`; the paid-invoice test → `INV-KW-0501`
-- [ ] `workflow/tests/test_scenarios.py`: ids; chases only for `keyway`; the scenario 4 pattern alert is for `keyway`
-- [ ] `workflow/tests/test_bank_change.py`: `INV-KW-0701`, vendor `v-summit`
-- [ ] `workflow/tests/test_memrails.py`: the paid-Apr-8 electrician is `INV-KW-0501`; Keyway recon check becomes `diff - duplicate_funded == 0`
-- [ ] `workflow/tests/test_moment.py`: the withdrawal reason's new due date is `2026-04-25`; two alerts kept
-- [ ] `workflow/run.py`: `--moment` help text says Apr 1 → Apr 15
-
-**Omar** (`evals/`, `pyproject.toml`):
-- [x] `evals/answer_key.json` moment: `keep_count` 1 → 2 and update `_doc` (three items, $3,140 → $2,240, receipt Apr 15). Check the scenarios against `world/scenario_spec.json`
-- [x] `evals/test_harness.py::test_judge_moment` passes once `keep_count` is 2
-- [x] `pyproject.toml`: add `"world"` to `testpaths`
-
-**Audrey** (`dashboard/`): one manager in the UI; preset id `invoice_received_correction`; demo numbers $3,140 → $2,240.
+Still open: Omar's baselines and the Checkpoint B scored run, all of Audrey's dashboard and pitch, and the Devpost write-up (feature freeze Sat 8 pm). The one-middleman migration (Keyway only, demo date Apr 22) is done and merged.
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
@@ -207,7 +174,7 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 8. [x] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
 9. [x] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
 10. [x] Judge Console backend: presets + free text → events
-11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`. Rails side verified: on the full demo world, `RAILS=real AGENTS=real VERIFIER=fake python -m workflow.run --scenario 1 2 3 4 5 6 7 8 9 --clean 100 --funding keyway:18400` gives the 8 expected alerts and the $3,140 hold; `RAILS=real pytest evals/test_prohibited.py` passes; the workflow's in-memory rails answer exactly like Postgres (parity test). Omar: done (`python -m evals.harness --rails real`: 9/9 in rules mode; live Sonnet agents + Haiku verifier on Postgres in `evals/results_live_real.md`; `RAILS=real pytest evals/test_prohibited.py` passes). Left: Kanishka runs his flows on `RAILS=real` (load the matching world first: `python -m rails.load --fresh --scenarios … --clean …`) and tick this
+11. [x] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`. Rails side verified: on the full demo world, `RAILS=real AGENTS=real VERIFIER=fake python -m workflow.run --scenario 1 2 3 4 5 6 7 8 9 --clean 100 --funding keyway:18400` gives the 8 expected alerts and the $3,140 hold; `RAILS=real pytest evals/test_prohibited.py` passes; the workflow's in-memory rails answer exactly like Postgres (parity test). Omar: done (`python -m evals.harness --rails real`: 9/9 in rules mode; live Sonnet agents + Haiku verifier on Postgres in `evals/results_live_real.md`; `RAILS=real pytest evals/test_prohibited.py` passes). Left: Kanishka runs his flows on `RAILS=real` (load the matching world first: `python -m rails.load --fresh --scenarios … --clean …`) and tick this
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
 1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Scored end to end by `evals/harness.py`. Still to do: Postgres checkpointer (in-memory today)
@@ -218,7 +185,7 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 5b. [x] Case agent: evidence pack and proposed hold amount for the controller
 6. [x] Bank-detail change path (scenario 7)
 7. [x] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)
-8. [ ] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
+8. [x] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
 9. [x] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed
 
 ### Omar: verification, evals, memory (`agents/verifier/`, `agents/briefing/`, `evals/`)
