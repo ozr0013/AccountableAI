@@ -112,6 +112,26 @@ const spacetimedb = schema({
       createdAt: t.timestamp(),
     }
   ),
+  chaseAction: table(
+    { name: 'chase_action', public: true },
+    {
+      actionId: t.string().primaryKey(),
+      invoiceId: t.string().index('btree'),
+      vendorName: t.string(),
+      action: t.string(),
+      level: t.option(t.string()),
+      dueDate: t.option(t.string()),
+      daysOverdue: t.i32(),
+      amountOwed: t.f64(),
+      message: t.option(t.string()),
+      reason: t.string(),
+      ruleId: t.option(t.string()),
+      ruleQuote: t.option(t.string()),
+      status: t.string(),
+      asOf: t.string(),
+      createdAt: t.timestamp(),
+    }
+  ),
   dependency: table(
     { name: 'dependency', public: true },
     {
@@ -308,5 +328,40 @@ export const setAgreementRules = spacetimedb.reducer(
         createdAt: ctx.timestamp,
       });
     }
+  }
+);
+
+// One row per chaser action; the id makes a same-day rerun a no-op.
+export const recordChase = spacetimedb.reducer(
+  {
+    actionId: t.string(),
+    invoiceId: t.string(),
+    vendorName: t.string(),
+    action: t.string(),
+    level: t.option(t.string()),
+    dueDate: t.option(t.string()),
+    daysOverdue: t.i32(),
+    amountOwed: t.f64(),
+    message: t.option(t.string()),
+    reason: t.string(),
+    ruleId: t.option(t.string()),
+    ruleQuote: t.option(t.string()),
+    status: t.string(),
+    asOf: t.string(),
+  },
+  (ctx, args) => {
+    requireWriter(ctx);
+    if (ctx.db.chaseAction.actionId.find(args.actionId)) {
+      return;
+    }
+    ctx.db.chaseAction.insert({
+      ...args,
+      level: args.level ?? undefined,
+      dueDate: args.dueDate ?? undefined,
+      message: args.message ?? undefined,
+      ruleId: args.ruleId ?? undefined,
+      ruleQuote: args.ruleQuote ?? undefined,
+      createdAt: ctx.timestamp,
+    });
   }
 );
