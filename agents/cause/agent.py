@@ -47,6 +47,8 @@ def fact_problems(ans: CauseAnswer, facts: dict) -> list[str]:
         p.append("Oakline never funded this invoice, so the cause must be owner_side")
     if facts["funded"] and ans.cause == Cause.owner_side:
         p.append("Oakline funded this invoice, so it cannot be owner_side")
+    if facts.get("bank_change_pending") and ans.cause == Cause.unexplained:
+        p.append("payment is held for the vendor's bank-detail change; it is not unexplained")
     if facts["paid_on_time"] and ans.cause == Cause.unexplained:
         p.append("the invoice was paid on time under the agreement; it is not unexplained")
     if ans.cause == Cause.authorized_hold and not facts["within_holdback"]:
