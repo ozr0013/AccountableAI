@@ -16,6 +16,8 @@ def database_url() -> str:
 def connect(schema: str | None = None) -> psycopg.Connection:
     """Autocommit connection; optionally pinned to a schema (used by tests)."""
     conn = psycopg.connect(database_url(), autocommit=True)
+    # Always read timestamps back in UTC, whatever the server's clock is set to.
+    conn.execute("SET TIME ZONE 'UTC'")
     if schema:
         conn.execute(f'CREATE SCHEMA IF NOT EXISTS "{schema}"')
         conn.execute(f'SET search_path TO "{schema}"')
