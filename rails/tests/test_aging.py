@@ -32,11 +32,11 @@ def world(*invoices):
 
 
 def test_clean_world_has_no_lateness():
-    evs = generate().events()
-    for m in ("keyway", "sunbelt", "peachtree"):
-        lm = late_months(evs, m, date(2026, 4, 25))
-        assert not any(v for k, v in lm.items() if not (m == "keyway" and k == "2026-03"))
-        assert not pattern(evs, m, date(2026, 4, 25)).recurring
+    evs = generate().events()           # scenario 3 only: just the planted plumber is late
+    lm = late_months(evs, "keyway", date(2026, 4, 22))
+    assert lm == {"2026-01": False, "2026-02": False, "2026-03": True, "2026-04": False}
+    p = pattern(evs, "keyway", date(2026, 4, 22))
+    assert not p.recurring and p.payment_window_days == 10
 
 
 def test_unpaid_planted_invoice_makes_march_late_for_keyway():

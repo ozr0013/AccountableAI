@@ -111,7 +111,7 @@ def test_terms_change_affects_every_invoice_of_that_manager(parts):
         deps.index_event(e)
     assert deps.dependents_of("terms:keyway.vendor_payment_days") == [
         "INV-KW-0301", "INV-KW-0402", "INV-KW-0403"]
-    assert deps.dependents_of("terms:sunbelt.vendor_payment_days") == []
+    assert deps.dependents_of("terms:othermgr.vendor_payment_days") == []
 
 
 def test_rebuild_matches_incremental_and_ties_unlabelled_payment(parts):
