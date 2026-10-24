@@ -1,4 +1,4 @@
-"""Load a generated world into Postgres:  python -m rails.load [--seed 13] [--scenarios 3] [--fresh]
+"""Load a generated world into Postgres:  python -m rails.load [--seed 13] [--scenarios 1 2 ... 9 (default: all)] [--fresh]
 
 --fresh drops the rails tables first (the log is append-only, so this is the only reset).
 """
@@ -6,6 +6,7 @@
 import argparse
 
 from world import generate
+from world.generator import ALL_SCENARIOS
 
 from .db import connect
 from .real import RealRails
@@ -15,7 +16,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--clean", type=int, default=100)
-    ap.add_argument("--scenarios", type=int, nargs="*", default=[3])
+    ap.add_argument("--scenarios", type=int, nargs="*", default=list(ALL_SCENARIOS))
     ap.add_argument("--fresh", action="store_true")
     a = ap.parse_args()
     if a.fresh:
