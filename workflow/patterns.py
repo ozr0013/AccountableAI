@@ -70,12 +70,18 @@ def pattern_draft(rails, manager_id: str, now: date,
                            "vendor payment with every monthly statement.")
 
 
-def duplicate_draft(rails, line: LedgerLine) -> AlertDraft | None:
+def duplicate_draft(rails, line: LedgerLine, now: date | None = None) -> AlertDraft | None:
+    """Duplicate-billing alert, once the duplicate has been funded. With `now`, nothing dated
+    after it is cited, so every citation is in the evidence the verifier is given."""
     if not line.duplicate_of:
         return None
+    if now and (line.funded_on is None or line.funded_on > now):
+        return None                     # not funded twice yet, so nothing to alert on
     pair = [line.duplicate_of, line.invoice_id]
     cites: dict[str, Citation] = {}
     for d in rails.documents(line.manager_id):
+        if now and d.dated and d.dated > now:
+            continue
         ids = {d.data.get("invoice_id")} | {x.get("invoice_id") for x in d.data.get("lines", [])}
         if ids & set(pair) and d.kind in (SourceKind.funding, SourceKind.manager_statement,
                                           SourceKind.vendor_invoice):

@@ -161,6 +161,12 @@ class Steps:
         paid_late = (not unpaid and line.paid_on and line.due_date and line.paid_on > line.due_date)
         if not unpaid and not paid_late and not explain:
             return Assessment(**base, status="paid")
+        if not unpaid and not explain:
+            # Paid in full, just late: nothing is owed, so there is no cause to find and no item
+            # alert to raise. The recurring-pattern alert tracks lateness; skipping the cause
+            # agent and the verifier here saves two model calls per late-but-paid invoice.
+            return Assessment(**base, status="paid",
+                              note=f"paid {(line.paid_on - line.due_date).days} days late")
         if unpaid and (line.due_date is None or now <= line.due_date):
             return Assessment(**base, status="not_due", note=f"due {line.due_date}")
         terms = terms_for(self.d.rails, self.d.agents, line.manager_id)
@@ -203,7 +209,8 @@ class Steps:
                 patterned.discard(s.manager_id)
         for a in s.assessments:
             if a.status == "skipped" and a.note.startswith("duplicate of"):
-                if (line := self._line(a.invoice_id)) and (d := patterns.duplicate_draft(self.d.rails, line)):
+                if (line := self._line(a.invoice_id)) and (
+                        d := patterns.duplicate_draft(self.d.rails, line, s.now)):
                     drafts.append(d)
                 continue
             kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding and a.status == "delayed" else None
