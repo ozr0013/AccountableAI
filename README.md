@@ -144,7 +144,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 2. [ ] Agreement agent: term sheets (vendor payment deadline, holdback rules, approval limit, allowed charges) with clause citations; human-confirm step
 3. [x] Payment-trail agent: one timeline per item, conflicts resolved by source-trust rules (scenario 3)
 4. [x] Delay-cause agent: five causes with evidence and confidence (scenarios 1, 5, 6 must produce no manager alert)
-5. [ ] Chaser agent: reminders to the middleman (polite, then firmer) from approved templates, logs replies; a "paid" reply counts only with vendor or bank proof (scenario 9)
+5. [x] Chaser agent: reminders to the middleman (polite, then firmer) from approved templates, logs replies; a "paid" reply counts only with vendor or bank proof (scenario 9)
 5b. [ ] Case agent: evidence pack and proposed hold amount for the controller
 6. [ ] Bank-detail change path (scenario 7)
 7. [ ] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)

@@ -18,6 +18,7 @@ from contracts.models import Event
 
 from .book import WorkflowBook
 from .graph import build_graph
+from .names import names_from
 from .steps import Deps, Steps
 
 log = logging.getLogger(__name__)
@@ -38,6 +39,8 @@ class RunResult:
 class Workflow:
     def __init__(self, deps: Deps, checkpointer: BaseCheckpointSaver | None = None):
         self.deps = deps
+        if hasattr(deps.agents, "set_names"):       # real chaser renders templates with names
+            deps.agents.set_names(names_from(deps.rails))
         self.graph = build_graph(Steps(deps), checkpointer)
 
     def handle(self, event: Event) -> RunResult:
