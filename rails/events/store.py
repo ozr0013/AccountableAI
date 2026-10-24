@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
@@ -27,8 +27,15 @@ class ConflictingEvent(Exception):
     """Same event id re-appended with different content."""
 
 
+def _utc(event: Event) -> Event:
+    """The same instant must hash the same whatever offset it is written with."""
+    return event.model_copy(update={
+        k: getattr(event, k).astimezone(timezone.utc)
+        for k in ("valid_from", "learned_at") if getattr(event, k).tzinfo})
+
+
 def content_hash(event: Event) -> str:
-    body = event.model_dump(mode="json")
+    body = _utc(event).model_dump(mode="json")
     return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
