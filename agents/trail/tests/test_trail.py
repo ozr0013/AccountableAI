@@ -22,13 +22,13 @@ def test_rules_trail_scenario_3_bank_and_vendor_beat_statement():
 
 
 def test_rules_trail_scenario_9_paid_reply_is_not_proof():
-    t = TrailAgent(None).build_trail(*invoice("INV-PT-0901", "peachtree"))
+    t = TrailAgent(None).build_trail(*invoice("INV-KW-0901", "keyway"))
     assert t.winning_claim == "unpaid" and t.conflict
-    assert "doc-reply-pt-0901" in _ids(t)
+    assert "doc-reply-kw-0901" in _ids(t)
 
 
 def test_rules_trail_paid_invoice_wins_paid():
-    t = TrailAgent(None).build_trail(*invoice("INV-KW-0402", "keyway"))
+    t = TrailAgent(None).build_trail(*invoice("INV-KW-0501", "keyway"))
     assert t.winning_claim == "paid" and not t.conflict
 
 

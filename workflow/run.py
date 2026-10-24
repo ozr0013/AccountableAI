@@ -44,7 +44,7 @@ def main() -> None:
     ap.add_argument("--funding", metavar="MANAGER:AMOUNT",
                     help="after the replay, Oakline is about to fund e.g. keyway:18400")
     ap.add_argument("--moment", action="store_true",
-                    help="then the judge says the electrician's invoice arrived Apr 1")
+                    help="then the judge says the electrician's invoice arrived Apr 15, not Mar 28")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
 
@@ -67,7 +67,7 @@ def main() -> None:
 
     if a.moment:
         from rails.console import JudgeConsole
-        res = JudgeConsole(rails).apply_preset("invoice_arrived")
+        res = JudgeConsole(rails).apply_preset("invoice_received_correction")
         print(f"JUDGE: {res.summary}  -> recheck only {res.affected}")
         results += [wf.handle(e) for e in res.events]
 
