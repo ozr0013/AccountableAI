@@ -1,4 +1,4 @@
-"""Aging and per-manager lateness patterns.
+"""Aging and per-manager lateness patterns, measured against the manager's own agreement.
 
 An invoice counts against the manager only when the manager is the reason it is late:
 funded, past its due date from confirmed terms, and either paid after the due date or still
@@ -12,6 +12,7 @@ from datetime import date
 
 from contracts.models import Event
 
+from ..facts import current_terms
 from ..ledger import build_ledger
 from ..recon import breakdown
 
@@ -39,23 +40,34 @@ def aging(events: list[Event], manager_id: str, as_of: date) -> dict[str, float]
     return {b: v / 100 for b, v in out.items()}
 
 
-def _late_invoices(events: list[Event], manager_id: str, as_of: date) -> dict[str, list[str]]:
-    """month (of invoice receipt) -> ids of invoices late because of the manager."""
+def _days_past_window(events: list[Event], manager_id: str, as_of: date) -> dict[str, dict[str, int]]:
+    """month (of invoice receipt) -> {invoice id: days past the agreement's payment window}.
+
+    The baseline is the manager's own confirmed terms (due date = receipt + payment window), not
+    other managers. Paid late: days from due date to payment. Still owed and overdue: days from
+    due date to `as_of`. Only invoices late because of the manager are listed; every month with a
+    funded invoice appears, so on-time months show up as empty.
+    """
     owed = {r.invoice_id: r.owed for r in breakdown(events, manager_id)}
-    months: dict[str, list[str]] = {}
+    months: dict[str, dict[str, int]] = {}
     for l in build_ledger(events):
         if l.manager_id != manager_id or not l.invoice_received or l.duplicate_of:
             continue
         if l.funded_amount <= 0:
             continue
-        m = months.setdefault(l.invoice_received.strftime("%Y-%m"), [])
+        m = months.setdefault(l.invoice_received.strftime("%Y-%m"), {})
         if not l.due_date:
             continue
-        paid_late = l.paid_on is not None and l.paid_on > l.due_date
-        unpaid_late = owed.get(l.invoice_id, 0) > 0 and as_of > l.due_date
-        if paid_late or unpaid_late:
-            m.append(l.invoice_id)
+        if l.paid_on is not None and l.paid_on > l.due_date:
+            m[l.invoice_id] = (l.paid_on - l.due_date).days
+        elif owed.get(l.invoice_id, 0) > 0 and as_of > l.due_date:
+            m[l.invoice_id] = (as_of - l.due_date).days
     return months
+
+
+def _late_invoices(events: list[Event], manager_id: str, as_of: date) -> dict[str, list[str]]:
+    """month (of invoice receipt) -> ids of invoices late because of the manager."""
+    return {m: sorted(d) for m, d in _days_past_window(events, manager_id, as_of).items()}
 
 
 def late_months(events: list[Event], manager_id: str, as_of: date) -> dict[str, bool]:
@@ -69,14 +81,22 @@ class Pattern:
     months: int
     late: int
     recurring: bool
-    history: list[dict] = field(default_factory=list)   # [{month, late, invoice_ids}]
+    payment_window_days: int | None = None
+    history: list[dict] = field(default_factory=list)
+    # history rows: {month, late, invoice_ids, days_past_window: {id: days}, max_days_past_window}
 
 
 def pattern(events: list[Event], manager_id: str, as_of: date, window: int = 6) -> Pattern:
-    """Recurring lateness over the last `window` months, with the history to cite."""
-    by_month = sorted(_late_invoices(events, manager_id, as_of).items())[-window:]
-    late = sum(1 for _, ids in by_month if ids)
+    """Recurring lateness against the manager's own agreement terms over the last `window`
+    months: recurring when late in at least RECURRING_MIN_LATE of at least RECURRING_MIN_MONTHS
+    months. Comes with the month-by-month history (days past the payment window) to cite."""
+    days = current_terms(events).get(manager_id, {}).get("vendor_payment_days")
+    by_month = sorted(_days_past_window(events, manager_id, as_of).items())[-window:]
+    late = sum(1 for _, d in by_month if d)
     return Pattern(
         manager_id=manager_id, months=len(by_month), late=late,
         recurring=len(by_month) >= RECURRING_MIN_MONTHS and late >= RECURRING_MIN_LATE,
-        history=[{"month": m, "late": bool(ids), "invoice_ids": ids} for m, ids in by_month])
+        payment_window_days=int(days) if days is not None else None,
+        history=[{"month": m, "late": bool(d), "invoice_ids": sorted(d),
+                  "days_past_window": dict(sorted(d.items())),
+                  "max_days_past_window": max(d.values(), default=0)} for m, d in by_month])

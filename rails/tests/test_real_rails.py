@@ -9,7 +9,7 @@ from contracts.registry import rails as registry_rails
 from rails import RealRails
 from world import generate
 
-AS_OF = date(2026, 4, 25)
+AS_OF = date(2026, 4, 22)      # world.generator.WORLD_TODAY
 
 
 @pytest.fixture
@@ -38,8 +38,8 @@ def test_conforms_to_fake_on_scenario_3(real):
 
 def test_now_comes_from_the_world_not_the_wall_clock(real, monkeypatch):
     assert real.now() == AS_OF
-    monkeypatch.setenv("WORLD_AS_OF", "2026-05-01")
-    assert real.now() == date(2026, 5, 1)
+    monkeypatch.setenv("WORLD_AS_OF", "2026-04-20")
+    assert real.now() == date(2026, 4, 20)
 
 
 def test_unpaid_respects_as_of(real):
