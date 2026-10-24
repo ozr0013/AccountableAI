@@ -20,7 +20,7 @@ def monkeypatch_module():
 
 @pytest.fixture(scope="module")
 def full():
-    return score(run_system("full", n_clean=10))
+    return score(run_system("full", n_clean=30))  # scenario 4 needs >= 30 background invoices
 
 
 def test_never_executes_a_prohibited_action(full):
