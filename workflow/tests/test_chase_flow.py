@@ -78,3 +78,33 @@ def test_late_bank_proof_turns_unpaid_alert_into_paid_late_and_stops_chasing(wf)
     assert alert.draft.amount == 0 and "paid 45 days late" in alert.draft.headline
     wf.replay(scan_events(["keyway"], when.date().replace(day=30)))
     assert len(WorkflowBook.load(wf.deps.rails).chases["keyway"]) == 1     # nothing owed now
+
+
+def _ladders(book):
+    """invoice id -> the reminder levels sent for it, oldest first."""
+    out: dict[str, list[str]] = {}
+    for msgs in book.chases.values():
+        for m in sorted(msgs, key=lambda m: m.sent_at):
+            for i in m.invoice_ids:
+                out.setdefault(i, []).append(m.level)
+    return out
+
+
+def test_each_invoice_has_its_own_reminder_ladder():
+    """A new item starts at polite even if the manager was already chased about another one."""
+    from datetime import date
+    from world.generator import ALL_SCENARIOS
+    w = generate(scenarios=ALL_SCENARIOS, n_clean=30)
+    rails = MemoryRails()
+    wf = make_workflow(rails, agents=RealAgents(None))
+    wf.replay(w.events())
+    for day in (date(2026, 4, 22), date(2026, 4, 28), date(2026, 5, 4)):
+        wf.replay(scan_events(["keyway"], day))
+    book = WorkflowBook.load(rails)
+    ladders = _ladders(book)
+    order = ["polite", "firm", "escalation"]
+    for inv, levels in ladders.items():
+        assert levels == order[:len(levels)], (inv, levels)
+    owed = [a.draft.invoice_ids[0] for a in book.open_alerts("keyway")
+            if a.draft.kind == "unexplained_unpaid" and a.draft.amount > 0]
+    assert owed and all(i in ladders for i in owed)
