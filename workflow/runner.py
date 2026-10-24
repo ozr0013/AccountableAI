@@ -48,7 +48,9 @@ def checkpointer_from_env() -> BaseCheckpointSaver | None:
     from langgraph.checkpoint.postgres import PostgresSaver
 
     from rails.db import database_url
-    saver = PostgresSaver(psycopg.connect(database_url(), autocommit=True))
+
+    from .graph import serde
+    saver = PostgresSaver(psycopg.connect(database_url(), autocommit=True), serde=serde())
     saver.setup()
     return saver
 

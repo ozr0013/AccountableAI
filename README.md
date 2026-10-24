@@ -149,7 +149,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 6. [x] Bank-detail change path (scenario 7)
 7. [x] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)
 8. [ ] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
-9. [ ] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed
+9. [x] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed
 
 ### Omar: verification, evals, memory (`agents/verifier/`, `agents/briefing/`, `evals/`)
 1. [ ] Answer key for all 9 scenarios (start here; it's the spec)
