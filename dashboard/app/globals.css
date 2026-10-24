@@ -785,3 +785,35 @@ textarea.input { height: auto; padding: 12px 14px; resize: vertical; line-height
 .decision-thinking-live { margin:8px 0 0; padding-left:10px; border-left:2px solid var(--o); border-radius:0; font-size:13px; line-height:20px; font-style:italic; white-space:pre-wrap; color:var(--n10); }
 .decision-thinking-live .caret { display:inline-block; width:7px; height:14px; margin-left:2px; background:var(--o); vertical-align:-2px; animation:blink 1s steps(1) infinite; border-radius:0; }
 @keyframes blink { 50% { opacity:0; } }
+
+/* Agent workflow (app/loop): three agents in a row, reasoning streamed under each */
+.flow-bar { display:flex; align-items:center; gap:16px; margin:4px 0 20px; flex-wrap:wrap; }
+.flow-link { margin-left:auto; font-size:13px; color:var(--n9); }
+.flow { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:28px; align-items:start; }
+.flow-col { position:relative; }
+.flow-arrow { position:absolute; right:-22px; top:34px; font-size:18px; color:var(--n5); transition:color .3s var(--ease); }
+.flow-arrow.on { color:var(--o); }
+.flow-card { background:var(--white); border-radius:18px; padding:20px; box-shadow:inset 0 0 0 1px var(--n3); transition:box-shadow .3s var(--ease), opacity .3s var(--ease); }
+.flow-card.waiting { opacity:.6; }
+.flow-card.running { box-shadow:inset 0 0 0 2px var(--o); }
+.flow-card header { display:flex; gap:12px; align-items:flex-start; }
+.flow-card h3 { margin:0; font-size:17px; font-weight:500; letter-spacing:-.01em; }
+.flow-card header p { margin:2px 0 0; font-size:13px; color:var(--n9); }
+.flow-n { flex:none; display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--n1); font-weight:500; }
+.flow-card.running .flow-n { background:var(--o); color:var(--white); }
+.flow-card.done .flow-n { background:var(--g-wash); color:var(--g-ink); }
+.flow-think { margin:16px 0 0; padding:12px 14px; min-height:150px; max-height:330px; overflow:auto; border-radius:12px; background:var(--n1); font-size:12.5px; line-height:19px; }
+.flow-idle { margin:0; color:var(--n9); }
+.flow-line { margin:0 0 4px; color:var(--n10); animation:rise .25s var(--ease) both; }
+.flow-line.question { margin-top:8px; color:var(--ink); }
+.flow-line.question:first-child { margin-top:0; }
+.flow-line.result { color:var(--ink); font-weight:500; }
+.flow-line.guard { color:var(--o-ink); }
+.flow-line.email { color:var(--g-ink); font-weight:500; }
+.flow-line.thinking { font-style:italic; border-left:2px solid var(--o); padding-left:8px; }
+.flow-caret { display:inline-block; width:7px; height:13px; background:var(--o); animation:blink 1s steps(1) infinite; }
+.flow-result { margin-top:10px; padding:10px 12px; border-radius:10px; font-size:13px; line-height:19px; animation:rise .3s var(--ease) both; }
+.flow-result.good { background:var(--g-wash); color:var(--g-ink); }
+.flow-result.warn { background:var(--o-pill); color:var(--o-ink); }
+.flow-foot { margin-top:16px; }
+@media (max-width:1000px) { .flow { grid-template-columns:1fr; } .flow-arrow { display:none; } }

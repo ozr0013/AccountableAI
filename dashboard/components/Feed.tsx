@@ -27,6 +27,7 @@ type Ctx = {
   setLive: (on: boolean) => Promise<{ ok: boolean; error?: string }>;
   brief: (question: string) => Promise<Briefing>;
   reset: () => Promise<void>;
+  refresh: () => Promise<void>;
 };
 
 const FeedCtx = createContext<Ctx | null>(null);
@@ -148,8 +149,13 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     setPanel(false);
   };
 
+  /** Re-read the live state after work that ran outside these actions (the Live loop page). */
+  const refresh: Ctx["refresh"] = async () => {
+    if (mode === "live") setState(await json<State>("/api/state"));
+  };
+
   return (
-    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, setLive, brief, reset }}>
+    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, setLive, brief, reset, refresh }}>
       {children}
     </FeedCtx.Provider>
   );

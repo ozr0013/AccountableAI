@@ -8,6 +8,7 @@ payload keys used (all optional unless stated):
   actor_role        "agent" | "controller" (default: controller iff actor starts with "controller")
   proposed_by       who proposed the thing being approved / sent
   template_id, prior_levels, days_since_last              (send_chase)
+  template_id, body, to, registered_to                   (send_statement_notice)
   body, to, approval {"draft_digest", "approved_by"}      (send_outbound)
   citations, text                                         (create_alert)
   identity_verified, approved_by, requested_by            (update_bank_details)
@@ -17,7 +18,7 @@ from __future__ import annotations
 
 import hashlib
 
-from .templates import APPROVED_TEMPLATES, LEVEL_ORDER, MIN_DAYS_BETWEEN
+from .templates import APPROVED_TEMPLATES, LEVEL_ORDER, MIN_DAYS_BETWEEN, STATEMENT_NOTICE_TEMPLATE
 from .wording import banned_terms_in
 
 NEVER = {"move_money", "pay", "pay_vendor", "transfer", "wire", "release_funds", "disburse",
@@ -26,7 +27,7 @@ READ_ONLY = {"read", "draft", "draft_chase", "draft_document_request", "propose_
              "recheck", "withdraw_alert", "resolve_alert", "decline", "request_bank_change",
              "build_case", "record_reply"}
 KNOWN = READ_ONLY | NEVER | {"approve", "hold", "send_chase", "send_outbound", "create_alert",
-                             "update_bank_details"}
+                             "update_bank_details", "send_statement_notice"}
 
 
 def draft_digest(to: str, body: str) -> str:
@@ -85,6 +86,16 @@ def policy_check(action: str, actor: str, payload: dict) -> tuple[bool, str]:
         if not ap.get("approved_by") or ap["approved_by"] == p.get("proposed_by"):
             return False, "proposer cannot approve their own draft"
         if bad := banned_terms_in(p["body"]):
+            return False, f"accusatory wording blocked: {', '.join(bad)}"
+        return True, "ok"
+
+    if action == "send_statement_notice":
+        # The anomaly detector's note: a code-rendered template, to the middleman on file only.
+        if p.get("template_id") != STATEMENT_NOTICE_TEMPLATE:
+            return False, "a statement notice must use the approved notice template"
+        if not p.get("to") or p.get("to") != p.get("registered_to"):
+            return False, "a statement notice goes only to the middleman's registered address"
+        if bad := banned_terms_in(p.get("body", "")):
             return False, f"accusatory wording blocked: {', '.join(bad)}"
         return True, "ok"
 

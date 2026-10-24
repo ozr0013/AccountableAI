@@ -122,6 +122,20 @@ def brief(body: BriefIn):
         return session().brief(body.question, use_model=os.getenv("DASHBOARD_BRIEF_MODEL") == "1")
 
 
+@app.post("/api/loop/{step}")
+def loop_step(step: Literal["start", "agreement", "chaser", "anomaly"]):
+    """The three-agent loop, one agent per call (dashboard Live loop page). start = fresh session."""
+    import loop
+    with _lock:
+        s = session()
+        if step == "start":
+            s.reset()
+            return {"ok": True, "as_of": s.rails.now().isoformat(), "live": s.live}
+        out = {"agreement": loop.agreement_step, "chaser": loop.chaser_step,
+               "anomaly": loop.anomaly_step}[step](s)
+        return {"ok": True, **out, "as_of": s.rails.now().isoformat()}
+
+
 @app.get("/api/timeline")
 def timeline(days: int = 15):
     """The investigation day by day: facts, agent decisions with reasoning, outcomes, people."""

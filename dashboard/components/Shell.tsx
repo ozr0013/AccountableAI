@@ -33,7 +33,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
     { href: "/overview", label: "Portfolio", icon: Home },
-    { href: "/investigation", label: "Agent workflow", icon: Spark },
+    { href: "/loop", label: "Agent workflow", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
     { href: "/items", label: "Invoices", icon: ListIcon, count: open },
     { href: "/keyway", label: "Manager payments", icon: Building },

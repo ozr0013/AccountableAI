@@ -92,9 +92,21 @@ def test_workflow_alerts_owner_drafts_note_to_middleman_and_withdraws_when_corre
     [al] = [a for a in WorkflowBook.load(rails).open_alerts("keyway")
             if a.draft.kind == AlertKind.statement_mismatch]
     assert al.draft.amount == line.amount / 2 and al.draft.invoice_ids == [line.invoice_id]
-    assert "controller approves" in al.draft.recommended_action          # note to the middleman
+    assert "Note to the middleman: Hello" in al.draft.recommended_action
     assert al.draft.claims[0].citations[0].source_id == "doc-stmt-half"
 
     ingest(line.amount, "doc-stmt-fixed", 8)
     assert not [a for a in WorkflowBook.load(rails).open_alerts("keyway")
                 if a.draft.kind == AlertKind.statement_mismatch]
+
+
+def test_statement_notice_goes_only_to_the_registered_middleman_from_the_template():
+    from rails.guards import policy_check
+    from rails.guards.templates import STATEMENT_NOTICE_TEMPLATE, render_statement_notice
+    body = render_statement_notice(manager_name="Keyway", statement_ref="dated Apr 27, 2026",
+                                   stated="$620.00", invoice_ref="INV-KW-0301", approved="$1,240.00")
+    ok = {"template_id": STATEMENT_NOTICE_TEMPLATE, "body": body, "to": "a@x.test", "registered_to": "a@x.test"}
+    assert policy_check("send_statement_notice", "anomaly_detector", ok)[0]
+    assert not policy_check("send_statement_notice", "anomaly_detector", {**ok, "to": "b@x.test"})[0]
+    assert not policy_check("send_statement_notice", "anomaly_detector", {**ok, "template_id": "free-text"})[0]
+    assert not policy_check("send_statement_notice", "anomaly_detector", {**ok, "body": body + " This is fraud."})[0]
