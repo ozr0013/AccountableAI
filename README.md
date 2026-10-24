@@ -1,6 +1,6 @@
 # AccountableAI: make sure the middleman pays your vendors
 
-**Cal Hacks 13.0 · Hyphenate track (core) · Team: Aaryan, Kanishka, Omar, Audrey**
+**Cal Hacks 13.0 · Hyphenate track (core) · Team: Aaryan, Kanishka, Omar, & Audrey**
 
 An owner pays a middleman, and the middleman is supposed to pay the vendors who do the work. Sometimes the money doesn't reach the vendor, or not all of it does. The vendor goes unpaid, stops working, and the owner finds out too late. AccountableAI closes that loop with three agents: one reads the agreement, one chases the payment, one checks the middleman's statements.
 
