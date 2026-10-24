@@ -1,11 +1,11 @@
-"""Mirror the PostgreSQL event log into SpacetimeDB so the dashboard can subscribe live.
+"""Mirror the PostgreSQL tables into SpacetimeDB so the dashboard can subscribe live.
 
 PostgreSQL stays the source of truth. Each event is published through the module's
 `publish_event` reducer over HTTP; the reducer ignores ids it already has, so a backfill or
 a retry never duplicates rows.
 
-    python -m rails.live.spacetime --backfill        # copy every Postgres event
-    python -m rails.live.spacetime --check           # compare row counts
+    python -m rails.live.spacetime --backfill        # copy all five tables
+    python -m rails.live.spacetime --check           # compare row counts per table
 
 Env: SPACETIME_URL (default http://127.0.0.1:3100), SPACETIME_DB (default accountableai),
 SPACETIME_TOKEN (the publisher's token: `spacetime login show --token`).
@@ -62,9 +62,58 @@ class SpacetimeMirror:
                 json.dumps(event.payload, sort_keys=True, default=str)]
         _post("call/publish_event", args, self.token)
 
-    def count(self) -> int:
-        rows = json.loads(_post("sql", b"SELECT * FROM event", self.token, "text/plain"))
+    def count(self, table: str = "event") -> int:
+        rows = json.loads(_post("sql", f"SELECT * FROM {table}".encode(), self.token, "text/plain"))
         return len(rows[0]["rows"]) if rows else 0
+
+    def call(self, reducer: str, args: list) -> None:
+        _post("call/" + reducer, args, self.token)
+
+
+def _iso(value) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+# Postgres table -> (SpacetimeDB table, SELECT, reducer args from a row).
+TABLES = {
+    "agent_cases": ("agent_case", "upsert_case",
+                    "SELECT id, owner_id, manager_id, vendor_id, invoice_id, body->>'state', "
+                    "version, body FROM agent_cases",
+                    lambda r: [r[0], r[1], r[2], r[3], r[4], r[5] or "", r[6],
+                               json.dumps(r[7], sort_keys=True, default=str)]),
+    "scheduled_jobs": ("scheduled_job", "upsert_job",
+                       "SELECT id, case_id, schedule_key, due_at, status, attempts, lease_owner, "
+                       "lease_until, last_error, payload FROM scheduled_jobs",
+                       lambda r: [r[0], r[1], r[2], _iso(r[3]), r[4], r[5], _option(r[6]),
+                                  _option(_iso(r[7])), _option(r[8]),
+                                  json.dumps(r[9], sort_keys=True, default=str)]),
+    "event_facts": ("event_fact", "put_fact", "SELECT event_id, fact_key FROM event_facts",
+                    lambda r: [r[0], r[1]]),
+    "dependencies": ("dependency", "put_dependency", "SELECT item_id, fact_key FROM dependencies",
+                     lambda r: [r[0], r[1]]),
+}
+
+
+def _exists(conn, table: str) -> bool:
+    return conn.execute("SELECT to_regclass(%s)", (table,)).fetchone()[0] is not None
+
+
+def sync_tables(conn, mirror: SpacetimeMirror) -> dict[str, tuple[int, int]]:
+    """Copy every non-event table. Returns {table: (rows sent, failures)}."""
+    mirror.call("clear_derived", [])
+    out = {}
+    for pg_table, (_, reducer, sql, to_args) in TABLES.items():
+        if not _exists(conn, pg_table):
+            continue
+        rows, failed = conn.execute(sql).fetchall(), 0
+        for row in rows:
+            try:
+                mirror.call(reducer, to_args(row))
+            except urllib.error.URLError as exc:
+                failed += 1
+                log.warning("%s row failed: %s", pg_table, exc)
+        out[pg_table] = (len(rows), failed)
+    return out
 
 
 _MIRROR: SpacetimeMirror | None = None
@@ -112,8 +161,15 @@ def main() -> None:
             except urllib.error.URLError as exc:
                 failed += 1
                 log.warning("publish %s failed: %s", event.id, exc)
-        print(f"published {len(events) - failed}/{len(events)} events")
-    print(f"postgres events: {len(events)}  spacetime events: {mirror.count()}")
+        print(f"events: published {len(events) - failed}/{len(events)}")
+        for table, (sent, bad) in sync_tables(rails.store.conn, mirror).items():
+            print(f"{table}: published {sent - bad}/{sent}")
+    print(f"{'table':16} {'postgres':>9} {'spacetime':>10}")
+    print(f"{'events':16} {len(events):>9} {mirror.count():>10}")
+    for pg_table, (st_table, *_rest) in TABLES.items():
+        if _exists(rails.store.conn, pg_table):
+            n = rails.store.conn.execute(f"SELECT count(*) FROM {pg_table}").fetchone()[0]
+            print(f"{pg_table:16} {n:>9} {mirror.count(st_table):>10}")
 
 
 if __name__ == "__main__":
