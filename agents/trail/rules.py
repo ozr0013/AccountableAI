@@ -36,8 +36,9 @@ def timeline(line: LedgerLine, docs: list[Document], dec: TrustDecision | None) 
     for d in docs:
         data = d.data
         if d.kind == SourceKind.vendor_invoice and data.get("invoice_id") == iid:
+            extra = f", inspection {data['inspection']}" if data.get("inspection") else ""
             out.append(_entry(d, f"invoiced {_money(data['amount'])}, received "
-                                 f"{data.get('received', d.dated)}", _d(data.get("received"))))
+                                 f"{data.get('received', d.dated)}{extra}", _d(data.get("received"))))
         elif d.kind == SourceKind.funding and data.get("invoice_id") == iid:
             out.append(_entry(d, f"Oakline funded {_money(data['amount'])}", _d(data.get("funded_on"))))
         elif d.kind == SourceKind.manager_statement:

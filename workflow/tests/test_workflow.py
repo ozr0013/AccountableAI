@@ -78,10 +78,11 @@ def test_fresh_workflow_over_same_log_adds_no_duplicates(s3):
     rails = MemoryRails()
     make_workflow(rails).replay(s3.events())
     before = _wf_events(rails)
-    make_workflow(rails).replay(s3.events() + scan_events(["keyway"], s3.as_of))
-    after = _wf_events(rails)
-    assert len([e for e in after if e.type == "alert_raised"]) == 1
-    assert len(after) == len(before) + 1          # only the new scan's done-marker
+    scan = scan_events(["keyway"], s3.as_of)
+    make_workflow(rails).replay(s3.events() + scan)
+    new = [e for e in _wf_events(rails) if e not in before]
+    assert {e.payload["trigger"] for e in new} == {scan[0].id}     # only the new scan did work
+    assert len(WorkflowBook.load(rails).open_ids) == 1
 
 
 class CrashOnce(FakeVerifier):
@@ -114,4 +115,4 @@ def test_scan_reassesses_a_whole_manager(s3):
     [r] = wf.replay(scan_events(["keyway"], s3.as_of))
     assert r.route == "scan"
     assert any("INV-KW-0301: delayed" in t for t in r.trace)
-    assert any("already open" in t for t in r.trace)
+    assert r.raised == [] and len(WorkflowBook.load(wf.deps.rails).open_ids) == 1
