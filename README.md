@@ -188,10 +188,10 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 | Person | Done | What's in `main` |
 |---|---|---|
 | Shared | Phase 0 | `contracts/` (models, step signatures, registry, stand-ins, scenario 3 fixture), `docker-compose.yml`, `.env.example`, `pyproject.toml` |
-| Aaryan | 11 / 11 | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22) |
-| Omar | 5 / 8 | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
+| Aaryan | 11 / 11 | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22), plus the live loop in `rails/live/` (see **Live loop** below) |
+| Omar | 8 / 8 | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
 | Kanishka | 10 / 10 | `workflow/` (LangGraph graph, runner, replay, recheck), all five judgment agents, bank-detail path, sealed commit-reveal eval |
-| Audrey | 7 / 10 | `dashboard/`: Next.js app on the live feed (`dashboard/feed/serve.py`, real workflow + Judge Console + approvals) with replay fallback; overview, open items + payment timeline, case queue, Keyway view, guardrails, Judge Console, briefing |
+| Audrey | 9 / 10 | `dashboard/`: Next.js app on the live feed (`dashboard/feed/serve.py`, real workflow + Judge Console + approvals) with replay fallback; overview, open items + payment timeline, case queue, Keyway view, guardrails, Judge Console, briefing |
 
 The scored evaluation artifacts, strong-model baseline, adversarial verifier study, guided live investigation, and Devpost draft are in the repository. The remaining deployment work is durable checkpointing and an authenticated production approval service; the hackathon demo intentionally uses a resettable in-memory session.
 
@@ -283,6 +283,31 @@ RAILS=real pytest evals/test_prohibited.py          # guardrails against the rea
 python dashboard/feed/serve.py                      # live feed for the dashboard (free, rules mode)
 cd dashboard && npm install && npm run dev          # dashboard on :3000 (see dashboard/README.md)
 ```
+
+## Live loop: the system reacts by itself
+
+`rails/live/` turns a fact into a reaction with no one pressing "run": a Judge Console fact is recorded at once, the workflow runs on it in the background, and what the system did is on the record. It is separate from the replay feed in `dashboard/feed/serve.py` and runs on Postgres.
+
+```bash
+python -m rails.load --fresh                    # the demo world (366 events, demo date Apr 22)
+python -m rails.live warm                       # process what is there, once, before the demo
+DEMO_TOKEN=... CORS_ORIGINS=http://localhost:3000 \
+  uvicorn rails.console.api:app --port 8001     # ONE worker: the workflow runs one event at a time
+```
+
+| Endpoint | What it does |
+|---|---|
+| `POST /presets/{id}`, `POST /text` | A fact arrives (receipt date, bank line, a reply, ...). Recorded before the response; the workflow then runs in the background (`?wait=true` runs it first). |
+| `POST /clock/advance` | Moves the demo clock to the **next deadline** (a reminder due or an invoice becoming overdue), or `{"days": n}` / `{"to": "YYYY-MM-DD"}`. Time only moves forward. |
+| `POST /funding-review` | "Oakline is about to fund Keyway": the case agent proposes a hold ($3,140 of $18,400). |
+| `GET /approvals`, `POST /approvals/{id}/decide` | The one human touch. The proposer and non-controllers are refused. |
+| `GET /feed`, `GET /stats`, `GET /jobs/{id}` | What the system did and why, with citations; automatic actions vs human decisions; job status. Header `X-Demo-Token` when `DEMO_TOKEN` is set. |
+
+Things to know before demoing:
+- **Reminders are recorded as issued; nothing is emailed.** The clock is a demo clock (like a test clock): time moves only when asked.
+- **Answers to identical model questions are reused** (`answer_cache` in Postgres), so a repeated "advance time" takes under a second instead of minutes. A fresh cache takes about 16 minutes to warm (30 invoices, live models); `TRUNCATE answer_cache;` gives a cold run.
+- **Rehearse once, then reset:** `python -m rails.live script` plays the whole demo with timings, but it uses up the demo state (the moment is applied and the clock ends at Apr 27). Then `python -m rails.load --fresh` and `python -m rails.live warm` before the real demo. Never run `warm` or `script` while the API server is up.
+- Agents and verifier follow `AGENTS` / `VERIFIER` (`real` = models, needs `ANTHROPIC_API_KEY`); `/stats` reports the mode.
 
 ## Rules
 
