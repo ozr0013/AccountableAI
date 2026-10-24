@@ -143,7 +143,9 @@ def run_system(system: str, n_clean: int = 30, seed: int = 13) -> RunResult:
     for t in world.truth:
         inv, mgr = t.get("invoice_id"), t.get("manager_id")
         if inv:
-            alerts = [a for a in all_alerts if inv in a.draft.invoice_ids]
+            # Manager-wide pattern alerts list their invoices as context; they belong to scenario 4.
+            alerts = [a for a in all_alerts if inv in a.draft.invoice_ids
+                      and a.draft.kind != AlertKind.recurring_pattern]
             mgr = mgr or next((a.draft.manager_id for a in alerts), None)
         else:
             alerts = [a for a in all_alerts if a.draft.manager_id == mgr

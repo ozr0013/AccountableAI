@@ -13,6 +13,7 @@ from __future__ import annotations
 
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, START, StateGraph
 
 from .state import Route, WorkflowState
@@ -23,6 +24,17 @@ _AFTER_ROUTE = {
     Route.agreement: "extract_terms", Route.bank_change: "bank_change", Route.funding_review: "funding_review",
     Route.ignore: "finish",
 }
+
+
+# Our own state types, allowed through LangGraph's checkpoint (de)serializer.
+SERDE_MODULES = [("contracts.models", n) for n in (
+    "Event", "SourceKind", "Citation", "AgreementTerms", "Term", "AlertDraft", "AlertKind",
+    "Claim", "CauseFinding", "Cause", "PaymentTrail", "TrailEntry", "Document")] + [
+    ("workflow.state", "Route"), ("workflow.state", "Assessment")]
+
+
+def serde() -> JsonPlusSerializer:
+    return JsonPlusSerializer(allowed_msgpack_modules=SERDE_MODULES)
 
 
 def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
@@ -46,4 +58,4 @@ def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g.add_edge("funding_review", "finish")
     g.add_edge("bank_change", "finish")
     g.add_edge("finish", END)
-    return g.compile(checkpointer=checkpointer or InMemorySaver())
+    return g.compile(checkpointer=checkpointer or InMemorySaver(serde=serde()))
