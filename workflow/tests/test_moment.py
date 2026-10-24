@@ -74,3 +74,17 @@ def test_terms_change_rechecks_the_whole_manager(world):
 
 def test_moment_fact_matches_world_truth():
     assert MOMENT["fact_key"] == f"invoice:{ELECTRICIAN}.received"
+
+
+def test_checkpoint_b_fallback_reruns_whole_manager_and_reports_changes(world, monkeypatch):
+    rails, wf = world
+    monkeypatch.setenv("RECHECK_MODE", "manager")
+    before = _open(rails)
+    _, [r] = _moment(rails, wf)
+    keyway = {l.invoice_id for l in rails.ledger("keyway") if not l.duplicate_of}
+    [done] = [e for e in rails.events() if e.type == "workflow_done"
+              and e.payload["trigger"] == r.event_id]
+    assert set(done.payload["rechecked"]) == keyway and len(keyway) > 2
+    assert done.payload["changed"] == [ELECTRICIAN]                   # same outcome as selective
+    assert _open(rails)[PLUMBER] == before[PLUMBER]
+    assert any(t.startswith("recheck:") and "1 changed" in t for t in r.trace)

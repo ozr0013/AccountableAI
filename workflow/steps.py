@@ -7,6 +7,7 @@ on real rails / agents / verifier once their env var says "real".
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from datetime import date
 
@@ -44,6 +45,7 @@ ACTION_FOR_KIND = {
     AlertKind.owner_pending_approval: "Oakline's own approval/funding is pending; no manager action.",
 }
 ITEM_KINDS = set(ALERT_FOR_CAUSE.values())
+RECHECK_TYPES = {"fact_corrected", "terms_confirmed"}
 _IGNORED = WF_TYPES | {"entity_registered", "world_meta", "period_closed",
                        "approval_requested", "approval_decided"}
 
@@ -61,6 +63,13 @@ class Deps:
                    registry.approvals())
 
 
+def _material(d: AlertDraft) -> tuple:
+    """What makes an alert different: kind, money and the evidence cited (not the wording or
+    the day count in the headline, which moves with the calendar)."""
+    return (d.kind, round(d.amount, 2), tuple(d.invoice_ids),
+            frozenset(c.source_id for cl in d.claims for c in cl.citations))
+
+
 def _term_values(t) -> dict:
     return {k: getattr(t, k).value for k in ("vendor_payment_days", "holdback_pct", "approval_limit")
             if getattr(t, k) is not None}
@@ -76,7 +85,9 @@ class Steps:
 
     # -- routing (code only) ---------------------------------------------------------------
     def route(self, s: WorkflowState) -> dict:
-        e, now = s.event, s.event.learned_at.date()
+        e = s.event
+        clock = WorkflowBook.load(self.d.rails).clock      # never run the clock backwards
+        now = max(e.learned_at, clock).date() if clock else e.learned_at.date()
         route = self._route_for(e)
         ids: list[str] = []
         if route in (Route.assess, Route.reply):
@@ -104,9 +115,16 @@ class Steps:
         }.get(e.type, Route.ignore)
 
     def _affected_invoices(self, e: Event) -> list[str]:
-        """Invoices whose facts this event touched, per rails.dependents_of, plus any it names."""
+        """Invoices whose facts this event touched, per rails.dependents_of, plus any it names.
+        RECHECK_MODE=manager (Checkpoint B fallback): a corrected fact reruns every invoice of
+        the affected manager instead, and the run reports which ones changed."""
         named = {e.invoice_id, *e.payload.get("invoice_ids", []),
                  e.payload.get("data", {}).get("invoice_id")} - {None}
+        if e.type in RECHECK_TYPES and os.getenv("RECHECK_MODE", "selective") == "manager":
+            managers = {e.manager_id} - {None} or {l.manager_id for i in named
+                                                   if (l := self._line(i))}
+            return sorted({l.invoice_id for m in managers for l in self.d.rails.ledger(m)
+                           if not l.duplicate_of} | named)
         return sorted(set(self.d.rails.dependents_of(e.id)) | named)
 
     # -- assess: payment trail + delay cause per invoice ----------------------------------
@@ -208,7 +226,7 @@ class Steps:
         raised, refreshed, rejected, notes = [], [], [], []
         for draft in s.drafts:
             old = book.alerts.get(draft.id) if draft.id in book.open_ids else None
-            if old and old.draft == draft:
+            if old and _material(old.draft) == _material(draft):
                 notes.append(f"{draft.id}: still holds, unchanged")
                 continue
             evidence = self._evidence(draft.manager_id, draft.invoice_ids, s.now)
@@ -425,7 +443,20 @@ class Steps:
 
     # -- finish: mark the event processed (replay guard) ----------------------------------
     def finish(self, s: WorkflowState) -> dict:
+        changed = self._changed(s)
         self.d.rails.append_event(done_event(s.event, {
             "route": s.route.value if s.route else None, "raised": s.raised,
-            "rejected": s.rejected, "chases": s.chases}))
-        return {"trace": ["done"]}
+            "refreshed": s.refreshed, "withdrawn": s.withdrawn, "rejected": s.rejected,
+            "chases": s.chases, "rechecked": s.invoice_ids, "changed": changed}))
+        notes = ["done"]
+        if s.event.type in RECHECK_TYPES:
+            notes.insert(0, f"recheck: {len(s.invoice_ids)} item(s) rerun, "
+                            f"{len(changed)} changed {changed}, "
+                            f"{len(s.invoice_ids) - len(changed)} unchanged")
+        return {"trace": notes}
+
+    def _changed(self, s: WorkflowState) -> list[str]:
+        book = WorkflowBook.load(self.d.rails)
+        ids = set(s.raised) | set(s.refreshed) | set(s.withdrawn)
+        return sorted({i for aid in ids if aid in book.alerts
+                       for i in book.alerts[aid].draft.invoice_ids})
