@@ -56,7 +56,8 @@ class DependencyIndex:
 
     def rebuild(self, events: list[Event]) -> None:
         """Recompute everything from the log. Also ties payments the matcher matched without an
-        invoice id, and links duplicate invoices to their originals."""
+        invoice id, bank records that show no payment to the still-open items they cover, and
+        links duplicate invoices to their originals."""
         self.conn.execute("TRUNCATE event_facts, dependencies")
         for e in events:
             self.index_event(e)
@@ -66,6 +67,10 @@ class DependencyIndex:
             for c in ev.cites.get("bank", []):
                 if c.source_id in by_doc:
                     self._facts(by_doc[c.source_id], {f"invoice:{iid}.payment"})
+            if not ev.bank_cents:       # "no payment found" is a fact about the still-open items
+                for _, c in ev.bank_docs:
+                    if c.source_id in by_doc:
+                        self._facts(by_doc[c.source_id], {f"invoice:{iid}.payment"})
         for dup, orig in find_duplicates(docs).items():
             for a in _DUP_ATTRS:
                 self.record_dependency(dup, f"invoice:{orig}.{a}")
