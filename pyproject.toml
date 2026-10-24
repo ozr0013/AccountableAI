@@ -17,6 +17,7 @@ dependencies = [
     "python-dotenv>=1.0",
     "langgraph>=0.2",
     "langgraph-checkpoint-postgres>=2.0",
+    "langchain-anthropic>=1.7",
 ]
 
 [project.optional-dependencies]
