@@ -1,5 +1,4 @@
 .env
-.env.example
 .venv/
 __pycache__/
 *.pyc
@@ -10,6 +9,3 @@ node_modules/
 .next/
 .DS_Store
 evals/runs/
-
-# Local env template (kept out of the repo)
-.env.example
