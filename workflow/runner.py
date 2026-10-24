@@ -30,6 +30,7 @@ class RunResult:
     route: str | None = None
     raised: list[str] = field(default_factory=list)
     rejected: list[str] = field(default_factory=list)
+    withdrawn: list[str] = field(default_factory=list)
     chases: list[str] = field(default_factory=list)
     trace: list[str] = field(default_factory=list)
 
@@ -49,7 +50,7 @@ class Workflow:
         route = out.get("route")
         return RunResult(
             event.id, route=getattr(route, "value", route), raised=out.get("raised", []),
-            rejected=out.get("rejected", []), chases=out.get("chases", []),
+            rejected=out.get("rejected", []), withdrawn=out.get("withdrawn", []), chases=out.get("chases", []),
             trace=out.get("trace", []))
 
     def ingest(self, event: Event) -> RunResult:

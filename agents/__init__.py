@@ -24,9 +24,11 @@ class RealAgents:
     def __init__(self, llm=None):
         from contracts.fakes import FakeAgents
 
+        from .cause import CauseAgent
         from .trail import TrailAgent
         self._stand_in = FakeAgents()
         self.trail = TrailAgent(llm)
+        self.cause = CauseAgent(llm)
 
     def extract_terms(self, agreement: Document) -> AgreementTerms:
         return self._stand_in.extract_terms(agreement)
@@ -36,7 +38,7 @@ class RealAgents:
 
     def classify_cause(self, line: LedgerLine, trail: PaymentTrail,
                        terms: AgreementTerms) -> CauseFinding:
-        return self._stand_in.classify_cause(line, trail, terms)
+        return self.cause.classify_cause(line, trail, terms)
 
     def draft_chase(self, manager_id: str, alerts: list[Alert],
                     prior: list[ChaseMessage]) -> ChaseMessage:
