@@ -121,7 +121,8 @@ def _kind_rule(draft: AlertDraft) -> str:
 
 class LLMVerifier:
     def __init__(self, client: anthropic.Anthropic | None = None, model: str | None = None):
-        self.client = client or anthropic.Anthropic()
+        # A stuck call must not hang the workflow: fail closed within about a minute.
+        self.client = client or anthropic.Anthropic(timeout=60, max_retries=2)
         self.model = model or os.getenv("VERIFIER_MODEL", DEFAULT_MODEL)
 
     def verify(self, draft: AlertDraft, evidence: list[Document]) -> Verdict:
@@ -170,14 +171,19 @@ class LLMVerifier:
         )
 
     def _decide(self, draft, evidence, out: _Refutation, meta) -> Verdict:
-        kinds = {d.id: d.kind for d in evidence}
+        docs = {d.id: d for d in evidence}
+        kinds = {i: d.kind for i, d in docs.items()}
         unsupported = [draft.claims[c.index].text for c in out.claim_checks
                        if not c.supported and 0 <= c.index < len(draft.claims)]
         why_unsupported = [f"claim {c.index} unsupported: {c.why}" for c in out.claim_checks
                            if not c.supported]
+        # Same rule the drafts get: counter-evidence must be a real document, and a quote must
+        # actually be in it. A refutation resting on an invented quote doesn't count.
         counter = [Citation(source_id=c.source_id, kind=kinds[c.source_id],
                             locator=c.locator or None, quote=c.quote or None)
-                   for c in out.counter_evidence if c.source_id in kinds]
+                   for c in out.counter_evidence if c.source_id in docs
+                   and (not c.quote or rules._norm(c.quote) in rules._norm(docs[c.source_id].text))]
+        unchecked = sorted(set(range(len(draft.claims))) - {c.index for c in out.claim_checks})
 
         if out.refuted and counter:
             return Verdict(alert_id=draft.id, status=VerdictStatus.refuted,
@@ -185,11 +191,16 @@ class LLMVerifier:
         if unsupported:
             return Verdict(alert_id=draft.id, status=VerdictStatus.blocked,
                            reasons=why_unsupported, uncited_claims=unsupported, meta=meta)
+        if unchecked:
+            # A skipped check is not a pass: fail closed, like every other gap.
+            return Verdict(alert_id=draft.id, status=VerdictStatus.blocked, meta=meta,
+                           reasons=[f"verifier didn't check claim(s) {unchecked}; held for review"],
+                           uncited_claims=[draft.claims[i].text for i in unchecked])
 
         reasons = ["survived refutation: " + out.refutation]
         if out.refuted:
             # The verifier holds itself to the same rule: no refutation without a valid source.
-            reasons.append("refutation ignored: it cited no known evidence")
+            reasons.append("refutation ignored: it cited no known evidence (or misquoted it)")
         return Verdict(alert_id=draft.id, status=VerdictStatus.approved, reasons=reasons, meta=meta)
 
     def _fail_closed(self, draft, reason, meta=None) -> Verdict:
