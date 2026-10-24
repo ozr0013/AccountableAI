@@ -17,3 +17,9 @@ def schema():
     yield name
     conn.execute(f'DROP SCHEMA "{name}" CASCADE')
     conn.close()
+
+
+@pytest.fixture(autouse=True)
+def _no_neo4j_mirror(monkeypatch):
+    """Tests never write into the dev Neo4j graph; the live mirror test opts back in."""
+    monkeypatch.setenv("MEMORY", "postgres")

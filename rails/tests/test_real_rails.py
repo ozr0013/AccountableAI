@@ -27,7 +27,9 @@ def test_conforms_to_fake_on_scenario_3(real):
     f, r = fake.reconcile("keyway"), real.reconcile("keyway")
     assert {k: r[k] for k in f} == f
     assert real.dependents_of("invoice:INV-KW-0301.received") == fake.dependents_of("x")
-    for case in [("move_money", "agent", {}), ("approve", "a", {"proposed_by": "a"}), ("read", "a", {})]:
+    for case in [("move_money", "agent", {}), ("approve", "a", {"proposed_by": "a"}), ("read", "a", {}),
+                 ("approve", "controller", {"proposed_by": "case_agent"}),
+                 ("send_unapproved", "chaser", {})]:
         assert real.policy_check(*case)[0] == fake.policy_check(*case)[0]
     assert {d.id for d in real.documents("keyway")} == {d.id for d in fake.documents("keyway")}
     assert [d.id for d in real.documents("keyway", "INV-KW-0301")] == \
@@ -57,3 +59,22 @@ def test_append_event_is_idempotent_and_indexed(real):
     ev = next(e for e in real.events("keyway") if e.type == "document_ingested")
     real.append_event(ev)
     assert len(real.events("keyway")) == len({e.id for e in real.events("keyway")})
+
+
+def test_stand_in_chaser_templates_pass_the_real_gate(real):
+    from contracts.fakes import FakeAgents
+    msg = FakeAgents().draft_chase("keyway", [], [])
+    assert real.policy_check("send_chase", "chaser", {"template_id": msg.template_id})[0]
+
+
+def test_reply_from_stand_in_reader_reaches_trust_rules(real):
+    from datetime import datetime, timezone
+    from contracts.fakes import FakeAgents
+    from contracts.models import Event
+    reply = FakeAgents().read_reply("We paid it.", "keyway", [])       # invoice_ids == []
+    ts = datetime(2026, 4, 24, tzinfo=timezone.utc)
+    real.append_event(Event(id=reply.id, type="chase_reply", manager_id="keyway",
+                            invoice_id="INV-KW-0301", valid_from=ts, learned_at=ts,
+                            payload=reply.model_dump(mode="json")))
+    assert any(d.kind == "manager_reply" for d in real.documents("keyway", "INV-KW-0301"))
+    assert "INV-KW-0301" in real.dependents_of(reply.id)

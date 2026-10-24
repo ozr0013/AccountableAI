@@ -5,7 +5,7 @@ a new capability can never slip in unreviewed. There is no money-moving function
 `move_money` and friends exist only to be refused.
 
 payload keys used (all optional unless stated):
-  actor_role        "agent" | "controller"
+  actor_role        "agent" | "controller" (default: controller iff actor starts with "controller")
   proposed_by       who proposed the thing being approved / sent
   template_id, prior_levels, days_since_last              (send_chase)
   body, to, approval {"draft_digest", "approved_by"}      (send_outbound)
@@ -35,7 +35,12 @@ def draft_digest(to: str, body: str) -> str:
 
 
 def _controller(actor: str, payload: dict) -> bool:
-    return payload.get("actor_role") == "controller"
+    """Role comes from payload["actor_role"]; without it, only an actor named "controller..."
+    counts. Agents ("case_agent", "chaser", ...) never do."""
+    role = payload.get("actor_role")
+    if role is not None:
+        return role == "controller"
+    return actor.lower().startswith("controller")
 
 
 def policy_check(action: str, actor: str, payload: dict) -> tuple[bool, str]:
