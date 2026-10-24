@@ -73,6 +73,7 @@ class AnthropicLLM:
         show = thinking and os.getenv("AGENT_THINKING", "summarized") != "off"
         self.chat = ChatAnthropic(model=self.model, max_tokens=max_tokens, max_retries=2,
                                   timeout=120, thinking=THINKING if show else None)
+        self.last: dict = {}            # the latest call's meta (for callers that meter usage)
 
     def __call__(self, schema: type[T], system: str, user: str) -> T | None:
         start = time.monotonic()
@@ -82,17 +83,21 @@ class AnthropicLLM:
             out = runnable.invoke([("system", system), ("human", user)])
         except Exception as e:      # noqa: BLE001 - any LLM failure falls back to rules
             log.warning("LLM call failed (%s): %s", schema.__name__, e)
-            report_call(model=self.model, error=f"{type(e).__name__}: {e}"[:300],
-                        ms=int((time.monotonic() - start) * 1000))
+            self.last = {"model": self.model, "error": f"{type(e).__name__}: {e}"[:300],
+                         "ms": int((time.monotonic() - start) * 1000)}
+            report_call(**self.last)
             return None
         raw, parsed = out.get("raw"), out.get("parsed")
         usage = getattr(raw, "usage_metadata", None) or {}
         meta = getattr(raw, "response_metadata", None) or {}
-        report_call(model=meta.get("model_name") or meta.get("model") or self.model,
-                    thinking=_thinking_text(getattr(raw, "content", None)),
-                    input_tokens=usage.get("input_tokens"), output_tokens=usage.get("output_tokens"),
-                    stop_reason=meta.get("stop_reason"), ms=int((time.monotonic() - start) * 1000),
-                    error=str(out.get("parsing_error"))[:300] if out.get("parsing_error") else None)
+        self.last = {"model": meta.get("model_name") or meta.get("model") or self.model,
+                     "thinking": _thinking_text(getattr(raw, "content", None)),
+                     "input_tokens": usage.get("input_tokens"),
+                     "output_tokens": usage.get("output_tokens"),
+                     "stop_reason": meta.get("stop_reason"),
+                     "ms": int((time.monotonic() - start) * 1000),
+                     "error": str(out.get("parsing_error"))[:300] if out.get("parsing_error") else None}
+        report_call(**self.last)
         return parsed if isinstance(parsed, schema) else None
 
 

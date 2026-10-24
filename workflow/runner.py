@@ -27,7 +27,7 @@ from .book import WorkflowBook
 from .graph import build_graph
 from .names import names_from
 from .steps import Deps, Steps
-from .trace import DecisionRecord, TracedAgents, TracedVerifier, Tracer
+from .trace import DecisionRecord, ReasonStep, TracedAgents, TracedVerifier, Tracer
 
 log = logging.getLogger(__name__)
 
@@ -112,9 +112,26 @@ class Workflow:
                              waiting=st.interrupts[0].value)
         with self.tracer.run(event):
             result = self._result(event.id, self.graph.invoke(None if st.next else {"event": event}, cfg))
+            self._record_run(event, result)
         if event.type == "terms_confirmed" and event.manager_id:
             self._settle_terms(event.manager_id)
         return result
+
+    def _record_run(self, event: Event, r: RunResult) -> None:
+        """The workflow's own decision for this event: what it rechecked and what it changed."""
+        lines = [t for t in r.trace if t != "done"]
+        if r.route in (None, "ignore") or not (r.raised or r.withdrawn or r.chases or r.rejected
+                                                or len(lines) > 1):
+            return
+        steps = [ReasonStep(kind="evidence", text=lines[0])]
+        steps += [ReasonStep(kind="result" if ("withdrawn" in t or "verifier" in t or "reminder" in t
+                                               or t.startswith("Recommend")) else "rule", text=t)
+                  for t in lines[1:]]
+        self.tracer.record(agent="workflow", invoice_id=event.invoice_id,
+                           question=f"What does {event.type.replace('_', ' ')} change?",
+                           steps=steps, answer={"route": r.route, "raised": r.raised,
+                                                "withdrawn": r.withdrawn, "chases": r.chases,
+                                                "blocked": r.rejected})
 
     def _settle_terms(self, manager_id: str) -> None:
         """Terms confirmed elsewhere: paused proposals that now match close themselves

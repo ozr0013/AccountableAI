@@ -131,7 +131,10 @@ class Steps:
     # -- assess: payment trail + delay cause per invoice ----------------------------------
     def assess(self, s: WorkflowState) -> dict:
         lines = {l.invoice_id: l for l in self._lines(s)}
-        alerted = {i for a in WorkflowBook.load(self.d.rails).open_alerts() for i in a.draft.invoice_ids}
+        # Only an item's own open alert needs explaining when it turns out fine; invoices that are
+        # merely listed in a pattern or duplicate alert don't (saves two model calls each).
+        alerted = {i for a in WorkflowBook.load(self.d.rails).open_alerts()
+                   if a.draft.kind in ITEM_KINDS for i in a.draft.invoice_ids}
         out, notes = [], []
         for iid in s.invoice_ids:
             line = lines.get(iid)

@@ -11,7 +11,10 @@ DASHBOARD_BRIEF_MODEL=1 (one Sonnet call each).
 
 from __future__ import annotations
 
+import asyncio
+import json
 import os
+import queue
 import sys
 import threading
 from pathlib import Path
@@ -20,8 +23,9 @@ from typing import Literal
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(Path(__file__).parent)]
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from session import DemoSession
 
@@ -116,6 +120,38 @@ def live_mode(body: LiveIn):
 def brief(body: BriefIn):
     with _lock:
         return session().brief(body.question, use_model=os.getenv("DASHBOARD_BRIEF_MODEL") == "1")
+
+
+@app.get("/api/timeline")
+def timeline(days: int = 15):
+    """The investigation day by day: facts, agent decisions with reasoning, outcomes, people."""
+    with _lock:
+        return session().timeline(days)
+
+
+@app.get("/api/stream")
+async def stream(request: Request):
+    """Server-Sent Events: each agent decision (reasoning steps, mode, Claude's thinking) and
+    each action's start/finish, as they happen. Connect directly to this server (not through
+    the Next.js dev proxy, which may buffer the stream)."""
+    hub = session().hub
+    q = hub.add()
+
+    async def events():
+        try:
+            yield "retry: 2000\n\n"
+            while not await request.is_disconnected():
+                try:
+                    msg = await asyncio.to_thread(q.get, True, 10)
+                except queue.Empty:
+                    yield ": keep-alive\n\n"
+                    continue
+                yield f"event: {msg['type']}\ndata: {json.dumps(msg, default=str)}\n\n"
+        finally:
+            hub.remove(q)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.post("/api/reset")
