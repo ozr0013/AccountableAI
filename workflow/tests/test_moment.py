@@ -12,7 +12,8 @@ from world.generator import ALL_SCENARIOS, MOMENT
 
 from .conftest import make_workflow
 
-ELECTRICIAN, PLUMBER = "INV-KW-0402", "INV-KW-0301"
+# The moment: $3,140 open across three items; the judge's fact withdraws the electrician only.
+ELECTRICIAN, PLUMBER, CLEANER = "INV-KW-0402", "INV-KW-0301", "INV-KW-0901"
 
 
 @pytest.fixture
@@ -28,13 +29,13 @@ def _open(rails):
 
 
 def _moment(rails, wf):
-    res = JudgeConsole(rails).apply_preset("invoice_arrived")        # INV-KW-0402 arrived Apr 1
+    res = JudgeConsole(rails).apply_preset("invoice_received_correction")   # Apr 15, not Mar 28
     return res, [wf.handle(e) for e in res.events]
 
 
-def test_before_the_moment_both_keyway_alerts_are_open(world):
+def test_before_the_moment_all_three_items_are_open(world):
     rails, _ = world
-    assert {ELECTRICIAN, PLUMBER} <= set(_open(rails))
+    assert {ELECTRICIAN, PLUMBER, CLEANER} <= set(_open(rails))
 
 
 def test_moment_withdraws_only_the_electrician_with_reason(world):
@@ -47,10 +48,9 @@ def test_moment_withdraws_only_the_electrician_with_reason(world):
     after = _open(rails)
     assert ELECTRICIAN not in after
     assert set(after) == set(before) - {ELECTRICIAN}
-    assert after[PLUMBER] == before[PLUMBER]                           # untouched
+    assert after[PLUMBER] == before[PLUMBER] and after[CLEANER] == before[CLEANER]   # untouched
     [w] = [e for e in rails.events() if e.type == "alert_withdrawn" and e not in log_before]
-    assert w.payload["reason"].startswith("now vendor side")
-    assert "2026-04-11" in w.payload["reason"]                         # new due date explained
+    assert "2026-04-25" in w.payload["reason"]                         # new due date explained
     touched = {e.invoice_id for e in rails.events() if e not in log_before and e.invoice_id}
     assert touched == {ELECTRICIAN}                                    # nothing else rechecked
 
@@ -65,10 +65,10 @@ def test_moment_is_idempotent(world):
 
 def test_terms_change_rechecks_the_whole_manager(world):
     rails, wf = world
-    res = JudgeConsole(rails).apply_preset("terms_changed", {"manager_id": "keyway", "days": "45"})
+    res = JudgeConsole(rails).apply_preset("terms_changed", {"manager_id": "keyway", "days": "30"})
     [r] = [wf.handle(e) for e in res.events]
     assert PLUMBER in res.affected and len(res.affected) > 2
-    assert PLUMBER in _open(rails)                     # 45 days still past due by Apr 25
+    assert PLUMBER in _open(rails)                     # Mar 3 + 30 days is still past due on Apr 22
     assert ELECTRICIAN in r.withdrawn or ELECTRICIAN not in _open(rails)
 
 
@@ -86,5 +86,17 @@ def test_checkpoint_b_fallback_reruns_whole_manager_and_reports_changes(world, m
               and e.payload["trigger"] == r.event_id]
     assert set(done.payload["rechecked"]) == keyway and len(keyway) > 2
     assert done.payload["changed"] == [ELECTRICIAN]                   # same outcome as selective
-    assert _open(rails)[PLUMBER] == before[PLUMBER]
+    assert _open(rails)[PLUMBER] == before[PLUMBER] and _open(rails)[CLEANER] == before[CLEANER]
     assert any(t.startswith("recheck:") and "1 changed" in t for t in r.trace)
+
+
+def test_moment_moves_the_hold_from_3140_to_2240(world):
+    from workflow.run import funding_event
+    rails, wf = world
+    as_of = rails.now()
+    wf.replay([funding_event("keyway", 18400, as_of)])
+    _moment(rails, wf)
+    after_ev = funding_event("keyway", 18400, as_of).model_copy(update={"id": "ev-funding-after"})
+    wf.replay([after_ev])
+    holds = [e.payload["case"]["proposed_hold"] for e in rails.events() if e.type == "case_proposed"]
+    assert holds == [3140.0, 2240.0]

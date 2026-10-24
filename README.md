@@ -180,14 +180,14 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 | scenario 4 pattern on `sunbelt` | on `keyway`: late Jan, Feb, Mar; April on time |
 
 **Kanishka** (`agents/`, `workflow/`):
-- [ ] `agents/cause/tests/test_cause.py`: ids and managers in the per-scenario table and the scenario 1 / 6 citation tests. `test_scenario_5_after_moment_is_vendor_side`: test vendor-side on `INV-KW-0501` (paid Apr 8, due Apr 11); `INV-KW-0402` is unpaid now
-- [ ] `agents/chaser/tests/test_chaser.py`: `INV-PT-0201` / `INV-PT-0901` with `peachtree` → `INV-KW-0201` / `INV-KW-0901` with `keyway`; the proof test uses `INV-KW-0501`
-- [ ] `agents/trail/tests/test_trail.py`: scenario 9 → `INV-KW-0901` / `doc-reply-kw-0901`; the paid-invoice test → `INV-KW-0501`
-- [ ] `workflow/tests/test_scenarios.py`: ids; chases only for `keyway`; the scenario 4 pattern alert is for `keyway`
-- [ ] `workflow/tests/test_bank_change.py`: `INV-KW-0701`, vendor `v-summit`
-- [ ] `workflow/tests/test_memrails.py`: the paid-Apr-8 electrician is `INV-KW-0501`; Keyway recon check becomes `diff - duplicate_funded == 0`
-- [ ] `workflow/tests/test_moment.py`: the withdrawal reason's new due date is `2026-04-25`; two alerts kept
-- [ ] `workflow/run.py`: `--moment` help text says Apr 1 → Apr 15
+- [x] `agents/cause/tests/test_cause.py`: ids and managers in the per-scenario table and the scenario 1 / 6 citation tests. `test_scenario_5_after_moment_is_vendor_side`: test vendor-side on `INV-KW-0501` (paid Apr 8, due Apr 11); `INV-KW-0402` is unpaid now
+- [x] `agents/chaser/tests/test_chaser.py`: `INV-PT-0201` / `INV-PT-0901` with `peachtree` → `INV-KW-0201` / `INV-KW-0901` with `keyway`; the proof test uses `INV-KW-0501`
+- [x] `agents/trail/tests/test_trail.py`: scenario 9 → `INV-KW-0901` / `doc-reply-kw-0901`; the paid-invoice test → `INV-KW-0501`
+- [x] `workflow/tests/test_scenarios.py`: ids; chases only for `keyway`; the scenario 4 pattern alert is for `keyway`
+- [x] `workflow/tests/test_bank_change.py`: `INV-KW-0701`, vendor `v-summit`
+- [x] `workflow/tests/test_memrails.py`: the paid-Apr-8 electrician is `INV-KW-0501`; Keyway recon check becomes `diff - duplicate_funded == 0`
+- [x] `workflow/tests/test_moment.py`: the withdrawal reason's new due date is `2026-04-25`; two alerts kept
+- [x] `workflow/run.py`: `--moment` help text says Apr 1 → Apr 15
 
 **Omar** (`evals/`, `pyproject.toml`):
 - [ ] `evals/answer_key.json` moment: `keep_count` 1 → 2 and update `_doc` (three items, $3,140 → $2,240, receipt Apr 15). Check the scenarios against `world/scenario_spec.json`
