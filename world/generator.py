@@ -11,10 +11,13 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
-from contracts.models import Document, InvoiceStatus, LedgerLine, Manager, SourceKind, Vendor
+from contracts.models import (
+    Citation, Document, Event, InvoiceStatus, LedgerLine, Manager, SourceKind, Vendor,
+)
+from rails.events.ingest import document_event
 
 AS_OF = date(2026, 4, 25)
 PAY_DAYS = 10
@@ -60,6 +63,19 @@ class World:
     documents: list[Document] = field(default_factory=list)
     ledger: list[LedgerLine] = field(default_factory=list)
     truth: list[dict] = field(default_factory=list)   # planted ground truth, one per scenario
+    terms: list[dict] = field(default_factory=list)   # human-confirmed agreement terms per manager
+
+    def events(self) -> list[Event]:
+        """Everything as events, in the order a real system would learn it."""
+        evs = [document_event(d) for d in self.documents]
+        for t in self.terms:
+            when = datetime(2026, 1, 2, tzinfo=timezone.utc)
+            evs.append(Event(
+                id=f"ev-terms-{t['manager_id']}", type="terms_confirmed",
+                manager_id=t["manager_id"], valid_from=when, learned_at=when,
+                payload=t, source=Citation(source_id=f"doc-agreement-{t['manager_id']}",
+                                           kind=SourceKind.agreement, locator="7.2")))
+        return sorted(evs, key=lambda e: (e.learned_at, e.id))
 
     def meta(self) -> dict:
         return {
@@ -201,6 +217,7 @@ def generate(seed: int = 13, scenarios: tuple[int, ...] = (3,), n_clean: int = 1
                  dated=date(2026, 1, 1), text=_AGREEMENT, data={})
         for m in w.managers
     ]
+    w.terms = [{"manager_id": m.id, "vendor_payment_days": PAY_DAYS} for m in w.managers]
     for s in sorted(scenarios):
         SCENARIOS[s](w, rng)
     _clean_invoices(w, rng, n_clean)
