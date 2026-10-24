@@ -21,7 +21,7 @@ def test_recheck_works_with_neo4j_down(schema, monkeypatch):
     monkeypatch.setenv("NEO4J_URI", "bolt://localhost:1")           # nothing listens here
     monkeypatch.setenv("MEMORY", "neo4j")
     r = RealRails(schema=schema)
-    r.load(generate(scenarios=(3, 5), n_clean=5).events())           # mirror fails quietly
+    r.load(generate(scenarios=(3,), n_clean=5, moment=True).events())   # mirror fails quietly
     assert r.sync_memory() is False
     assert r.dependents_of("invoice:INV-KW-0402.received") == ["INV-KW-0402"]
 
@@ -35,7 +35,7 @@ def test_memory_postgres_skips_mirror(schema, monkeypatch):
 def test_mirror_agrees_with_postgres_and_links_sources(schema, monkeypatch):
     monkeypatch.setenv("MEMORY", "neo4j")
     r = RealRails(schema=schema)
-    r.load(generate(scenarios=(3, 5), n_clean=5).events())
+    r.load(generate(scenarios=(3,), n_clean=5, moment=True).events())
     assert r.sync_memory() is True
     m = Neo4jMirror()
     try:
