@@ -8,7 +8,14 @@ from __future__ import annotations
 
 import re
 
-from contracts.models import AnomalyReport, Citation, Document, LedgerLine, SourceKind, StatementAnomaly
+from contracts.models import (
+    AnomalyReport,
+    Citation,
+    Document,
+    LedgerLine,
+    SourceKind,
+    StatementAnomaly,
+)
 
 # "L14: 03/10 Rio Grande Plumbing INV-KW-0301 $1,240.00 PAID"
 _LINE = re.compile(r"(?:\b(L\d+)\s*:?\s*)?[^;\n]*?\b(INV-[A-Z]{2}-\d{3,4})\b[^$;\n]*?\$\s?([\d,]+(?:\.\d{2})?)")
