@@ -181,6 +181,10 @@ class FakeAgents:
             evidence=[c for a in alerts for cl in a.draft.claims for c in cl.citations],
         )
 
+    def detect_anomalies(self, statement, ledger):
+        from agents.anomaly.rules import detect     # comparing amounts is code either way
+        return detect(statement, ledger)
+
 
 class FakeVerifier:
     """Rule-only stand-in: blocks uncited claims and banned wording. No refutation."""

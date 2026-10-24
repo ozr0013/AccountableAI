@@ -33,6 +33,19 @@ APPROVED_TEMPLATES: dict[str, dict] = {
 # Not a reminder: a request that goes out only after the controller approves that exact draft.
 DOCUMENT_REQUEST_TEMPLATE = "doc-request-v1"
 
+# Not a reminder either: the anomaly detector's note to the middleman when a statement line
+# doesn't match what Oakline approved. Drafted by code; sent only once a controller approves it.
+STATEMENT_NOTICE_TEMPLATE = "stmt-notice-v1"
+STATEMENT_NOTICE_BODY = (
+    "Hello {manager_name}, your statement {statement_ref} shows {stated} for {invoice_ref}, but "
+    "Oakline Homes approved {approved} for that invoice. Oakline's controller has been notified. "
+    "Please check the line and send a corrected statement or the vendor's confirmation of the "
+    "amount paid.")
+
+
+def render_statement_notice(**fields) -> str:
+    return STATEMENT_NOTICE_BODY.format(**fields)
+
 # Approved schedule: first reminder any time, then at least this many days between levels.
 LEVEL_ORDER = ("polite", "firm", "escalation")
 MIN_DAYS_BETWEEN = 5
@@ -50,3 +63,4 @@ def _check_templates() -> None:
 
 
 _check_templates()
+assert not banned_terms_in(STATEMENT_NOTICE_BODY)

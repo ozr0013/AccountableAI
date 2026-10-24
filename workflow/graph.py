@@ -2,6 +2,7 @@
 
     route ─┬─ assess ──▶ assess ─▶ draft_alerts ─▶ verify ─▶ chase ─▶ finish
            ├─ scan   ──▶ assess (all of one manager's invoices)
+           ├─ statement ─▶ detect_anomalies (statement amount vs approved) ─▶ assess
            ├─ reply  ──▶ read_reply ─▶ assess
            ├─ funding_review ─▶ funding_review (case agent -> controller approval)
            ├─ agreement ─▶ extract_terms ─▶ confirm_terms (pauses for a controller) ─▶ assess
@@ -21,7 +22,7 @@ from .steps import Steps
 
 _AFTER_ROUTE = {
     Route.assess: "assess", Route.scan: "assess", Route.reply: "read_reply",
-    Route.agreement: "extract_terms", Route.bank_change: "bank_change", Route.funding_review: "funding_review",
+    Route.statement: "detect_anomalies", Route.agreement: "extract_terms", Route.bank_change: "bank_change", Route.funding_review: "funding_review",
     Route.ignore: "finish",
 }
 
@@ -39,7 +40,7 @@ def serde() -> JsonPlusSerializer:
 
 def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g = StateGraph(WorkflowState)
-    for name in ("route", "assess", "draft_alerts", "verify", "chase", "read_reply",
+    for name in ("route", "detect_anomalies", "assess", "draft_alerts", "verify", "chase", "read_reply",
                  "funding_review", "extract_terms", "confirm_terms", "bank_change", "pending",
                  "finish"):
         g.add_node(name, getattr(steps, name))
@@ -47,6 +48,7 @@ def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g.add_conditional_edges("route", lambda s: _AFTER_ROUTE[s.route],
                             sorted(set(_AFTER_ROUTE.values())))
     g.add_edge("read_reply", "assess")
+    g.add_edge("detect_anomalies", "assess")
     g.add_edge("extract_terms", "confirm_terms")
     g.add_conditional_edges("confirm_terms", lambda s: "assess" if s.invoice_ids else "finish",
                             ["assess", "finish"])

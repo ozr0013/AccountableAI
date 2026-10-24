@@ -19,6 +19,7 @@ class Route(str, Enum):
     scan = "scan"                      # periodic sweep of one manager
     bank_change = "bank_change"        # vendor asks to change bank details
     funding_review = "funding_review"  # Oakline is about to send more money
+    statement = "statement"            # manager's financial statement -> anomaly detector, then assess
     ignore = "ignore"
 
 
@@ -42,6 +43,7 @@ class WorkflowState(BaseModel):
     invoice_ids: list[str] = Field(default_factory=list)
     assessments: list[Assessment] = Field(default_factory=list)
     drafts: list[AlertDraft] = Field(default_factory=list)
+    anomaly_drafts: list[AlertDraft] = Field(default_factory=list)  # statement != approved amount
     raised: list[str] = Field(default_factory=list)       # alert ids opened by this run
     refreshed: list[str] = Field(default_factory=list)    # open alerts re-verified on new evidence
     rejected: list[str] = Field(default_factory=list)     # alert ids the verifier stopped

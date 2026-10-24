@@ -45,6 +45,7 @@ function HeroSnapshot() {
         setValues(next.map((item) => Math.round(item.value * eased)));
         if (progress < 1) frame = requestAnimationFrame(tick); else setReady(true);
       };
+      
       frame = requestAnimationFrame(tick);
     };
     const load = async () => {

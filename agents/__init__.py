@@ -1,6 +1,6 @@
 """Judgment agents. contracts.registry loads build() when AGENTS=real.
 
-Kanishka's agents (agreement, trail, cause, chaser, case) sit behind one facade implementing
+Kanishka's agents (agreement, trail, cause, chaser, case) and the anomaly detector sit behind one facade implementing
 contracts.steps.Agents. Methods whose agent isn't built yet delegate to the stand-in.
 Keep this module import-light: agents.verifier / agents.briefing import it as their parent.
 """
@@ -10,6 +10,7 @@ from __future__ import annotations
 from contracts.models import (
     AgreementTerms,
     Alert,
+    AnomalyReport,
     Case,
     CauseFinding,
     ChaseMessage,
@@ -25,6 +26,7 @@ class RealAgents:
         from contracts.fakes import FakeAgents
 
         from .agreement import AgreementAgent
+        from .anomaly import AnomalyAgent
         from .case import CaseAgent
         from .cause import CauseAgent
         from .chaser import ChaserAgent
@@ -35,6 +37,7 @@ class RealAgents:
         self.cause = CauseAgent(llm)
         self.case = CaseAgent(llm)
         self.chaser = ChaserAgent(llm, names) if names else ChaserAgent(llm)
+        self.anomaly = AnomalyAgent(llm)
 
     def set_names(self, names) -> None:
         """Let the workflow supply real manager / vendor names for reminder templates."""
@@ -59,6 +62,9 @@ class RealAgents:
 
     def build_case(self, manager_id: str, alerts: list[Alert]) -> Case:
         return self.case.build_case(manager_id, alerts)
+
+    def detect_anomalies(self, statement: Document, ledger: list[LedgerLine]) -> AnomalyReport:
+        return self.anomaly.detect_anomalies(statement, ledger)
 
 
 def build() -> RealAgents:

@@ -45,7 +45,7 @@ class DecisionRecord(BaseModel):
     seq: int                             # order within that run
     at: datetime | None
     day: date | None
-    agent: str                           # agreement | trail | cause | chaser | case | verifier
+    agent: str                           # agreement | trail | cause | chaser | case | anomaly | verifier
     invoice_id: str | None = None
     question: str
     steps: list[ReasonStep]
@@ -278,6 +278,28 @@ class TracedAgents:
                            question=q, steps=steps,
                            answer={"claims_paid": r.claims_paid, "proof": [c.source_id for c in r.proof]},
                            mode=mode, citations=r.proof, ms=ms, **usage)
+        return r
+
+    def detect_anomalies(self, statement, ledger):
+        q = f"Do the amounts on {statement.id} match what Oakline approved to pay?"
+        r, ms_steps, mode, usage, ms = self._call("anomaly", None, q, self.inner.detect_anomalies,
+                                                  statement, ledger)
+        steps = [ReasonStep(kind="fact", text=f"Read {r.checked} statement line(s) ({r.read_by})"),
+                 ReasonStep(kind="rule", text="Each line's amount must equal the approved invoice "
+                                              "amount to the cent; an invoice we never approved is "
+                                              "an anomaly too.")]
+        steps += ms_steps
+        steps += [ReasonStep(kind="evidence", text=(
+                      f"{a.citation.locator or 'line'}: {a.invoice_id or 'no invoice'} "
+                      f"${a.statement_amount:,.2f} vs approved ${a.expected_amount:,.2f}"),
+                      citations=[a.citation]) for a in r.anomalies]
+        steps.append(ReasonStep(kind="result", text=(
+            f"{len(r.anomalies)} anomaly(ies); {len(r.matched)} line(s) match" if r.anomalies
+            else f"All {r.checked} line(s) match the approved amounts")))
+        self.tracer.record(agent="anomaly", invoice_id=(r.anomalies[0].invoice_id if r.anomalies else None),
+                           question=q, steps=steps,
+                           answer={"anomalies": len(r.anomalies), "matched": r.matched},
+                           mode=mode, citations=[a.citation for a in r.anomalies], ms=ms, **usage)
         return r
 
     def build_case(self, manager_id, alerts):

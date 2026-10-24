@@ -65,6 +65,11 @@ KIND_RULES = {
         "The manager paid vendors late, beyond the agreement's payment window, in the months listed.",
         "the evidence shows payments in those months were within the agreement's window, or the "
         "agreement allows a longer window than stated."),
+    "statement_mismatch": (
+        "A line on the manager's financial statement reports a different amount for an invoice "
+        "than Oakline approved to pay, or reports an invoice Oakline never approved.",
+        "the statement line in fact shows the approved amount, or the approved invoice amount is "
+        "different from the one stated (an amended invoice or credit note in the evidence)."),
     "duplicate_billing": (
         "The same work was billed and funded twice under two invoice numbers.",
         "the two invoices are for different work, periods or amounts, or only one was funded."),

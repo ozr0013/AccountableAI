@@ -29,9 +29,11 @@ from contracts.models import (
 )
 from contracts.steps import Agents, Approvals, Rails, Verifier
 from rails.facts import current_terms
+from rails.guards.templates import render_statement_notice
 
 from . import patterns
 from .book import WF_TYPES, WorkflowBook, alert_id, digest, done_event, wf_event
+from .names import names_from
 from .state import Assessment, Route, WorkflowState
 from .terms import terms_for
 
@@ -91,7 +93,7 @@ class Steps:
         now = max(e.learned_at, clock).date() if clock else e.learned_at.date()
         route = self._route_for(e)
         ids: list[str] = []
-        if route in (Route.assess, Route.reply):
+        if route in (Route.assess, Route.reply, Route.statement):
             ids = self._affected_invoices(e)
         elif route == Route.scan:
             ids = [l.invoice_id for l in self.d.rails.ledger(e.manager_id) if not l.duplicate_of]
@@ -106,6 +108,8 @@ class Steps:
             kind, data = e.payload.get("kind"), e.payload.get("data", {})
             if kind == SourceKind.agreement:
                 return Route.agreement
+            if kind == SourceKind.manager_statement:
+                return Route.statement           # the only trigger for the anomaly detector
             if data.get("status") == "bank_change_request":
                 return Route.bank_change
             return Route.assess
@@ -127,6 +131,50 @@ class Steps:
             return sorted({l.invoice_id for m in managers for l in self.d.rails.ledger(m)
                            if not l.duplicate_of} | named)
         return sorted(set(self.d.rails.dependents_of(e.id)) | named)
+
+    # -- anomaly detector: statement amounts vs what Oakline approved (statements only) ------
+    def detect_anomalies(self, s: WorkflowState) -> dict:
+        """Each statement line whose amount differs from the approved invoice amount (or that
+        names an invoice Oakline never approved) becomes an alert for the owner, with a drafted
+        note to the middleman that a controller approves before it is sent. A line that now
+        matches withdraws an earlier mismatch alert on that invoice."""
+        stmt = Document(**s.event.payload)
+        report = self.d.agents.detect_anomalies(stmt, self.d.rails.ledger(stmt.manager_id))
+        drafts = [self._mismatch_draft(stmt, a) for a in report.anomalies]
+        book = WorkflowBook.load(self.d.rails)
+        notes = [f"{stmt.id}: {report.checked} line(s) checked, {len(report.anomalies)} anomaly(ies)"]
+        for al in book.open_alerts(stmt.manager_id):
+            if al.draft.kind == AlertKind.statement_mismatch and al.draft.invoice_ids[0] in report.matched:
+                why = f"{stmt.id} now shows the approved amount for {al.draft.invoice_ids[0]}"
+                self.d.rails.append_event(wf_event(
+                    "alert_withdrawn", al.draft.id, s.event,
+                    {"alert_id": al.draft.id, "reason": why, "invoice_id": al.draft.invoice_ids[0]},
+                    stmt.manager_id, al.draft.invoice_ids[0]))
+                notes.append(f"{al.draft.id}: withdrawn ({why})")
+        return {"anomaly_drafts": drafts, "trace": notes}
+
+    def _mismatch_draft(self, stmt: Document, a) -> AlertDraft:
+        name = names_from(self.d.rails)
+        ref = a.invoice_id or f"line {a.line or '?'}"
+        approved = f"${a.expected_amount:,.2f}" if a.reason == "amount_differs" else "nothing"
+        notice = render_statement_notice(manager_name=name(stmt.manager_id), statement_ref=stmt.id,
+                                         stated=f"${a.statement_amount:,.2f}", invoice_ref=ref,
+                                         approved=approved)
+        if a.reason == "amount_differs":
+            claim = (f"Statement {a.line or ''} shows ${a.statement_amount:,.2f} for {ref}; Oakline "
+                     f"approved ${a.expected_amount:,.2f} (funded ${a.funded_amount:,.2f}), a "
+                     f"difference of ${a.difference:+,.2f}.")
+        else:
+            claim = f"Statement {a.line or ''} shows ${a.statement_amount:,.2f} for {ref}, which is not on Oakline's ledger."
+        ids = [a.invoice_id or stmt.id]
+        return AlertDraft(
+            id=alert_id(AlertKind.statement_mismatch.value, stmt.manager_id, ids),
+            kind=AlertKind.statement_mismatch, manager_id=stmt.manager_id, invoice_ids=ids,
+            amount=abs(a.difference),
+            headline=f"{ref}: statement says ${a.statement_amount:,.2f}, approved {approved}",
+            claims=[Claim(text=claim.replace("  ", " "), citations=[a.citation])],
+            recommended_action=("Owner: review the difference before any further funding. "
+                                f"Draft to the middleman (sent once a controller approves): {notice}"))
 
     # -- assess: payment trail + delay cause per invoice ----------------------------------
     def assess(self, s: WorkflowState) -> dict:
@@ -200,7 +248,7 @@ class Steps:
         book = WorkflowBook.load(self.d.rails)
         patterned = {a.draft.manager_id for a in book.open_alerts()
                      if a.draft.kind == AlertKind.recurring_pattern}
-        drafts: list[AlertDraft] = []
+        drafts: list[AlertDraft] = list(s.anomaly_drafts)
         pattern = None
         if s.route == Route.scan and s.manager_id:
             terms = terms_for(self.d.rails, self.d.agents, s.manager_id)

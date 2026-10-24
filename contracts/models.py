@@ -182,6 +182,29 @@ class AlertKind(str, Enum):
     bank_detail_change = "bank_detail_change"
     owner_pending_approval = "owner_pending_approval"  # flag on Oakline, not the manager
     paperwork_request = "paperwork_request"
+    statement_mismatch = "statement_mismatch"          # manager's statement amount != what we approved
+
+
+class StatementAnomaly(BaseModel):
+    """One statement line whose amount is not what Oakline approved to pay (anomaly agent)."""
+
+    invoice_id: str | None               # None: the line names no invoice we can match
+    line: str | None                     # statement line locator, "L14"
+    statement_amount: float
+    expected_amount: float               # approved invoice amount; 0 if not on our ledger
+    funded_amount: float = 0.0
+    difference: float                    # statement - expected
+    reason: Literal["amount_differs", "not_on_ledger"]
+    citation: Citation
+
+
+class AnomalyReport(BaseModel):
+    statement_id: str
+    manager_id: str
+    checked: int                         # statement lines compared
+    anomalies: list[StatementAnomaly] = Field(default_factory=list)
+    matched: list[str] = Field(default_factory=list)   # invoice ids whose amount agrees
+    read_by: Literal["data", "rules", "model"] = "data"
 
 
 class Claim(BaseModel):

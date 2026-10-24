@@ -13,6 +13,7 @@ from .models import (
     AgreementTerms,
     Alert,
     AlertDraft,
+    AnomalyReport,
     Briefing,
     Case,
     CauseFinding,
@@ -43,7 +44,7 @@ class Rails(Protocol):
 
 
 class Agents(Protocol):
-    """Kanishka: agents/agreement|trail|cause|chaser|case."""
+    """Kanishka: agents/agreement|trail|cause|chaser|case; agents/anomaly."""
 
     def extract_terms(self, agreement: Document) -> AgreementTerms: ...
     def build_trail(self, line: LedgerLine, docs: list[Document]) -> PaymentTrail: ...
@@ -53,6 +54,7 @@ class Agents(Protocol):
     def draft_chase(self, manager_id: str, alerts: list[Alert], prior: list[ChaseMessage]) -> ChaseMessage: ...
     def read_reply(self, reply_text: str, manager_id: str, docs: list[Document]) -> ChaseReply: ...
     def build_case(self, manager_id: str, alerts: list[Alert]) -> Case: ...
+    def detect_anomalies(self, statement: Document, ledger: list[LedgerLine]) -> AnomalyReport: ...
 
 
 class Verifier(Protocol):

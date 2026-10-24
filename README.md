@@ -2,62 +2,102 @@
 
 **Cal Hacks 13.0 · Hyphenate track (core) · Team: Aaryan, Kanishka, Omar, Audrey**
 
-A company pays a middleman, and the middleman is supposed to pay the vendors who do the work. Sometimes the middleman sits on the money. The vendor goes unpaid, stops working, and the company finds out too late. AccountableAI's agents watch every dollar the company hands a middleman, confirm each vendor actually got paid, chase the middleman when they didn't, and tell the company early, with proof.
+An owner pays a middleman, and the middleman is supposed to pay the vendors who do the work. Sometimes the money doesn't reach the vendor, or not all of it does. The vendor goes unpaid, stops working, and the owner finds out too late. AccountableAI closes that loop with three agents: one reads the agreement, one chases the payment, one checks the middleman's statements.
 
 > **Priority rule: Hyphenate first, sponsors later.** Until Checkpoint B (Sat 2 pm, first full scored run), nobody touches sponsor work.
 
 ---
 
-## The pitch in one breath
+## Three stakeholders, three agents, one closed loop
 
-*"When you pay a middleman, you can't see whether your vendors got paid until a vendor stops showing up. Our agents check every vendor payment, chase the middleman, and warn you before you send them more money."*
+| Stakeholder | In the demo | What they need |
+|---|---|---|
+| **Owner** | *Oakline Homes* (fictional), ~60 rental homes in 3 states | Know every vendor got paid, in full, on time, from the money it sent |
+| **Middleman** | *Keyway Property Management* (fictional) | Receives the owner's money and pays the vendors |
+| **Vendor** | 20 fictional plumbers, electricians, roofers, cleaners... | Get paid what the agreement says, when it says |
 
-- **Market:** property management, the market of Rently (a named Hyphenate customer). We never say "built for Rently."
-- **Parent company (fictional):** *Oakline Homes*, a rental owner with ~60 homes in 3 states.
-- **Middleman (fictional):** one property manager, *Keyway Property Management*. Oakline sends it money for repairs and upkeep.
-- **Vendors (fictional):** plumbers, electricians, HVAC, roofers, landscapers, cleaners. The middleman hires them and is supposed to pay them from Oakline's money.
-- **Customer:** Oakline's controller. Today they get a monthly statement from Keyway saying "vendors paid" and can't check it against the bank, the vendors and the management agreement.
-- **Seats filled:** *"The accounts payable reviewer who confirms every vendor got paid from the money we sent the middleman, and the collections person who chases the middleman when they didn't."*
-- **The money flow:** Oakline funds the manager → the manager pays the vendor. Our system tracks every vendor invoice from "Oakline funded it" to "vendor confirmed paid." Tenants and rent are out of scope.
-- **The moment:** Oakline is about to send Keyway next month's $18,400 repair funding. The system stops it: *"Keyway still owes 3 vendors $3,140 from March money you already sent. Chased 3 times. Recommend holding $3,140."* (Rio Grande Plumbing $1,240, Brightside Cleaning $1,000, Sparkline Electric $900.) A judge plays Keyway and says "we paid the electrician." The system checks: no vendor confirmation, no payment in Keyway's bank records, so it **holds its position and shows why**. Then the judge adds one real fact: Keyway's statement implied the electrician's invoice arrived Mar 28, but it only arrived Apr 15, and the agreement gives Keyway 10 days (due Apr 25). The system rechecks only that item, **withdraws that one alert and explains why**, and keeps the other two: $3,140 → $2,240.
-- **Demo date:** Apr 22, 2026.
+The owner and the vendors are the ones getting hurt today: the owner only sees the middleman's statement, and the vendor only sees that nothing arrived.
+
+```
+ Owner's Gmail ──▶ 1. AGREEMENT AGENT ──▶ database: agreement, companies, amount, due date, payment details
+                         │ something missing?
+                         └──▶ owner is told what's missing
+                                      │
+                                      ▼ (due date passes)
+                    2. CHASER AGENT: did the middleman send a statement showing the vendor was paid?
+                         │ no ──▶ reminds the middleman, again and again
+                         │        └─ after 3 days: owner is told "not paid"; middleman is told the owner knows
+                         │ yes
+                         ▼
+ Middleman's statement ─▶ 3. ANOMALY DETECTOR: does each amount match what the owner approved?
+                         │ mismatch (approved $1,000, statement shows $500)
+                         └──▶ owner is alerted; middleman gets a note that the amount is wrong
+```
+
+### 1. Agreement agent: is the agreement complete?
+
+Triggered when an agreement arrives in the owner's Gmail. It reads the document (PDF or text, header first, then each section) and checks for the owner and vendor company names, the payment due date or terms, the amount or rate, and how to pay (bank, routing and account, check payable to, remit-to). A complete agreement is stored with the agreement name, the companies, how much the owner pays the vendor, the due terms and the payment details. If anything is missing or unclear, the owner gets a drafted notice listing exactly what, with nothing sent automatically. Every value it records must be quoted verbatim from the document.
+
+### 2. Chaser agent: was the vendor paid by the due date?
+
+Reads the stored terms, works out each invoice's due date, and once it passes, looks for proof the vendor was paid: the middleman's statement, the middleman's bank record, or the vendor's own confirmation. A middleman's word alone ("we paid it") is never proof. No proof: it reminds the middleman from approved templates, escalating polite → firm → escalation. If it is still unpaid **3 days** after the first reminder, the owner is told the payment hasn't been made and the middleman is told the owner has been notified.
+
+### 3. Anomaly detector: does the statement match what we approved?
+
+Triggered **only** when the middleman sends a financial statement. Every line is compared, to the cent, with the amount the owner approved for that invoice. A line that differs (approved $1,000, statement says $500) or names an invoice the owner never approved becomes an alert for the owner, with a note to the middleman saying which line is wrong. The comparison is code; a model is only used to read a statement that arrives as free text, and only figures printed verbatim in the statement are accepted.
+
+### What is built today, and what is still planned
+
+| Piece | Status | Where |
+|---|---|---|
+| Agreement agent: Gmail sign-in (read-only), PDF parsing, field checks, owner escalation draft | Built | `agreement_agent/`, dashboard **Agreements** page |
+| Agreement agent: extract terms with clause citations, controller confirms, stored as events in Postgres | Built | `agents/agreement/`, `workflow/` |
+| Agreement agent: a complete Gmail agreement written straight into the database | **Planned**: the Gmail agent saves its review to `agreement_agent/out/`, not Postgres yet | |
+| Chaser: due dates from the terms, proof check, approved reminder ladder | Built (reminders are recorded, not emailed) | `agents/chaser/`, `workflow/steps.py` |
+| Chaser: "owner told after 3 days, middleman told the owner knows" | **Planned**: today the escalation is the third reminder, at least 5 days apart (`rails/guards/templates.py`) | |
+| Anomaly detector: statement amount vs approved amount, owner alert, drafted note to the middleman | Built; the note goes out only after a controller approves that exact draft | `agents/anomaly/`, `workflow/steps.py` (`detect_anomalies`) |
+
+Behind the three agents, the workflow also runs supporting checks that existed before the three-agent plan: the payment-trail and delay-cause agents (what really happened to a payment, and why it is late), the verifier (blocks any alert without a cited record or with accusing wording), duplicate-billing and recurring-lateness checks, and the case agent (how much of the next funding to hold).
 
 ---
+
+## The demo moment
+
+Oakline is about to send Keyway next month's $18,400 repair funding. The system stops it: *"Keyway still owes 3 vendors $3,140 from March money you already sent. Chased 3 times. Recommend holding $3,140."* (Rio Grande Plumbing $1,240, Brightside Cleaning $1,000, Sparkline Electric $900.) A judge plays Keyway and says "we paid the electrician." The system checks: no vendor confirmation, no payment in Keyway's bank records, so it **holds its position and shows why**. Then the judge adds one real fact: Keyway's statement implied the electrician's invoice arrived Mar 28, but it only arrived Apr 15, and the agreement gives Keyway 10 days (due Apr 25). The system rechecks only that item, **withdraws that one alert and explains why**, and keeps the other two: $3,140 → $2,240. Demo date: Apr 22, 2026.
+
+- **Market:** property management, the market of Rently (a named Hyphenate customer). We never say "built for Rently."
+- **Customer:** the owner's controller, who today gets a monthly statement saying "vendors paid" and can't check it against the bank, the vendors and the agreement.
+- **Seats filled:** *"The accounts payable reviewer who confirms every vendor got paid, and the collections person who chases the middleman when they didn't."*
 
 ## Hyphenate's five hard parts
 
 | Hard part | How we answer it | Proven by |
 |---|---|---|
-| **Sources that disagree** | Middleman says "paid," vendor says "not received," bank shows no payment; source-trust rules pick the winner and say why | Scenarios 3, 9 |
-| **Time** (late in Jan to Mar changes how April is handled) | A middleman late in Jan to Mar gets flagged sooner and held to stricter terms in April; precedents; selective recheck on corrected facts | Scenario 4, the moment |
-| **Working with others** | Agents chase the middleman, wait for replies, escalate when ignored; controller approves holds and can decline | Scenarios 2, 3, 6 |
+| **Sources that disagree** | Middleman says "paid," vendor says "not received," bank shows no payment; source-trust rules pick the winner and say why. A statement amount that disagrees with the approved amount is caught by the anomaly detector | Scenarios 3, 9 |
+| **Time** (late in Jan to Mar changes how April is handled) | A middleman late in Jan to Mar gets flagged sooner and held to stricter terms in April; selective recheck on corrected facts | Scenario 4, the moment |
+| **Working with others** | The chaser reminds the middleman, waits for replies, escalates when ignored; the controller approves holds and outbound notes and can decline | Scenarios 2, 3, 6 |
 | **Limits** | No money-moving tool; agents recommend a hold, only the controller holds; proposer can't approve; vendor bank-detail change held | Scenario 7 |
-| **Explainable and accountable** | Every alert cites the funding record, the vendor's evidence and the agreement clause; verifier blocks uncited claims | "Why" trace, 100% cited |
+| **Explainable and accountable** | Every alert cites the funding record, the vendor's evidence and the agreement clause; the verifier blocks uncited claims | "Why" trace, 100% cited |
 
-Every unpaid vendor invoice gets one cause: **authorized hold**, **paperwork pending**, **vendor-side**, **owner-side**, or **unexplained**. Only "unexplained" and recurring patterns become alerts. The system defends the middleman when the evidence supports them.
-
----
+Every unpaid vendor invoice gets one cause: **authorized hold**, **paperwork pending**, **vendor-side**, **owner-side**, or **unexplained**. Only "unexplained", recurring patterns and statement mismatches become alerts. The system defends the middleman when the evidence supports them.
 
 ## Architecture: deterministic code on top, agents only for judgment
 
 ```
- Documents / Judge Console ──▶ Ingestion (code) ──▶ Event log (Postgres, append-only)
+ Owner's Gmail / documents / Judge Console ──▶ Ingestion (code) ──▶ Event log (Postgres, append-only)
                                                             │ each event triggers
- ┌──────────── LAYER 1: Deterministic workflow (code decides what runs next) ────────────┐
- └─────────────┬──────────────────────────────┬────────────────────────────┬─────────────┘
-               ▼                              ▼                            ▼
-   LAYER 2: code services          LAYER 3: judgment agents          Gates (code)
-   funding ledger · matcher        agreement · payment-trail         policy + accounting checks
-   aging · source-trust rules      delay-cause · chaser              no money-moving tool
-   patterns · funded-vs-paid recon verifier · case · briefing        controller approves holds
-               └──────────────────────────────┴────────────────────────────┘
+ ┌──────────── Deterministic workflow (LangGraph; code picks every edge) ─────────────────┐
+ │ agreement ─▶ extract terms ─▶ controller confirms                                      │
+ │ statement ─▶ anomaly detector ─▶ assess                                                │
+ │ any fact  ─▶ assess (trail + cause) ─▶ draft alerts ─▶ verifier ─▶ chaser              │
+ └────────────────────────────────────────────────────────────────────────────────────────┘
+        code services: ledger · matcher · trust rules · recon · aging · patterns
+        gates (code): policy + accounting checks · no money-moving tool · controller approves
                                               ▼
-              Memory (Neo4j + event log): entity graph, two-timeline facts, precedents
-                                              ▼
-           Controller dashboard · case queue · chase log · Judge Console · eval harness
+           Owner dashboard · alerts · chase log · approvals · Judge Console · eval harness
 ```
 
-Models: Haiku for fuzzy matching, Sonnet for agreement / trail / cause / chaser / case / briefing, Opus for the verifier.
+Models: Sonnet for the agreement, trail, cause, chaser, case and briefing agents and for reading free-text statements; Opus for the verifier. Every agent has a free rules mode that runs with no API key.
 
 ## The 9 planted scenarios (the answer key everyone builds to)
 
@@ -147,7 +187,7 @@ Baselines: (1) one strong model with all documents; (2) our system without the v
 |---|---|---|
 | **Aaryan** | Rails and data world | `rails/`, `world/` |
 | **Kanishka** (AI engineer) | Deterministic workflow + judgment agents | `workflow/`, `agents/agreement`, `agents/trail`, `agents/cause`, `agents/chaser`, `agents/case` |
-| **Omar** | Verification, evals, memory briefing | `agents/verifier`, `agents/briefing`, `evals/` |
+| **Omar** | Verification, evals, memory briefing; Gmail agreement agent, anomaly detector | `agents/verifier`, `agents/briefing`, `evals/`, `agreement_agent/`, `agents/anomaly` |
 | **Audrey** (frontend) | Dashboard, Judge Console UI, pitch | `dashboard/`, `docs/` |
 | Shared | Data contracts, stand-ins, sample data | `contracts/` (PR only) |
 
@@ -281,6 +321,8 @@ pytest -q world                                     # world tests (not in testpa
 python -m evals.run evals/runs/full.json evals/runs/no_verifier.json --out evals/results.md
 RAILS=real pytest evals/test_prohibited.py          # guardrails against the real rails
 python dashboard/feed/serve.py                      # live feed for the dashboard (free, rules mode)
+python -m agreement_agent.server                    # Gmail agreement agent on :8770 (Sign in with Google)
+python -m agreement_agent --local agreement_agent/samples/batch   # check the 12 test documents, free
 cd dashboard && npm install && npm run dev          # dashboard on :3000 (see dashboard/README.md)
 ```
 
