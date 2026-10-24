@@ -1,0 +1,8 @@
+{
+  "model_calls": 193,
+  "model_attempts": 195,
+  "model_cost_usd_estimate": 2.807908000000001,
+  "baseline_cost_usd_estimate": 0.190384,
+  "budget_usd": 4.0,
+  "includes_attack_controls": true
+}
