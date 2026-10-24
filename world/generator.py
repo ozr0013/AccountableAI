@@ -76,6 +76,10 @@ class World:
                 payload=t, source=Citation(source_id=f"doc-agreement-{t['manager_id']}",
                                            kind=SourceKind.agreement, locator="7.2")))
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        for kind, rows in (("manager", self.managers), ("vendor", self.vendors)):
+            for r in rows:
+                evs.append(Event(id=f"ev-{kind}-{r.id}", type="entity_registered", valid_from=start,
+                                 learned_at=start, payload={"kind": kind, **r.model_dump()}))
         evs.append(Event(id="ev-world-meta", type="world_meta", valid_from=start, learned_at=start,
                          payload={"as_of": self.as_of.isoformat(), "seed": self.seed}))
         return sorted(evs, key=lambda e: (e.learned_at, e.id))
@@ -136,7 +140,51 @@ def scenario_3(w: World, rng: random.Random) -> None:
     })
 
 
-SCENARIOS: dict[int, Callable[[World, random.Random], None]] = {3: scenario_3}
+# --- scenario 5: vendor-side, on time under the terms (the "moment") -------------------------
+# The file holds the invoice's own date (Mar 20), which is what the system first believes was the
+# receipt date, so the Apr 8 payment looks 9 days late. The invoice actually arrived Apr 1, so
+# the 10-day term ends Apr 11 and the payment is on time. The judge injects that one fact.
+
+MOMENT = {"fact_key": "invoice:INV-KW-0402.received", "value": "2026-04-01"}
+
+
+def scenario_5(w: World, rng: random.Random) -> None:
+    inv = "INV-KW-0402"
+    w.documents += [
+        Document(id="doc-inv-kw-0402", kind=SourceKind.vendor_invoice, manager_id="keyway",
+                 vendor_id="v-sparkline", dated=date(2026, 3, 20),
+                 text="Sparkline Electric. Invoice KW-0402. Replace panel breaker, 88 Birch Ct. "
+                      "Amount due: $900.00. Terms: Net 10. Invoice dated 03/20.",
+                 data={"invoice_id": inv, "amount": 900.00, "received": "2026-03-20"}),
+        Document(id="doc-funding-kw-0402", kind=SourceKind.funding, manager_id="keyway",
+                 dated=date(2026, 3, 25),
+                 text="Oakline Homes wire to Keyway Property Management, repair funding batch "
+                      "2026-03-B, includes INV-KW-0402 $900.00.",
+                 data={"invoice_id": inv, "amount": 900.00, "funded_on": "2026-03-25"}),
+        Document(id="doc-bank-kw-2026-04", kind=SourceKind.manager_bank, manager_id="keyway",
+                 dated=date(2026, 4, 12),
+                 text="Keyway operating account, 04/06-04/12. 04/08 Sparkline Electric $900.00.",
+                 data={"payments": [{"invoice_id": inv, "vendor_id": "v-sparkline",
+                                     "amount": 900.00, "on": "2026-04-08"}]}),
+        Document(id="doc-conf-kw-0402", kind=SourceKind.vendor_confirmation, manager_id="keyway",
+                 vendor_id="v-sparkline", dated=date(2026, 4, 10),
+                 text="Sparkline Electric confirms receipt of $900.00 on 04/08 for KW-0402.",
+                 data={"invoice_id": inv, "status": "paid", "amount": 900.00,
+                       "paid_on": "2026-04-08"}),
+    ]
+    w.ledger.append(LedgerLine(
+        invoice_id=inv, manager_id="keyway", vendor_id="v-sparkline", amount=900.00,
+        invoice_received=date(2026, 3, 20), funded_amount=900.00, funded_on=date(2026, 3, 25),
+        paid_amount=900.00, paid_on=date(2026, 4, 8), due_date=date(2026, 3, 30),
+        status=InvoiceStatus.paid))
+    w.truth.append({
+        "scenario": 5, "invoice_id": inv, "cause": "vendor_side", "alert": False,
+        "must_cite": ["doc-inv-kw-0402", "doc-bank-kw-2026-04"],
+        "moment": {**MOMENT, "withdraw": [inv], "keep": ["INV-KW-0301"]},
+    })
+
+
+SCENARIOS: dict[int, Callable[[World, random.Random], None]] = {3: scenario_3, 5: scenario_5}
 
 
 # --- clean background: funded, paid on time, confirmed by vendor ------------------------------

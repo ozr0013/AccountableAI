@@ -50,3 +50,13 @@ def test_clean_statements_agree_with_bank():
     assert stmts.keys() == banks.keys()
     for k in stmts:
         assert [l["invoice_id"] for l in stmts[k].data["lines"]] == [p["invoice_id"] for p in banks[k].data["payments"]]
+
+
+def test_scenario_5_moment_changes_only_the_receipt_date():
+    from rails.ledger import build_ledger
+    w = generate(scenarios=(3, 5), n_clean=5)
+    line = next(l for l in build_ledger(w.events()) if l.invoice_id == "INV-KW-0402")
+    assert line.paid_on > line.due_date                       # looks late on the invoice date
+    moment = next(t for t in w.truth if t["scenario"] == 5)["moment"]
+    assert moment["keep"] == ["INV-KW-0301"] and moment["withdraw"] == ["INV-KW-0402"]
+    assert line.invoice_received.isoformat() == "2026-03-20" and moment["value"] == "2026-04-01"
