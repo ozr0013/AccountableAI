@@ -163,6 +163,39 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 
 Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the first live verifier run, the agreement / chaser / case agents, and an adapter from the workflow's output to the scorer's `RunResult`.
 
+### Switching to the one-middleman world (Sat)
+
+The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo world**). Nothing in `contracts/` or the rails API changed; only world data did, so this is test and id updates in your own folder. The old preset name `invoice_arrived` still works (alias of `invoice_received_correction`). Every planted item, with ids, amounts and dates, is in `world/scenario_spec.json`.
+
+| Old | New |
+|---|---|
+| `INV-SB-0101`, `INV-PT-0201`, `INV-PT-0601`, `INV-SB-0701`, `INV-SB-0801`, `INV-SB-0802`, `INV-PT-0901` | `INV-KW-0101`, `INV-KW-0201`, `INV-KW-0601`, `INV-KW-0701`, `INV-KW-0801`, `INV-KW-0802`, `INV-KW-0901` |
+| manager `sunbelt` / `peachtree` | `keyway` (the only manager) |
+| `doc-agreement-sunbelt`, `doc-funding-sb-0101`, `doc-funding-pt-0201`, `doc-reply-pt-0901` | `doc-agreement-keyway`, `doc-funding-kw-0101`, `doc-funding-kw-0201`, `doc-reply-kw-0901` |
+| scenario 7 vendor `v-voltwise` | `v-summit` (Summit Heating & Air, still $4,800) |
+| `INV-KW-0402` = electrician paid Apr 8 | `INV-KW-0402` = the moment's **unpaid** Sparkline electrician ($900). The paid-on-time electrician (scenario 5) is `INV-KW-0501` (AmperPro, `doc-bank-kw-2026-04-s5`, `doc-conf-kw-0501`) |
+| `MOMENT["value"]` `2026-04-01`, new due date Apr 11 | `2026-04-15`, new due date Apr 25 |
+| moment keeps 1 alert | keeps 2: `INV-KW-0301` ($1,240) and `INV-KW-0901` ($1,000) |
+| Keyway recon `diff == 0` | `diff == 320`: the flagged scenario 8 duplicate is on Keyway now (`diff - duplicate_funded == 0`) |
+| scenario 4 pattern on `sunbelt` | on `keyway`: late Jan, Feb, Mar; April on time |
+
+**Kanishka** (`agents/`, `workflow/`):
+- [ ] `agents/cause/tests/test_cause.py`: ids and managers in the per-scenario table and the scenario 1 / 6 citation tests. `test_scenario_5_after_moment_is_vendor_side`: test vendor-side on `INV-KW-0501` (paid Apr 8, due Apr 11); `INV-KW-0402` is unpaid now
+- [ ] `agents/chaser/tests/test_chaser.py`: `INV-PT-0201` / `INV-PT-0901` with `peachtree` → `INV-KW-0201` / `INV-KW-0901` with `keyway`; the proof test uses `INV-KW-0501`
+- [ ] `agents/trail/tests/test_trail.py`: scenario 9 → `INV-KW-0901` / `doc-reply-kw-0901`; the paid-invoice test → `INV-KW-0501`
+- [ ] `workflow/tests/test_scenarios.py`: ids; chases only for `keyway`; the scenario 4 pattern alert is for `keyway`
+- [ ] `workflow/tests/test_bank_change.py`: `INV-KW-0701`, vendor `v-summit`
+- [ ] `workflow/tests/test_memrails.py`: the paid-Apr-8 electrician is `INV-KW-0501`; Keyway recon check becomes `diff - duplicate_funded == 0`
+- [ ] `workflow/tests/test_moment.py`: the withdrawal reason's new due date is `2026-04-25`; two alerts kept
+- [ ] `workflow/run.py`: `--moment` help text says Apr 1 → Apr 15
+
+**Omar** (`evals/`, `pyproject.toml`):
+- [ ] `evals/answer_key.json` moment: `keep_count` 1 → 2 and update `_doc` (three items, $3,140 → $2,240, receipt Apr 15). Check the scenarios against `world/scenario_spec.json`
+- [ ] `evals/test_harness.py::test_judge_moment` passes once `keep_count` is 2
+- [ ] `pyproject.toml`: add `"world"` to `testpaths`
+
+**Audrey** (`dashboard/`): one manager in the UI; preset id `invoice_received_correction`; demo numbers $3,140 → $2,240.
+
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
 2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (built: Oakline, one middleman (Keyway), 20 vendors, all 9 scenarios and the moment, Jan to Apr 2026; every planted item in `world/scenario_spec.json`)

@@ -67,6 +67,8 @@ PRESETS = [
            {"vendor_id": "v-summit", "invoice_id": "INV-KW-0701"}),
 ]
 _BY_ID = {p.id: p for p in PRESETS}
+# Old preset names that still work (workflow/run.py and older UIs call these).
+ALIASES = {"invoice_arrived": "invoice_received_correction"}
 
 
 @dataclass
@@ -89,6 +91,7 @@ class JudgeConsole:
         return PRESETS
 
     def apply_preset(self, preset_id: str, params: dict | None = None) -> ConsoleResult:
+        preset_id = ALIASES.get(preset_id, preset_id)
         if preset_id not in _BY_ID:
             raise ConsoleError(f"unknown preset {preset_id!r}", [p.id for p in PRESETS])
         p = {**_BY_ID[preset_id].defaults, **(params or {})}
