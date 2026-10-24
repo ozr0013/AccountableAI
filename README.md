@@ -159,9 +159,9 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 | Aaryan | 11 / 11 | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22) |
 | Omar | 5 / 8 | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
 | Kanishka | 10 / 10 | `workflow/` (LangGraph graph, runner, replay, recheck), all five judgment agents, bank-detail path, sealed commit-reveal eval |
-| Audrey | 0 / 10 | no `dashboard/` or `docs/` in the repo yet |
+| Audrey | 7 / 10 | `dashboard/`: Next.js app on the live feed (`dashboard/feed/serve.py`, real workflow + Judge Console + approvals) with replay fallback; overview, open items + payment timeline, case queue, Keyway view, guardrails, Judge Console, briefing |
 
-Still open: Omar's baselines and the Checkpoint B scored run, all of Audrey's dashboard and pitch, and the Devpost write-up (feature freeze Sat 8 pm). The one-middleman migration (Keyway only, demo date Apr 22) is done and merged.
+Still open: Omar's baselines and the Checkpoint B scored run, Audrey's Figma skeleton, Devpost visuals and pitch, and the Devpost write-up (feature freeze Sat 8 pm). The one-middleman migration (Keyway only, demo date Apr 22) is done and merged.
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
@@ -199,15 +199,15 @@ Still open: Omar's baselines and the Checkpoint B scored run, all of Audrey's da
 8. [ ] **NEEDS** Checkpoint C: final numbers to Audrey
 
 ### Audrey: dashboard and pitch (`dashboard/`, `docs/`)
-1. [ ] Figma skeleton of every screen (start now)
-2. [ ] Next.js app on the replay feed (`contracts/fixtures/sample/`): headline numbers, Keyway's open items sorted by vendor money still owed
-3. [ ] Payment timeline (one lane per source; trusted source marked)
-4. [ ] Case queue: evidence pack, Approve / Decline, audit trail, blocked outbound send visible
-5. [ ] Keyway view: funded vs paid vs owed, and the chase log
-6. [ ] Judge Console UI showing what changed and what didn't
-7. [ ] Ask-about-Keyway briefing panel
-8. [ ] Seats line, Devpost visuals
-9. [ ] **NEEDS** Checkpoint A: `NEXT_PUBLIC_FEED=live`
+1. [ ] Figma skeleton of every screen (skipped: built straight in code)
+2. [x] Next.js app on the replay feed (`dashboard/public/feed/`, baked by `python dashboard/feed/export.py`): headline numbers, Keyway's open items sorted by vendor money still owed
+3. [x] Payment timeline (one lane per source; trusted source marked, overruled claims struck) → `/items/[id]`
+4. [x] Case queue: evidence pack, Approve / Decline (rails policy gate), audit trail, blocked outbound send visible → `/cases`, `/guardrails`
+5. [x] Keyway view: funded vs paid vs owed, lateness by month, terms, aging, and the chase log → `/keyway`
+6. [x] Judge Console UI showing what changed and what didn't (presets + free text; $3,140 → $2,240) → `/console`
+7. [x] Ask-about-Keyway briefing panel → `/ask`
+8. [ ] Seats line (done, overview footer), Devpost visuals (not yet)
+9. [x] **NEEDS** Checkpoint A: `NEXT_PUBLIC_FEED=live` (default; falls back to replay if the feed isn't running)
 10. [ ] **NEEDS** Checkpoint C: record the video opening with the moment
 
 ### Phase 2 sponsors (after Checkpoint B only)
@@ -247,7 +247,8 @@ python -m rails.console.moment                      # replay the moment: $3,140 
 pytest -q world                                     # world tests (not in testpaths yet)
 python -m evals.run evals/runs/full.json evals/runs/no_verifier.json --out evals/results.md
 RAILS=real pytest evals/test_prohibited.py          # guardrails against the real rails
-cd dashboard && npm install && npm run dev     # Audrey sets this up (Next.js)
+python dashboard/feed/serve.py                      # live feed for the dashboard (free, rules mode)
+cd dashboard && npm install && npm run dev          # dashboard on :3000 (see dashboard/README.md)
 ```
 
 ## Rules
