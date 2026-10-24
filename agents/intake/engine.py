@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
@@ -50,6 +51,7 @@ STATUS_PHRASES = {
 NEGATED_PAID = r"\bunpaid\b|not paid|not received|outstanding|past due"
 INSTRUCTION = r"ignore previous|disregard|system prompt|override|assistant|instruction|auto-approve|" \
               r"transfer all|mark this paid"
+FUNDING_GAP = "payment exceeds the funding on record for its invoice"
 MONTHS = ("january", "february", "march", "april", "may", "june", "july", "august", "september",
           "october", "november", "december")
 
@@ -204,6 +206,8 @@ class Intake:
         self.earliest, self.latest = earliest, latest
         self.cache = cache if cache is not None else {}
         self.invoices, self.seen, self.processed = {}, set(), set()
+        # Money on record per invoice, so a payment cannot enter books that would not balance.
+        self.funded, self.paid, self.blocked, self.attempts = defaultdict(Decimal), defaultdict(Decimal), {}, {}
         self.hits, self.requests = 0, 0
 
     def extract(self, doc):
@@ -226,13 +230,14 @@ class Intake:
         self.cache[key] = answer.model_dump(mode="json")
         return answer, rules, model
 
-    def process(self, doc, day):
+    def process(self, doc, day, attempt=0):
         result = IntakeResult()
         if doc.id in self.processed:
             return result
         self.processed.add(doc.id)
-        result.events.append(event("source_document_received", doc.id, doc, day,
-                                   {"document": doc.model_dump(mode="json")}))
+        if not attempt:
+            result.events.append(event("source_document_received", doc.id, doc, day,
+                                       {"document": doc.model_dump(mode="json")}))
         try:
             answer, rules, model = self.extract(doc)
         except (ValueError, TypeError) as exc:
@@ -275,10 +280,13 @@ class Intake:
                 if len(possible) == 1:
                     data["payments"][0]["invoice_id"] = possible[0]
             converted.append((c, data, fingerprint))
+        issues += self._exceeds_funding(converted)
         # Atomic at document level: no partial bank export silently accepted.
         if issues or not converted:
+            if issues and set(issues) == {FUNDING_GAP}:
+                self.blocked[doc.id] = doc
             result.reviews = sorted(set(issues or ["no facts extracted"]))
-            result.events.append(event("needs_review", [doc.id, result.reviews], doc, day,
+            result.events.append(event("needs_review", [doc.id, result.reviews, attempt], doc, day,
                  {"reasons": result.reviews, "model": model, "extraction": answer.model_dump(mode="json")}))
             if any("disagreement" in x for x in issues):
                 result.events.append(event("extraction_disagreement", doc.id, doc, day,
@@ -303,4 +311,31 @@ class Intake:
             result.documents.append(material)
             if c.role == "invoice":
                 self.invoices[c.invoice_id] = {**data, "vendor_id": c.vendor_id}
+            elif c.role == "funding":
+                self.funded[c.invoice_id] += c.amount
+            elif c.role == "payment" and data["payments"][0].get("invoice_id"):
+                self.paid[data["payments"][0]["invoice_id"]] += c.amount
         return result
+
+    def _exceeds_funding(self, converted):
+        """A payment linked to an invoice may not exceed the funding on record for it. While the
+        funding record is still unread or in review, the payment waits for review instead of
+        unbalancing the books; `retry` reprocesses it once more funding is accepted."""
+        if not self.checks:
+            return []
+        extra = defaultdict(Decimal)
+        for c, data, _ in converted:
+            if c.role == "payment" and (iid := data["payments"][0].get("invoice_id")):
+                extra[iid] += c.amount
+        return [FUNDING_GAP for iid, amount in extra.items()
+                if self.paid[iid] + amount > self.funded[iid]][:1]
+
+    def retry(self, day):
+        """Reprocess documents blocked only by a funding gap that accepted funding may have closed."""
+        results = []
+        for did, doc in list(self.blocked.items()):
+            del self.blocked[did]
+            self.processed.discard(did)
+            self.attempts[did] = self.attempts.get(did, 0) + 1
+            results.append((doc, self.process(doc, day, self.attempts[did])))
+        return results

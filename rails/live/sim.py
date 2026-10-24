@@ -33,7 +33,7 @@ class CachedModel:
         from evals.harness import Budget, _MeteredLLM
         self.meter = _MeteredLLM(Budget(budget, max_calls), model=model)
         self.model = self.meter.model
-        self.meter.client = self.meter.client.with_options(timeout=20, max_retries=0)
+        self.meter.client = self.meter.client.with_options(timeout=90, max_retries=2)
         self.cache = cache if cache is not None else {}
         self.hits, self.requests, self.attempts = 0, 0, 0
         self.unavailable = []
@@ -186,7 +186,7 @@ def single_model(public, budget, model=None):
     try:
         # Keep the baseline's prompt and metering, add a hold field locally and bound output.
         import anthropic
-        client = anthropic.Anthropic(timeout=30, max_retries=0)
+        client = anthropic.Anthropic(timeout=600, max_retries=2)
         original_messages = client.messages
         class Messages:
             def stream(self, **kwargs):

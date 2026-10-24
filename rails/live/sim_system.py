@@ -6,12 +6,13 @@ This adapter validates documents, advances an explicit clock, and observes workf
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from agents import RealAgents
 from agents.intake import Intake
-from agents.intake.engine import stamp
+from agents.intake.engine import FUNDING_GAP, stamp
 from agents.verifier.rules import check as check_draft
-from contracts.models import Citation, Event, SourceKind, Verdict, VerdictStatus
+from contracts.models import Citation, Document, Event, SourceKind, Verdict, VerdictStatus
 from rails.audit import Audit
 from rails.events.ingest import document_event
 from rails.serialization import digest
@@ -101,6 +102,22 @@ class SimSystem:
         for doc in self.rails.documents():
             if doc.kind == SourceKind.vendor_invoice and doc.data.get("invoice_id"):
                 self.intake.invoices[doc.data["invoice_id"]] = {**doc.data, "vendor_id": doc.vendor_id}
+            elif doc.kind == SourceKind.funding and doc.data.get("invoice_id"):
+                self.intake.funded[doc.data["invoice_id"]] += Decimal(str(doc.data["amount"]))
+            elif doc.kind == SourceKind.manager_bank:
+                for p in doc.data.get("payments", []):
+                    if p.get("invoice_id"):
+                        self.intake.paid[p["invoice_id"]] += Decimal(str(p["amount"]))
+        # Documents still waiting only for funding are waiting again after a restart.
+        ingested = {e.source.source_id.split("-row-")[0] for e in self.rails.events()
+                    if e.type == "document_ingested" and e.source}
+        received = {e.payload["document"]["id"]: e.payload["document"] for e in self.rails.events()
+                    if e.type == "source_document_received"}
+        for e in self.rails.events():
+            did = e.source.source_id if e.source else None
+            if e.type == "needs_review" and e.payload["reasons"] == [FUNDING_GAP] and did in received \
+                    and did not in ingested:
+                self.intake.blocked[did] = Document.model_validate(received[did])
 
     def advance(self, day):
         if day < self.day or (self.end and day > self.end):
@@ -113,7 +130,14 @@ class SimSystem:
     def ingest(self, doc):
         if self.audit.halted:
             raise RuntimeError("processing stopped pending invariant repair")
-        result = self.intake.process(doc, self.day)
+        result = self._apply(doc, self.intake.process(doc, self.day))
+        # Accepted funding can release payments that were waiting for it.
+        if any(d.kind == SourceKind.funding for d in result.documents):
+            for blocked, retried in self.intake.retry(self.day):
+                self._apply(blocked, retried)
+        return result
+
+    def _apply(self, doc, result):
         if not result.events:
             return result
         self.last_runs = []

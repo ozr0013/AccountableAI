@@ -14,11 +14,14 @@ INVOICE = Document(id="invoice", kind=SourceKind.vendor_invoice, manager_id="key
     text="Rio Grande Plbg LLC\nInvoice INV-KW-0301\nReceived: 2026-03-01\nAmount due: $100.00\nService period: 2026-03; vendor reference: RG-1.")
 BANK = Document(id="bank", kind=SourceKind.manager_bank, manager_id="keyway", dated=date(2026, 3, 5),
     text="Keyway operating account export\nDate,Debit,Memo,Transaction\n2026-03-05,$40.00,Rio Grande Plbg LLC 0301 pt1,TX-1")
+FUNDING = Document(id="funding", kind=SourceKind.funding, manager_id="keyway", dated=date(2026, 3, 2),
+    text="Oakline Homes -> Keyway Property Management\nAllocation INV-KW-0301: $100.00\nValue date 2026-03-02")
 
 
 def test_bank_split_without_invoice_is_checked_and_linked_and_replay_safe():
     intake = Intake(VENDORS)
     intake.process(INVOICE, DAY)
+    intake.process(FUNDING, DAY)
     r = intake.process(BANK, DAY)
     assert not r.reviews
     assert r.documents[0].data["payments"][0]["invoice_id"] == "INV-KW-0301"
@@ -157,3 +160,17 @@ def test_status_needs_supporting_wording(status, quote, ok):
                   quotes={"invoice_id": "INV-KW-0301", "status": quote}, confidence=.95)
     found = [p for p in problems(c, doc, VENDORS, {"INV-KW-0301": {}}, DAY) if "status" in p]
     assert (not found) == ok
+
+
+def test_payment_waits_for_its_funding_then_enters_on_retry():
+    from agents.intake.engine import FUNDING_GAP
+    linked = BANK.model_copy(update={"text": BANK.text.replace("0301 pt1", "INV-KW-0301 pt1")})
+    intake = Intake(VENDORS)
+    intake.process(INVOICE, DAY)
+    r = intake.process(linked, DAY)
+    assert r.reviews == [FUNDING_GAP] and not r.documents and "bank" in intake.blocked
+    assert intake.process(FUNDING, DAY).documents
+    [(doc, retried)] = intake.retry(DAY)
+    assert doc.id == "bank" and retried.documents and not retried.reviews
+    assert all(e.type != "source_document_received" for e in retried.events)
+    assert not intake.blocked and intake.retry(DAY) == []

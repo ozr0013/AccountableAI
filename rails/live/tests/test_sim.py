@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from agents.intake.tests.test_intake import BANK, INVOICE, VENDORS
+from agents.intake.tests.test_intake import BANK, FUNDING, INVOICE, VENDORS
 from rails.live.scoring import score
 from rails.live.sim import attack_control, simulate
 from rails.live.sim_system import SimSystem
@@ -66,7 +66,7 @@ def test_bank_intake_flows_through_existing_workflow_unchanged():
     intake = Intake(VENDORS)
     rails = MemoryRails()
     workflow = Workflow(Deps(rails, RealAgents(None), FakeVerifier(), FakeApprovals()))
-    for doc in (INVOICE, BANK):
+    for doc in (INVOICE, FUNDING, BANK):
         for e in intake.process(doc, date(2026, 3, 20)).events:
             workflow.ingest(e)
     line = rails.ledger("keyway")[0]
@@ -151,3 +151,11 @@ def test_late_evidence_that_changes_a_prediction_is_caught_and_never_miscorrecte
     assert metrics["prediction_errors"] > 0
     assert metrics["errors_caught"] > 0
     assert metrics["wrong_corrections"] == 0
+
+
+def test_unreadable_funding_never_halts_the_books():
+    from world.messy import held_out_noise
+    public, truth = generate(9000, split="held_out", noise=held_out_noise())
+    output = simulate(public, "rules")
+    assert output["failure"] is None
+    assert score(public, truth, output)["invariant_violations"] == 0
