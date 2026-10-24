@@ -15,7 +15,9 @@ def _dt(d) -> datetime:
 
 def document_event(doc: Document, learned_at: datetime | None = None) -> Event:
     """document_ingested event; valid_from = document date, learned_at = when we received it."""
-    valid = _dt(doc.dated) if doc.dated else (learned_at or datetime.now(timezone.utc))
+    if not doc.dated and not learned_at:
+        raise ValueError(f"document {doc.id} has no date; pass learned_at so replay stays identical")
+    valid = _dt(doc.dated) if doc.dated else learned_at
     return Event(
         id=f"ev-doc-{doc.id}",
         type="document_ingested",

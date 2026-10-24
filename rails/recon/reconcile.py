@@ -19,6 +19,7 @@ from dataclasses import dataclass
 from contracts.models import Event, SourceKind
 
 from ..docs import documents_from_events
+from ..facts import current_terms
 from ..ledger import build_ledger
 
 
@@ -43,8 +44,7 @@ class ReconLine:
 
 
 def breakdown(events: list[Event], manager_id: str | None = None) -> list[ReconLine]:
-    holdback = {e.manager_id: e.payload.get("holdback_pct", 0) for e in events
-                if e.type == "terms_confirmed"}
+    holdback = {m: t.get("holdback_pct", 0) for m, t in current_terms(events).items()}
     pending = {d.data["invoice_id"] for d in documents_from_events(events)
                if d.kind == SourceKind.vendor_invoice and d.data.get("inspection") == "pending"}
     out = []
