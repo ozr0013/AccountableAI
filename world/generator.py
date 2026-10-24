@@ -75,6 +75,9 @@ class World:
                 manager_id=t["manager_id"], valid_from=when, learned_at=when,
                 payload=t, source=Citation(source_id=f"doc-agreement-{t['manager_id']}",
                                            kind=SourceKind.agreement, locator="7.2")))
+        start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        evs.append(Event(id="ev-world-meta", type="world_meta", valid_from=start, learned_at=start,
+                         payload={"as_of": self.as_of.isoformat(), "seed": self.seed}))
         return sorted(evs, key=lambda e: (e.learned_at, e.id))
 
     def meta(self) -> dict:

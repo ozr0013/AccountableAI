@@ -15,6 +15,7 @@ from datetime import date, timedelta
 from contracts.models import Document, Event, InvoiceStatus, LedgerLine, SourceKind
 
 from ..docs import documents_from_events
+from ..facts import current_terms
 from ..matcher import find_duplicates, gather_evidence
 
 
@@ -28,10 +29,7 @@ def _d(s: str | None) -> date | None:
 
 def build_ledger(events: list[Event]) -> list[LedgerLine]:
     """Pass current events (superseded ones already dropped). Returns lines sorted by invoice id."""
-    terms: dict[str, int] = {}
-    for e in events:
-        if e.type == "terms_confirmed" and e.manager_id:
-            terms[e.manager_id] = int(e.payload["vendor_payment_days"])
+    terms = {m: int(t["vendor_payment_days"]) for m, t in current_terms(events).items()}
 
     docs = documents_from_events(events)
     result = gather_evidence(docs)
