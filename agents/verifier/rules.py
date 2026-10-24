@@ -24,9 +24,14 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().lower()
 
 
+# Inflections a banned stem may take ("fraudulent", "misused", "embezzlement", "scammer"), so
+# whole words like "Stealth Roofing" or "scamper" don't match.
+_SUFFIX = r"(?:s|es|d|ed|ing|er|ers|mer|mers|med|ming|ulent|ulently|ment|ments|ion|ions|ive|ly)?"
+
+
 def find_banned(text: str) -> list[str]:
     low = text.lower()
-    return [t for t in BANNED_TERMS if re.search(rf"\b{re.escape(t)}", low)]
+    return [t for t in BANNED_TERMS if re.search(rf"\b{re.escape(t)}{_SUFFIX}\b", low)]
 
 
 def check(draft: AlertDraft, evidence: list[Document]) -> RuleResult:

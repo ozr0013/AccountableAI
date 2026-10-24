@@ -167,3 +167,46 @@ def test_live_scenario_3():
     v = LLMVerifier().verify(scenario_3_draft(), DOCS)
     print(v.model_dump_json(indent=2))
     assert v.status == VerdictStatus.approved
+
+
+# --- hardening ----------------------------------------------------------------------------
+
+def test_refutation_with_invented_quote_is_ignored():
+    out = _Refutation(claim_checks=_all_supported(), refuted=True, refutation="It was paid.",
+                      counter_evidence=[_CounterEvidence(source_id="doc-bank-kw-2026-03", locator="",
+                                                         quote="Paid in full on 03/10")])
+    v = LLMVerifier(client=StubClient(out), model="x").verify(scenario_3_draft(), DOCS)
+    assert v.status == VerdictStatus.approved
+    assert any("misquoted" in r for r in v.reasons)
+
+
+def test_refutation_with_a_real_quote_still_counts():
+    out = _Refutation(claim_checks=_all_supported(), refuted=True, refutation="Not due yet.",
+                      counter_evidence=[_CounterEvidence(source_id="doc-agreement-keyway", locator="7.2",
+                                                         quote="within ten (10) days")])
+    v = LLMVerifier(client=StubClient(out), model="x").verify(scenario_3_draft(), DOCS)
+    assert v.status == VerdictStatus.refuted
+
+
+def test_skipped_claim_checks_fail_closed():
+    out = _Refutation(claim_checks=_all_supported(1), refuted=False, refutation="fine",
+                      counter_evidence=[])
+    v = LLMVerifier(client=StubClient(out), model="x").verify(scenario_3_draft(), DOCS)
+    assert v.status == VerdictStatus.blocked
+    assert "didn't check claim(s) [1, 2]" in v.reasons[0]
+
+
+def test_default_client_has_a_short_timeout(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test")
+    assert LLMVerifier().client.timeout == 60
+
+
+@pytest.mark.parametrize("text,hit", [
+    ("Possible fraud at Keyway", ["fraud"]), ("a fraudulent statement", ["fraud"]),
+    ("funds were misused", ["misuse"]), ("embezzlement", ["embezzle"]),
+    ("misappropriation of funds", ["misappropriat"]), ("a scammer", ["scam"]),
+    ("Stealth Roofing invoice", []), ("the dog scampered off", []), ("Stoleson Electric", []),
+])
+def test_banned_words_match_whole_words(text, hit):
+    from agents.verifier.rules import find_banned
+    assert find_banned(text) == hit
