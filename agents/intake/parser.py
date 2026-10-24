@@ -135,6 +135,7 @@ def parse(doc: Document, vendors: list[dict], invoices: dict[str, dict]) -> Extr
                     args["vendor_id"] = vid
                     quotes["vendor_id"] = sender.group(1)
         status = ("bank_change_requested" if "bank change requested" in body.lower() else
+                  "paperwork_received" if re.search(r"w-9 (provided|received|attached)", body, re.IGNORECASE) else
                   "not_received" if "not received" in body.lower() or "remains unpaid" in body.lower() else
                   "paid" if re.fullmatch(r"paid|cheque went out Friday", body, re.IGNORECASE) or (kind == "vendor_confirmation" and re.search(r"payment received|confirms receipt", body, re.IGNORECASE)) else "claim")
         quotes["status"] = body

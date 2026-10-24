@@ -39,7 +39,8 @@ def oracle(row, on, payments, w9_dates):
     amount = row["amount"]
     bank_change = row["scenario"] == 7 and on >= date(2026, 4, 19)
     paperwork = row["scenario"] == 2 and not any(d <= on for d in w9_dates)
-    cause = ("owner_side" if not funded else
+    # A duplicate bill is not owed, so there is no payment delay to explain.
+    cause = (None if row["duplicate"] else "owner_side" if not funded else
              "vendor_side" if paid >= amount and paid_on and paid_on <= rec+timedelta(days=10) else
              "vendor_side" if bank_change else
              "authorized_hold" if row["scenario"] == 1 and 0 < round(amount-paid, 2) <= round(amount*.1, 2) else
@@ -75,7 +76,7 @@ def score(public, truth, output):
     tp = sum(bool(decisions.get(i, {}).get("alert")) and decisions[i]["alert"] == t["alert"] for i, t in expected.items())
     predicted = sum(d.get("alert") in relevant_alerts for d in decisions.values())
     positives = sum(t["alert"] is not None for t in expected.values())
-    correct_causes = sum(decisions.get(i, {}).get("cause") == t["cause"] for i, t in expected.items())
+    correct_causes = sum(i in decisions and decisions[i].get("cause") == t["cause"] for i, t in expected.items())
     holds = [abs(d.get("hold", 0)-expected.get(i, {"hold": 0})["hold"]) for i, d in decisions.items() if d.get("hold") is not None]
     holds += [t["hold"] for i, t in expected.items() if i not in decisions]
     # Extraction metrics exclude derived metadata but include every planted field.

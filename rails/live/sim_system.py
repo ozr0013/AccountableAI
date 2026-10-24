@@ -41,6 +41,25 @@ class _NoVerifier:
                        reasons=["evaluation ablation: verifier disabled"])
 
 
+SCORED_ALERTS = ("unexplained_unpaid", "duplicate_billing", "bank_detail_change")
+
+
+def _alert_names(draft, invoice_id):
+    """Whether an open alert is a scored alert about this invoice.
+
+    A duplicate alert lists [original, duplicate]; only the duplicate is the billing error.
+    An unexplained alert with nothing owed reads "paid N days late": lateness, not unpaid.
+    """
+    kind = draft.kind.value
+    if kind not in SCORED_ALERTS:
+        return False
+    if kind == "duplicate_billing":
+        return draft.invoice_ids[-1:] == [invoice_id]
+    if kind == "unexplained_unpaid" and draft.amount <= 0:
+        return False
+    return invoice_id in draft.invoice_ids
+
+
 class SimSystem:
     def __init__(self, public, system="ours", llm=None, cache=None, regression_dir=None,
                  rails=None, agents=None, verifier=None):
@@ -58,7 +77,8 @@ class SimSystem:
         self.audit = Audit(self.rails, regression_dir)
         self.approvals = RailsApprovals(self.rails, clock=lambda: stamp(self.day))
         verify = verifier or (_NoVerifier() if system == "no_verifier" else CodeVerifier())
-        self.workflow = Workflow(Deps(self.rails, agents or RealAgents(None), verify, self.approvals))
+        self.agents = agents or RealAgents(None)
+        self.workflow = Workflow(Deps(self.rails, self.agents, verify, self.approvals))
         self.last_runs = []
         self._actions_read = {e.id for e in self.rails.events()
                               if e.type in ("chase_sent", "alert_raised")}
@@ -224,6 +244,17 @@ class SimSystem:
             self._actions_read.add(e.id)
         return actions
 
+    def _cause_for_paid(self, line):
+        """Workflow does not explain invoices paid on time; ask the same cause agent, with the
+        same evidence, so cause accuracy is graded on every invoice (as evals.harness does)."""
+        from workflow.terms import terms_for
+        terms = terms_for(self.rails, self.agents, line.manager_id)
+        if terms is None:
+            return None
+        trail = self.agents.build_trail(line, self.rails.documents(line.manager_id, line.invoice_id))
+        finding = self.agents.classify_cause(line, trail, terms)
+        return finding.model_dump(mode="json") if finding else None
+
     def output(self):
         book = WorkflowBook.load(self.rails)
         assessments = {e.invoice_id: e.payload["assessment"] for e in self.rails.events()
@@ -231,14 +262,15 @@ class SimSystem:
         decisions = {}
         for line in self.rails.ledger(self.public.get("manager_id", "keyway")):
             a = assessments.get(line.invoice_id, {})
-            alerts = [x for x in book.open_alerts() if line.invoice_id in x.draft.invoice_ids]
-            relevant = next((x for x in alerts if x.draft.kind.value in
-                            ("unexplained_unpaid", "duplicate_billing", "bank_detail_change")), None)
-            decisions[line.invoice_id] = {"cause": (a.get("finding") or {}).get("cause"),
+            relevant = next((x for x in book.open_alerts() if _alert_names(x.draft, line.invoice_id)), None)
+            finding = a.get("finding")
+            if finding is None and a.get("status") == "paid":
+                finding = self._cause_for_paid(line)
+            decisions[line.invoice_id] = {"cause": (finding or {}).get("cause"),
                 "status": a.get("status"), "alert": relevant.draft.kind.value if relevant else None,
                 "hold": max(relevant.draft.amount, 0) if relevant and relevant.draft.kind.value == "unexplained_unpaid" else 0,
                 "paid": line.paid_amount, "amount": line.amount,
-                "source_ids": [c["source_id"] for c in (a.get("finding") or {}).get("citations", [])]}
+                "source_ids": [c["source_id"] for c in (finding or {}).get("citations", [])]}
         events = self.rails.events()
         return {"system": self.kind, "model_mode": "live_intake" if self.llm else "rules_fallback",
                 "orchestrator": "workflow.runner.Workflow", "simulated": self.simulated,

@@ -105,3 +105,12 @@ def test_provider_transport_has_fixed_fields_and_checks_duplicate_quotes():
     payload["quotes"].append(payload["quotes"][0])
     with pytest.raises(ValueError, match="duplicate quote"):
         ModelExtraction(candidates=[ModelCandidate(**payload)], uncertain=[]).checked_shape()
+
+
+def test_vendor_paperwork_receipt_is_a_checked_claim():
+    intake = Intake(VENDORS)
+    intake.process(INVOICE, DAY)
+    notice = Document(id="w9", kind=SourceKind.vendor_notice, manager_id="keyway", dated=DAY,
+                      text="From: Rio Grande Plumbing\nRe: INV-KW-0301\nW-9 provided and received")
+    r = intake.process(notice, DAY)
+    assert r.documents[0].data == {"invoice_id": "INV-KW-0301", "status": "paperwork_received"}

@@ -100,3 +100,26 @@ def test_separate_blind_process_blocks_answers_and_output_tampering(tmp_path):
     (tmp_path / "ours-cold.json").write_text(json.dumps(output))
     with pytest.raises(ValueError, match="output commitment"):
         score_sealed(tmp_path, "ours-cold")
+
+
+def test_scored_alerts_name_the_billing_error_not_its_neighbours():
+    from types import SimpleNamespace as NS
+
+    from rails.live.sim_system import _alert_names
+    kind = lambda v: NS(value=v)  # noqa: E731
+    duplicate = NS(kind=kind("duplicate_billing"), invoice_ids=["INV-A", "INV-B"], amount=320)
+    assert _alert_names(duplicate, "INV-B") and not _alert_names(duplicate, "INV-A")
+    late_but_paid = NS(kind=kind("unexplained_unpaid"), invoice_ids=["INV-C"], amount=0)
+    unpaid = NS(kind=kind("unexplained_unpaid"), invoice_ids=["INV-C"], amount=12.5)
+    assert not _alert_names(late_but_paid, "INV-C") and _alert_names(unpaid, "INV-C")
+    assert not _alert_names(NS(kind=kind("recurring_pattern"), invoice_ids=["INV-C"], amount=0), "INV-C")
+
+
+def test_paid_on_time_invoices_are_graded_and_w9_receipt_reopens_the_unpaid_item():
+    public, truth = generate(13, n_clean=3, noise=clean_noise())
+    output = simulate(public)
+    paid = [d for d in output["decisions"].values() if d["status"] == "paid"]
+    assert paid and all(d["cause"] == "vendor_side" for d in paid)
+    metrics = score(public, truth, output)
+    assert metrics["cause_accuracy"] == 1
+    assert metrics["alert_precision"] == metrics["alert_recall"] == 1

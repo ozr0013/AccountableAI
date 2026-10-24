@@ -37,7 +37,8 @@ ROLES = {"vendor_invoice": "invoice", "funding": "funding", "manager_bank": "pay
 STATUS_PHRASES = {"paid": ("paid", "cheque went out friday", "payment received", "confirms receipt"),
                   "not_received": ("not received", "remains unpaid"),
                   "hold_missing_w9": ("w-9 not on file", "held until the w-9", "w-9 missing"),
-                  "bank_change_requested": ("bank change requested",)}
+                  "bank_change_requested": ("bank change requested",),
+                  "paperwork_received": ("w-9 provided", "w-9 received", "w-9 attached")}
 
 
 def stamp(day):

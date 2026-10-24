@@ -153,7 +153,7 @@ def generate(seed=13, instances=1, n_clean=10, noise: Noise | None = None):
             add(kind, f"From: {label if scenario == 7 else 'Keyway'}\nRe: {iid}\n{reply}",
                 date(2026, 4, 19), {"invoice_id": iid, "status": status}, vendor if scenario == 7 else None)
         # Oracle is built from planted amounts, not extracted fields or pipeline decisions.
-        cause = ("owner_side" if scenario == 6 else "authorized_hold" if scenario == 1 else
+        cause = (None if duplicate else "owner_side" if scenario == 6 else "authorized_hold" if scenario == 1 else
                  "paperwork_pending" if scenario == 2 else "vendor_side" if scenario == 7 or
                  (paid >= amount and paid_on <= received + timedelta(days=10)) else "unexplained")
         alert_kind = ("bank_detail_change" if scenario == 7 else "duplicate_billing" if duplicate else

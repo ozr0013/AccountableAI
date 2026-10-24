@@ -15,7 +15,7 @@ class Candidate(BaseModel):
     payee: str | None = None
     amount: Decimal | None = None
     on: date | None = None
-    status: Literal["paid", "not_received", "hold_missing_w9", "bank_change_requested", "claim"] | None = None
+    status: Literal["paid", "not_received", "hold_missing_w9", "bank_change_requested", "paperwork_received", "claim"] | None = None
     received: date | None = None
     vendor_ref: str | None = None
     service_period: str | None = None
