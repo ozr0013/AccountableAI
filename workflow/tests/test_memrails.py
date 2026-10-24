@@ -29,7 +29,8 @@ def test_unpaid_respects_as_of(rails):
     early = {l.invoice_id for l in rails.unpaid("keyway", date(2026, 3, 4))}
     late = {l.invoice_id for l in rails.unpaid("keyway", date(2026, 4, 25))}
     assert "INV-KW-0301" in early and "INV-KW-0301" in late
-    assert "INV-KW-0402" not in late          # paid Apr 8
+    assert "INV-KW-0501" not in late          # paid Apr 8
+    assert "INV-KW-0402" in late              # the moment item, unpaid
 
 
 def test_replaying_an_event_is_a_noop(world):
@@ -50,4 +51,5 @@ def test_dependents_of_moment_fact_is_only_that_invoice(world):
                          invoice_id="INV-KW-0402", valid_from=when, learned_at=when,
                          payload=MOMENT))
     assert r.dependents_of("ev-moment") == ["INV-KW-0402"]
-    assert r.ledger("keyway") and r.reconcile("keyway")["diff"] == 0
+    rec = r.reconcile("keyway")
+    assert r.ledger("keyway") and rec["diff"] - rec["duplicate_funded"] == 0    # scenario 8 $320

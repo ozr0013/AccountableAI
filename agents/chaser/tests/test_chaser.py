@@ -51,30 +51,30 @@ def test_paid_reply_without_proof_is_not_proof():
 
 
 def test_not_paid_wording_is_not_a_payment_claim():
-    _, docs = invoice("INV-PT-0201", "peachtree")
-    r = ChaserAgent(None).read_reply("Not paid yet, we are waiting on their W-9.", "peachtree", docs)
+    _, docs = invoice("INV-KW-0201", "keyway")
+    r = ChaserAgent(None).read_reply("Not paid yet, we are waiting on their W-9.", "keyway", docs)
     assert not r.claims_paid
 
 
 def test_proof_found_when_records_show_payment():
-    _, docs = invoice("INV-KW-0402", "keyway")
-    r = ChaserAgent(None).read_reply("Sparkline was paid on 4/8.", "keyway", docs)
-    assert {c.source_id for c in r.proof} >= {"doc-bank-kw-2026-04", "doc-conf-kw-0402"}
+    _, docs = invoice("INV-KW-0501", "keyway")
+    r = ChaserAgent(None).read_reply("AmperPro was paid on 4/8.", "keyway", docs)
+    assert {c.source_id for c in r.proof} >= {"doc-bank-kw-2026-04-s5", "doc-conf-kw-0501"}
 
 
 def test_llm_cannot_offer_the_reply_itself_as_proof():
-    _, docs = invoice("INV-PT-0901", "peachtree")
-    bad = ReplyReading(claims_paid=True, invoice_ids=["INV-PT-0901"],
-                       proof_source_ids=["doc-reply-pt-0901"], summary="Manager says paid.")
+    _, docs = invoice("INV-KW-0901", "keyway")
+    bad = ReplyReading(claims_paid=True, invoice_ids=["INV-KW-0901"],
+                       proof_source_ids=["doc-reply-kw-0901"], summary="Manager says paid.")
     good = bad.model_copy(update={"proof_source_ids": []})
     llm = ScriptedLLM(bad, good)
-    r = ChaserAgent(llm).read_reply("this one was paid last week", "peachtree", docs)
+    r = ChaserAgent(llm).read_reply("this one was paid last week", "keyway", docs)
     assert r.claims_paid and r.proof == [] and "not a bank record" in llm.prompts[1]
 
 
 def test_llm_reads_fuzzy_reply():
-    _, docs = invoice("INV-PT-0901", "peachtree")
-    llm = ScriptedLLM(ReplyReading(claims_paid=False, invoice_ids=["INV-PT-0901"],
+    _, docs = invoice("INV-KW-0901", "keyway")
+    llm = ScriptedLLM(ReplyReading(claims_paid=False, invoice_ids=["INV-KW-0901"],
                                    proof_source_ids=[], summary="Payment is scheduled."))
-    r = ChaserAgent(llm).read_reply("cleared for next week's run", "peachtree", docs)
+    r = ChaserAgent(llm).read_reply("cleared for next week's run", "keyway", docs)
     assert not r.claims_paid                 # rules alone would read "cleared" as paid

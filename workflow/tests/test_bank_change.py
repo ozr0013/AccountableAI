@@ -29,8 +29,8 @@ def test_request_is_held_with_cited_alert(run):
     [r] = [r for r in results if r.route == "bank_change"]
     [alert] = [a for a in WorkflowBook.load(rails).open_alerts()
                if a.draft.kind == AlertKind.bank_detail_change]
-    assert alert.draft.invoice_ids == ["INV-SB-0701"] and alert.draft.amount == 4800.0
-    assert alert.draft.claims[0].citations[0].source_id == "doc-notice-voltwise-bank"
+    assert alert.draft.invoice_ids == ["INV-KW-0701"] and alert.draft.amount == 4800.0
+    assert alert.draft.claims[0].citations[0].source_id == "doc-notice-summit-bank"
     [held] = [e for e in rails.events() if e.type == "bank_change_held"]
     assert held.payload["requires"] == ["identity_verification", "controller_approval"]
     assert held.payload["approval_id"] in approvals.pending()
@@ -55,7 +55,7 @@ def test_agents_cannot_approve_the_change(run):
 def test_judge_console_style_request(run):
     rails, approvals, wf, _ = run
     when = datetime(2026, 4, 25, 12, tzinfo=UTC)
-    ev = Event(id="ev-judge-bank_change-x", type="bank_change_requested", invoice_id="INV-SB-0701",
-               valid_from=when, learned_at=when, payload={"vendor_id": "v-voltwise"})
+    ev = Event(id="ev-judge-bank_change-x", type="bank_change_requested", invoice_id="INV-KW-0701",
+               valid_from=when, learned_at=when, payload={"vendor_id": "v-summit"})
     [r] = wf.replay([ev])
     assert r.route == "bank_change" and any("held pending approval" in t for t in r.trace)
