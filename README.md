@@ -190,9 +190,9 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 - [ ] `workflow/run.py`: `--moment` help text says Apr 1 → Apr 15
 
 **Omar** (`evals/`, `pyproject.toml`):
-- [ ] `evals/answer_key.json` moment: `keep_count` 1 → 2 and update `_doc` (three items, $3,140 → $2,240, receipt Apr 15). Check the scenarios against `world/scenario_spec.json`
-- [ ] `evals/test_harness.py::test_judge_moment` passes once `keep_count` is 2
-- [ ] `pyproject.toml`: add `"world"` to `testpaths`
+- [x] `evals/answer_key.json` moment: `keep_count` 1 → 2 and update `_doc` (three items, $3,140 → $2,240, receipt Apr 15). Check the scenarios against `world/scenario_spec.json`
+- [x] `evals/test_harness.py::test_judge_moment` passes once `keep_count` is 2
+- [x] `pyproject.toml`: add `"world"` to `testpaths`
 
 **Audrey** (`dashboard/`): one manager in the UI; preset id `invoice_received_correction`; demo numbers $3,140 → $2,240.
 
@@ -207,7 +207,7 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 8. [x] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
 9. [x] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
 10. [x] Judge Console backend: presets + free text → events
-11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`. Rails side verified: on the full demo world, `RAILS=real AGENTS=real VERIFIER=fake python -m workflow.run --scenario 1 2 3 4 5 6 7 8 9 --clean 100 --funding keyway:18400` gives the 8 expected alerts and the $3,140 hold; `RAILS=real pytest evals/test_prohibited.py` passes; the workflow's in-memory rails answer exactly like Postgres (parity test). Left: Kanishka and Omar run their flows on `RAILS=real` (load the matching world first: `python -m rails.load --fresh --scenarios … --clean …`) and tick this
+11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`. Rails side verified: on the full demo world, `RAILS=real AGENTS=real VERIFIER=fake python -m workflow.run --scenario 1 2 3 4 5 6 7 8 9 --clean 100 --funding keyway:18400` gives the 8 expected alerts and the $3,140 hold; `RAILS=real pytest evals/test_prohibited.py` passes; the workflow's in-memory rails answer exactly like Postgres (parity test). Omar: done (`python -m evals.harness --rails real`: 9/9 in rules mode; live Sonnet agents + Haiku verifier on Postgres in `evals/results_live_real.md`; `RAILS=real pytest evals/test_prohibited.py` passes). Left: Kanishka runs his flows on `RAILS=real` (load the matching world first: `python -m rails.load --fresh --scenarios … --clean …`) and tick this
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
 1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Scored end to end by `evals/harness.py`. Still to do: Postgres checkpointer (in-memory today)
