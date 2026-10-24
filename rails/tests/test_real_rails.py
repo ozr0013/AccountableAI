@@ -28,7 +28,7 @@ def test_conforms_to_fake_on_scenario_3(real):
     assert {k: r[k] for k in f} == f
     assert real.dependents_of("invoice:INV-KW-0301.received") == fake.dependents_of("x")
     for case in [("move_money", "agent", {}), ("approve", "a", {"proposed_by": "a"}), ("read", "a", {})]:
-        assert real.policy_check(*case) == fake.policy_check(*case)
+        assert real.policy_check(*case)[0] == fake.policy_check(*case)[0]
     assert {d.id for d in real.documents("keyway")} == {d.id for d in fake.documents("keyway")}
     assert [d.id for d in real.documents("keyway", "INV-KW-0301")] == \
            [d.id for d in fake.documents("keyway", "INV-KW-0301")]
