@@ -54,8 +54,16 @@ def inspection_pending(trail: PaymentTrail) -> bool:
 
 
 def paperwork_hold(trail: PaymentTrail) -> bool:
-    return any(e.kind == SourceKind.manager_statement and "hold" in e.claim.lower()
-               and PAPERWORK.search(e.claim) for e in trail.entries)
+    """Held for paperwork, unless the vendor has since supplied it: a hold dated before a
+    vendor's 'paperwork received' no longer explains the money still being unpaid."""
+    holds = [e for e in trail.entries if e.kind == SourceKind.manager_statement
+             and "hold" in e.claim.lower() and PAPERWORK.search(e.claim)]
+    if not holds:
+        return False
+    since = max((e.on for e in holds if e.on), default=None)
+    return not any(e.kind in (SourceKind.vendor_notice, SourceKind.vendor_confirmation)
+                   and "paperwork received" in e.claim
+                   and (since is None or e.on is None or e.on >= since) for e in trail.entries)
 
 
 def hard_facts(line: LedgerLine, trail: PaymentTrail, terms: AgreementTerms) -> dict:

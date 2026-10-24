@@ -117,3 +117,20 @@ def test_llm_cannot_call_a_paperwork_hold_unexplained():
     assert "paperwork pending, not unexplained" in llm.prompts[1]
     f = CauseAgent(ScriptedLLM(bad, bad)).classify_cause(*case("INV-KW-0201", "keyway"))
     assert f.cause == Cause.paperwork_pending                 # rules fallback
+
+
+def test_paperwork_hold_ends_when_the_vendor_supplies_it():
+    """Scenario 2 after the W-9 arrives: the statement's hold no longer explains the unpaid money."""
+    from datetime import date
+
+    from contracts.models import Document, SourceKind
+    line, docs = invoice("INV-KW-0201", "keyway")
+    held = max(d.dated for d in docs if d.kind == SourceKind.manager_statement)
+    w9 = Document(id="doc-w9-0201", kind=SourceKind.vendor_notice, manager_id="keyway",
+                  vendor_id=line.vendor_id, dated=max(held, date(2026, 4, 20)), text="W-9 provided.",
+                  data={"invoice_id": "INV-KW-0201", "status": "paperwork_received"})
+    terms = terms_for(world_rails(), FakeAgents(), "keyway")
+    before = CauseAgent(None).classify_cause(line, TrailAgent(None).build_trail(line, docs), terms)
+    after = CauseAgent(None).classify_cause(line, TrailAgent(None).build_trail(line, docs + [w9]), terms)
+    assert before.cause == Cause.paperwork_pending
+    assert after.cause == Cause.unexplained
