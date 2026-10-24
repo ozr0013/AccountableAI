@@ -3,11 +3,14 @@
 A fact key names one thing an item depends on, e.g. `invoice:INV-1.received` or
 `terms:keyway.vendor_payment_days`. Events set or change facts; items (invoices) depend on them.
 
-`fact_corrected` events overlay a new value onto the original document data (history is never
-edited; the latest `learned_at` wins). Pass events already filtered by the caller for
+`fact_recorded` and `fact_corrected` events overlay a value onto the original document data
+(history is never edited; the latest `learned_at` wins). Pass events already filtered by the caller for
 `known_at` / `current_only` and the overlay respects that automatically.
 
+fact_recorded payload:   {"fact_key": "invoice:INV-1.received", "value": "2026-03-28"}
+                         (a fact read off a document, e.g. a statement line; the source cites it)
 fact_corrected payload:  {"fact_key": "invoice:INV-1.received", "value": "2026-04-01"}
+                         (usually `supersedes` the fact_recorded / fact_corrected it replaces)
 chase_reply payload:     contracts.models.ChaseReply.model_dump(mode="json")
 """
 
@@ -18,12 +21,13 @@ from contracts.models import Event
 INVOICE_ATTRS = ("received", "amount", "inspection", "service_period", "vendor_ref", "funding",
                  "payment")
 TERMS_ATTRS = ("vendor_payment_days", "holdback_pct")
+FACT_TYPES = ("fact_recorded", "fact_corrected")
 
 
 def effective(events: list[Event]) -> list[Event]:
     """Events with fact corrections applied to invoice documents and confirmed terms."""
     patches: dict[str, object] = {}
-    for e in sorted((e for e in events if e.type == "fact_corrected"), key=lambda e: e.learned_at):
+    for e in sorted((e for e in events if e.type in FACT_TYPES), key=lambda e: e.learned_at):
         patches[e.payload["fact_key"]] = e.payload["value"]
     if not patches:
         return events
@@ -55,7 +59,7 @@ def fact_keys(e: Event) -> set[str]:
     """Fact keys this event sets or changes (exact invoice ids only; see DependencyIndex.rebuild
     for payments that the matcher ties to an invoice)."""
     d = e.payload.get("data", {})
-    if e.type == "fact_corrected":
+    if e.type in FACT_TYPES:
         return {e.payload["fact_key"]}
     if e.type == "terms_confirmed":
         return {f"terms:{e.manager_id}.{a}" for a in TERMS_ATTRS}

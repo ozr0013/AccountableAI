@@ -14,12 +14,13 @@ A company pays a middleman, and the middleman is supposed to pay the vendors who
 
 - **Market:** property management, the market of Rently (a named Hyphenate customer). We never say "built for Rently."
 - **Parent company (fictional):** *Oakline Homes*, a rental owner with ~60 homes in 3 states.
-- **Middlemen (fictional):** 3 property managers, *Keyway Property Management*, *Sunbelt Residential*, *Peachtree Rentals*. Oakline sends each one money for repairs and upkeep.
+- **Middleman (fictional):** one property manager, *Keyway Property Management*. Oakline sends it money for repairs and upkeep.
 - **Vendors (fictional):** plumbers, electricians, HVAC, roofers, landscapers, cleaners. The middleman hires them and is supposed to pay them from Oakline's money.
 - **Customer:** Oakline's controller. Today they get a monthly statement from each manager saying "vendors paid" and can't check it against the bank, the vendors and the management agreement.
 - **Seats filled:** *"The accounts payable reviewer who confirms every vendor got paid from the money we sent the middleman, and the collections person who chases the middleman when they didn't."*
 - **The money flow:** Oakline funds the manager → the manager pays the vendor. Our system tracks every vendor invoice from "Oakline funded it" to "vendor confirmed paid." Tenants and rent are out of scope.
-- **The moment:** Oakline is about to send Keyway next month's $18,400 repair funding. The system stops it: *"Keyway still owes 3 vendors $3,140 from March money you already sent. Chased 3 times. Recommend holding $3,140."* A judge plays Keyway and says "we paid the electrician." The system checks: no vendor confirmation, no payment in Keyway's bank records, so it **holds its position and shows why**. Then the judge adds one real fact: the electrician's invoice only arrived Apr 1, and the agreement gives Keyway 10 days. The system rechecks only that item, **withdraws that one alert and explains why**, and keeps the other two.
+- **The moment:** Oakline is about to send Keyway next month's $18,400 repair funding. The system stops it: *"Keyway still owes 3 vendors $3,140 from March money you already sent. Chased 3 times. Recommend holding $3,140."* A judge plays Keyway and says "we paid the electrician." The system checks: no vendor confirmation, no payment in Keyway's bank records, so it **holds its position and shows why**. Then the judge adds one real fact: the electrician's invoice only arrived Apr 15, and the agreement gives Keyway 10 days. The system rechecks only that item, **withdraws that one alert and explains why**, and keeps the other two.
+- **Demo date:** Apr 22, 2026.
 
 ---
 
@@ -28,7 +29,7 @@ A company pays a middleman, and the middleman is supposed to pay the vendors who
 | Hard part | How we answer it | Proven by |
 |---|---|---|
 | **Sources that disagree** | Middleman says "paid," vendor says "not received," bank shows no payment; source-trust rules pick the winner and say why | Scenarios 3, 9 |
-| **Time** (March changes June) | A middleman late in March gets flagged sooner and held to stricter terms in June; precedents; selective recheck on corrected facts | Scenario 4, the moment |
+| **Time** (late in Jan to Mar changes how April is handled) | A middleman late in Jan to Mar gets flagged sooner and held to stricter terms in April; precedents; selective recheck on corrected facts | Scenario 4, the moment |
 | **Working with others** | Agents chase the middleman, wait for replies, escalate when ignored; controller approves holds and can decline | Scenarios 2, 3, 6 |
 | **Limits** | No money-moving tool; agents recommend a hold, only the controller holds; proposer can't approve; vendor bank-detail change held | Scenario 7 |
 | **Explainable and accountable** | Every alert cites the funding record, the vendor's evidence and the agreement clause; verifier blocks uncited claims | "Why" trace, 100% cited |
@@ -65,7 +66,7 @@ Models: Haiku for fuzzy matching, Sonnet for agreement / trail / cause / chaser 
 | 1 | Oakline funded a $2,000 roof repair; manager holds 10% until inspection passes, as the agreement allows | Authorized hold. **No alert** |
 | 2 | Vendor unpaid because their W-9 / invoice is missing | Paperwork pending. Draft request for the missing document |
 | 3 | Statement says plumber paid Mar 10; plumber's Apr 20 past-due notice says unpaid; manager's bank shows no payment | Sources disagree. Bank + vendor beat the statement. **Unexplained alert** citing all three; chaser starts |
-| 4 | One manager pays vendors late 4 of 6 months; others on time | Recurring-pattern alert with history; recommend stricter terms |
+| 4 | Keyway pays vendors past its agreement's payment window in 3 of 4 months (Jan to Apr 2026) | Recurring-pattern alert with history; recommend stricter terms |
 | 5 | Electrician paid Apr 8; invoice arrived Apr 1 (agreement: pay within 10 days of invoice) | Vendor-side, on time under the terms. **No alert on the manager** |
 | 6 | HVAC replacement over approval limit unpaid because Oakline never funded it | Owner-side. **No alert on the manager**; flag Oakline's pending approval |
 | 7 | Vendor asks to change bank details before a large payment | Hold for identity verification and controller approval |
@@ -140,7 +141,7 @@ Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
-2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (built: Oakline, 3 managers, 40 vendors, all 9 scenarios; 6 months of history for Sunbelt and Peachtree, Keyway from Jan 2026 to match the sample fixture)
+2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (built: Oakline, one middleman (Keyway), 20 vendors, all 9 scenarios and the moment, Jan to Apr 2026; every planted item in `world/scenario_spec.json`)
 3. [x] Funding ledger: per manager and vendor invoice, amount Oakline funded, amount paid to the vendor, due date (from confirmed terms)
 4. [x] Matcher: vendor payments in the manager's bank records vs statement lines vs vendor confirmations; duplicate detection (scenario 8)
 5. [x] Source-trust rules (bank > manager statement; vendor confirmation > manager "paid" claim)

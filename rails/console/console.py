@@ -1,11 +1,13 @@
 """Judge Console backend: presets and free text become events.
 
-A judge injects one real fact ("the electrician's invoice arrived Apr 1"); this turns it into
+A judge injects one real fact ("the electrician's invoice arrived Apr 15"); this turns it into
 an append-only event and reports which items depend on it (`dependents_of`) so the workflow
 rechecks only those. Free text goes through a constrained deterministic parser. If the text
 doesn't map cleanly onto a known event, it is rejected with suggestions. Never guessed.
 
 Events are deterministic in their ids, so clicking the same preset twice is a no-op.
+Works on any Rails (RealRails over Postgres, or the workflow's in-memory MemoryRails): it only
+uses the protocol's events / append_event / dependents_of / ledger / now.
 """
 
 from __future__ import annotations
@@ -14,12 +16,13 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 
 from contracts.models import Citation, Document, Event, SourceKind
 
 from ..docs import documents_from_events
 from ..events.ingest import document_event
+from ..facts import FACT_TYPES, current_terms
 
 
 class ConsoleError(ValueError):
@@ -38,21 +41,22 @@ class Preset:
 
 
 PRESETS = [
-    Preset("invoice_arrived", "Invoice actually arrived on a date",
-           "Corrects the receipt date of one invoice; the payment deadline moves with it.",
+    Preset("invoice_received_correction", "Invoice was actually received on a date",
+           "Supersedes the recorded receipt date of one invoice; its payment deadline moves "
+           "with it. Default: the Sparkline electrician invoice arrived Apr 15, not Mar 28.",
            {"invoice_id": "invoice id", "date": "YYYY-MM-DD"},
-           {"invoice_id": "INV-KW-0402", "date": "2026-04-01"}),
+           {"invoice_id": "INV-KW-0402", "date": "2026-04-15"}),
     Preset("manager_replies_paid", "Manager replies \"paid\"",
            "Reply to a chase claiming payment, with no proof attached.",
            {"invoice_id": "invoice id"}, {"invoice_id": "INV-KW-0301"}),
     Preset("vendor_confirms_paid", "Vendor confirms it was paid",
            "The vendor says it received the money.",
            {"invoice_id": "invoice id", "paid_on": "YYYY-MM-DD"},
-           {"invoice_id": "INV-KW-0301", "paid_on": "2026-04-24"}),
+           {"invoice_id": "INV-KW-0301", "paid_on": "2026-04-22"}),
     Preset("bank_shows_payment", "Bank record shows the payment",
            "The manager's bank records show an outgoing payment to the vendor.",
            {"invoice_id": "invoice id", "on": "YYYY-MM-DD"},
-           {"invoice_id": "INV-KW-0301", "on": "2026-04-24"}),
+           {"invoice_id": "INV-KW-0301", "on": "2026-04-22"}),
     Preset("terms_changed", "Agreement payment window corrected",
            "Corrects the vendor payment window (days) in the confirmed terms.",
            {"manager_id": "manager id", "days": "number of days"},
@@ -60,7 +64,7 @@ PRESETS = [
     Preset("vendor_requests_bank_change", "Vendor asks to change bank details",
            "Held for identity verification and controller approval.",
            {"vendor_id": "vendor id", "invoice_id": "invoice id (optional)"},
-           {"vendor_id": "v-voltwise", "invoice_id": "INV-SB-0701"}),
+           {"vendor_id": "v-summit", "invoice_id": "INV-KW-0701"}),
 ]
 _BY_ID = {p.id: p for p in PRESETS}
 
@@ -104,17 +108,27 @@ class JudgeConsole:
     def now(self) -> datetime:
         return datetime.combine(self.rails.now(), time(12), tzinfo=timezone.utc)
 
+    def _current(self) -> list[Event]:
+        evs = self.rails.events()
+        replaced = {e.supersedes for e in evs if e.supersedes}
+        return [e for e in evs if e.id not in replaced]
+
+    def _get(self, event_id: str) -> Event | None:
+        return next((e for e in self.rails.events() if e.id == event_id), None)
+
     def invoices(self) -> list[Document]:
-        return [d for d in documents_from_events(self.rails.store.events(current_only=True))
+        return [d for d in documents_from_events(self._current())
                 if d.kind == SourceKind.vendor_invoice]
 
+    def _registered(self, kind: str) -> dict[str, dict]:
+        return {e.payload["id"]: e.payload for e in self.rails.events()
+                if e.type == "entity_registered" and e.payload.get("kind") == kind}
+
     def vendors(self) -> dict[str, dict]:
-        return {e.payload["id"]: e.payload for e in self.rails.store.events(type="entity_registered")
-                if e.payload.get("kind") == "vendor"}
+        return self._registered("vendor")
 
     def managers(self) -> dict[str, dict]:
-        return {e.payload["id"]: e.payload for e in self.rails.store.events(type="entity_registered")
-                if e.payload.get("kind") == "manager"}
+        return self._registered("manager")
 
     def invoice(self, invoice_id: str) -> Document:
         for d in self.invoices():
@@ -149,23 +163,33 @@ class JudgeConsole:
 
     def _correction(self, eid: str, fact_key: str, value, manager_id, invoice_id,
                     valid_from: datetime) -> Event:
-        """New fact_corrected event; supersedes an earlier correction of the same fact."""
-        same = [e for e in self.rails.store.events(type="fact_corrected", current_only=True)
-                if e.payload["fact_key"] == fact_key and e.id != eid]
+        """New fact_corrected event; supersedes the current event that set the same fact (a
+        fact_recorded read off a document, or an earlier correction)."""
+        same = sorted((e for e in self._current() if e.type in FACT_TYPES
+                       and e.payload["fact_key"] == fact_key and e.id != eid),
+                      key=lambda e: e.learned_at)
         return Event(id=eid, type="fact_corrected", manager_id=manager_id, invoice_id=invoice_id,
                      valid_from=valid_from, learned_at=self.now(),
                      supersedes=same[-1].id if same else None,
                      payload={"fact_key": fact_key, "value": value}, source=self._source(eid))
 
     # -- presets --------------------------------------------------------------------------
-    def _invoice_arrived(self, p):
-        inv = self.invoice(p["invoice_id"])
+    def _invoice_received_correction(self, p):
+        iid = p["invoice_id"]
+        inv = self.invoice(iid)
         day = self._date(p["date"], "date")
-        eid = self._eid("invoice_arrived", {"i": p["invoice_id"], "d": day.isoformat()})
-        ev = self.rails.store.get(eid) or self._correction(
-            eid, f"invoice:{p['invoice_id']}.received", day.isoformat(), inv.manager_id,
-            p["invoice_id"], datetime.combine(day, time.min, tzinfo=timezone.utc))
-        return [ev], f"{p['invoice_id']} arrived {day:%b} {day.day}; its payment deadline moves with it."
+        line = next((l for l in self.rails.ledger(inv.manager_id) if l.invoice_id == iid), None)
+        eid = self._eid("invoice_received_correction", {"i": iid, "d": day.isoformat()})
+        ev = self._get(eid) or self._correction(
+            eid, f"invoice:{iid}.received", day.isoformat(), inv.manager_id, iid,
+            datetime.combine(day, time.min, tzinfo=timezone.utc))
+        window = current_terms(self._current()).get(inv.manager_id, {}).get("vendor_payment_days")
+        was = (f", not {line.invoice_received:%b} {line.invoice_received.day}"
+               if line and line.invoice_received and line.invoice_received != day else "")
+        new_due = day + timedelta(days=int(window)) if window else None
+        due = f"; due {new_due:%b} {new_due.day} under the {window}-day window" if new_due else ""
+        amount = f" (${inv.data['amount']:,.2f})"
+        return [ev], f"{iid}{amount} was received {day:%b} {day.day}{was}{due}."
 
     def _terms_changed(self, p):
         if p["manager_id"] not in self.managers():
@@ -175,7 +199,7 @@ class JudgeConsole:
         except ValueError:
             raise ConsoleError(f"days must be a whole number, got {p['days']!r}") from None
         eid = self._eid("terms_changed", {"m": p["manager_id"], "d": days})
-        ev = self.rails.store.get(eid) or self._correction(
+        ev = self._get(eid) or self._correction(
             eid, f"terms:{p['manager_id']}.vendor_payment_days", days, p["manager_id"], None,
             self.now())
         return [ev], f"{p['manager_id']} payment window is now {days} days."

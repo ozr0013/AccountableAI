@@ -14,10 +14,10 @@ _DATE = re.compile(
     r"|(?P<m2>\d{1,2})/(?P<d2>\d{1,2})")
 
 EXAMPLES = [
-    "The electrician's invoice arrived Apr 1",
+    "The electrician's invoice arrived Apr 15",
     "Keyway says they paid the electrician",
     "Rio Grande Plumbing confirmed they were paid",
-    "Sparkline Electric asks to change bank details",
+    "Summit Heating & Air asks to change bank details",
 ]
 
 
@@ -51,7 +51,7 @@ def _resolve_invoice(text: str, c: JudgeConsole, manager_id: str | None,
     hit = {v for v, info in vendors.items()
            if info["name"].lower() in low or info["trade"] in low}
     cands = [d for d in invs if d.vendor_id in hit and (scope is None or d.manager_id == scope)]
-    if len(cands) > 1 and prefer_open:      # a "paid" claim is only about something still open
+    if len(cands) > 1 and prefer_open:      # a "paid" claim or a receipt-date fix is about an open item
         still_open = {l.invoice_id for m in {d.manager_id for d in cands}
                       for l in c.rails.ledger(m) if l.paid_amount < l.amount}
         cands = [d for d in cands if d.data["invoice_id"] in still_open] or cands
@@ -80,8 +80,9 @@ def parse(text: str, c: JudgeConsole, manager_id: str | None = None) -> tuple[st
         when = parse_date(text, c.rails.now().year)
         if not when:
             raise ConsoleError("I need the date it arrived (e.g. Apr 1 or 2026-04-01)", EXAMPLES)
-        return "invoice_arrived", {"invoice_id": _resolve_invoice(text, c, manager_id),
-                                   "date": when.isoformat()}
+        return "invoice_received_correction", {
+            "invoice_id": _resolve_invoice(text, c, manager_id, prefer_open=True),
+            "date": when.isoformat()}
 
     if re.search(r"\b(vendor|they|it)\b.*\b(confirm\w*)\b.*\bpaid\b|\bconfirm\w*\b.*\bpaid\b", low):
         when = parse_date(text, c.rails.now().year)
