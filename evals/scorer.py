@@ -150,13 +150,18 @@ def score(run: RunResult, key: dict | None = None) -> Score:
     return Score(system=run.system, scenarios=scores, metrics=metrics, failures=failures)
 
 
-def _fmt(v) -> str:
+_RATIOS = {"cause_accuracy", "alert_precision", "alert_recall", "citation_rate"}
+
+
+def _fmt(name: str, v) -> str:
     if v is None:
         return "n/a"
     if isinstance(v, bool):
         return "yes" if v else "NO"
-    if isinstance(v, float) and 0 <= v <= 1:
+    if name in _RATIOS:
         return f"{v:.0%}"
+    if name == "cost_usd":
+        return f"${v:.4f}"
     return str(v)
 
 
@@ -166,7 +171,7 @@ def to_markdown(scores: list[Score]) -> str:
              "| Metric | " + " | ".join(s.system for s in scores) + " |",
              "|---|" + "---|" * len(scores)]
     for n in names:
-        lines.append(f"| {n} | " + " | ".join(_fmt(s.metrics[n]) for s in scores) + " |")
+        lines.append(f"| {n} | " + " | ".join(_fmt(n, s.metrics[n]) for s in scores) + " |")
     for s in scores:
         lines += ["", f"## Failures: {s.system}", ""]
         lines += [f"- {f}" for f in s.failures] or ["- none"]
