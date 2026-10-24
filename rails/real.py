@@ -36,13 +36,16 @@ class RealRails:
 
     # -- time -----------------------------------------------------------------------------
     def now(self) -> date:
-        """The world's "today": WORLD_AS_OF, else the world_meta event, else the newest event.
-        Never the wall clock, so demos and evals are reproducible."""
+        """The world's "today": WORLD_AS_OF, else the latest `clock_advanced` event or the
+        world_meta date (whichever is later), else the newest event. Never the wall clock, so
+        demos and evals are reproducible. Time only moves forward."""
         if env := os.getenv("WORLD_AS_OF"):
             return date.fromisoformat(env)
         meta = self.store.events(type="world_meta")
         if meta:
-            return date.fromisoformat(meta[-1].payload["as_of"])
+            days = [date.fromisoformat(e.payload["as_of"])
+                    for e in meta + self.store.events(type="clock_advanced")]
+            return max(days)
         evs = self.store.events()
         return max((e.valid_from.date() for e in evs), default=date(2026, 1, 1))
 
