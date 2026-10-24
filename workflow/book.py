@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass, field
+from datetime import datetime
 
 from contracts.models import Alert, ChaseMessage, Event
 
@@ -44,6 +45,7 @@ def done_event(trigger: Event, summary: dict) -> Event:
 @dataclass
 class WorkflowBook:
     processed: set[str] = field(default_factory=set)
+    clock: datetime | None = None          # latest moment the workflow has already acted on
     alerts: dict[str, Alert] = field(default_factory=dict)          # every alert ever raised
     open_ids: set[str] = field(default_factory=set)
     chases: dict[str, list[ChaseMessage]] = field(default_factory=dict)  # manager -> sent, oldest first
@@ -57,6 +59,7 @@ class WorkflowBook:
             p = e.payload
             if e.type == "workflow_done":
                 book.processed.add(p["trigger"])
+                book.clock = max(book.clock or e.learned_at, e.learned_at)
             elif e.type == "alert_raised":
                 a = Alert(**{k: p[k] for k in ("draft", "verdict", "state", "withdrawn_reason")})
                 book.alerts[a.draft.id] = a
