@@ -69,6 +69,20 @@ class SpacetimeMirror:
     def call(self, reducer: str, args: list) -> None:
         _post("call/" + reducer, args, self.token)
 
+    def query(self, sql: str) -> list[dict]:
+        """Rows as dicts; option columns come back as the value or None."""
+        out = []
+        for result in json.loads(_post("sql", sql.encode(), self.token, "text/plain")):
+            cols = result["schema"]["elements"]
+            names = [c["name"]["some"] for c in cols]
+            optional = ["Sum" in c["algebraic_type"] and
+                        [v["name"]["some"] for v in c["algebraic_type"]["Sum"]["variants"]]
+                        == ["some", "none"] for c in cols]
+            for row in result["rows"]:
+                out.append({n: (v[1] if v[0] == 0 else None) if opt else v
+                            for n, v, opt in zip(names, row, optional, strict=True)})
+        return out
+
 
 def _iso(value) -> str | None:
     return value.isoformat() if value is not None else None

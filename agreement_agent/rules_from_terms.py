@@ -115,5 +115,15 @@ def rules_for(review: Review) -> list[dict]:
             label = f.label if f else name
             rules.append(_rule(review, f, "hold_payment", {"term": name},
                                f"{label} is {f.status if f else 'missing'}: hold payment until "
-                               "the owner receives it.", "blocking"))
+                               "the controller confirms it.", "blocking"))
+    if any(r["status"] == "blocking" for r in rules):
+        # Nothing from an incomplete agreement is relied on until the controller confirms it.
+        rules = [{**r, "status": "pending_controller"} if r["status"] == "active" else r
+                 for r in rules]
     return rules
+
+
+def agreement_status(review: Review, rules: list[dict]) -> str:
+    if review.kind != "agreement":
+        return "not_agreement"
+    return "needs_controller" if any(r["status"] == "blocking" for r in rules) else "active"

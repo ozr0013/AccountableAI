@@ -91,6 +91,9 @@ const spacetimedb = schema({
       steps: t.string(),
       mode: t.string(),
       costUsd: t.f64(),
+      status: t.string(),
+      confirmedBy: t.option(t.string()),
+      controllerNote: t.option(t.string()),
       reviewedAt: t.timestamp(),
     }
   ),
@@ -259,6 +262,9 @@ export const saveAgreement = spacetimedb.reducer(
     steps: t.string(),
     mode: t.string(),
     costUsd: t.f64(),
+    status: t.string(),
+    confirmedBy: t.option(t.string()),
+    controllerNote: t.option(t.string()),
   },
   (ctx, args) => {
     requireWriter(ctx);
@@ -272,6 +278,8 @@ export const saveAgreement = spacetimedb.reducer(
       effectiveDate: args.effectiveDate ?? undefined,
       escalationSubject: args.escalationSubject ?? undefined,
       escalationBody: args.escalationBody ?? undefined,
+      confirmedBy: args.confirmedBy ?? undefined,
+      controllerNote: args.controllerNote ?? undefined,
       reviewedAt: ctx.timestamp,
     };
     if (ctx.db.agreement.docId.find(args.docId)) {

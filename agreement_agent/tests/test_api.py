@@ -15,7 +15,7 @@ SAVED = []
 @pytest.fixture(autouse=True)
 def _no_spacetime(monkeypatch):
     SAVED.clear()
-    monkeypatch.setattr(api, "save", lambda r, rules: SAVED.append(api.agreement_row(r)))
+    monkeypatch.setattr(api, "save", lambda r, rules, status, *a: SAVED.append(api.agreement_row(r, status)))
 
 
 def _upload(name, data, mime):

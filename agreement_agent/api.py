@@ -10,22 +10,33 @@ POST /review  (multipart file; Claude drives the tools, about $0.03 per document
 Each review is saved to SpacetimeDB's `agreement` table (one row per document, replaced on a
 re-review), and the rules derived from it (agreement_agent/rules_from_terms.py) to
 `agreement_rule`. The file itself is not stored; the escalation stays a draft, never sent.
+
+A complete agreement's rules go active. An incomplete one waits as `needs_controller`; only a
+controller (Authorization: Bearer $CONTROLLER_API_TOKEN) can then confirm it by supplying the
+missing terms, or reject it:
+    GET  /agreements, GET /agreements/{doc_id}
+    POST /agreements/{doc_id}/confirm  {"values": {"payment_due": "...", ...}, "note": "..."}
+    POST /agreements/{doc_id}/reject   {"note": "..."}
 """
 from __future__ import annotations
 
+import hmac
 import json
 import logging
 import os
+import re
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
+from pydantic import BaseModel, ConfigDict, Field
 
 from .graph import review
 from .models import Review, SourceDoc
-from .rules_from_terms import rules_for
+from .controller import ControllerError, confirm, reject
+from .rules_from_terms import agreement_status, rules_for
 
 log = logging.getLogger(__name__)
 
@@ -46,7 +57,8 @@ def _opt(value: str | None) -> dict:
     return {"none": []} if value is None else {"some": value}
 
 
-def agreement_row(r: Review) -> list:
+def agreement_row(r: Review, status: str, confirmed_by: str | None = None,
+                  note: str | None = None) -> list:
     """Reducer arguments for save_agreement, in the module's order."""
     by = {f.name: f for f in r.fields}
 
@@ -61,7 +73,7 @@ def agreement_row(r: Review) -> list:
             [f.name for f in r.fields if f.status != "found"],
             _opt(esc.subject if esc else None), _opt(esc.body if esc else None),
             json.dumps([f.model_dump(mode="json") for f in r.fields]), json.dumps(r.steps),
-            r.mode, float(r.cost_usd)]
+            r.mode, float(r.cost_usd), status, _opt(confirmed_by), _opt(note)]
 
 
 def rule_rows(r: Review, rules: list[dict]) -> list:
@@ -75,12 +87,17 @@ def rule_rows(r: Review, rules: list[dict]) -> list:
                                 "location": _opt(x["location"])} for x in rules]]
 
 
-def save(r: Review, rules: list[dict]) -> str | None:
-    """Save the agreement and its rules to SpacetimeDB. Returns an error message, or None."""
+def _mirror():
     from rails.live.spacetime import SpacetimeMirror
+    return SpacetimeMirror()
+
+
+def save(r: Review, rules: list[dict], status: str, confirmed_by: str | None = None,
+         note: str | None = None) -> str | None:
+    """Save the agreement and its rules to SpacetimeDB. Returns an error message, or None."""
     try:
-        mirror = SpacetimeMirror()
-        mirror.call("save_agreement", agreement_row(r))
+        mirror = _mirror()
+        mirror.call("save_agreement", agreement_row(r, status, confirmed_by, note))
         if r.kind == "agreement":
             mirror.call("set_agreement_rules", rule_rows(r, rules))
         return None
@@ -107,9 +124,96 @@ async def review_document(file: UploadFile = File(...),
                     received_at=datetime.now(UTC))
     result = review(doc, use_model=model)
     rules = rules_for(result)
-    error = save(result, rules)
-    return {"review": result.model_dump(mode="json"), "rules": rules,
+    status = agreement_status(result, rules)
+    error = save(result, rules, status)
+    return {"review": result.model_dump(mode="json"), "status": status, "rules": rules,
             "saved_to_spacetime": error is None, "save_error": error}
+
+
+# -- controller sign-off -----------------------------------------------------------------
+
+_DOC_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def controller(authorization: str | None = Header(default=None)) -> str:
+    expected = os.getenv("CONTROLLER_API_TOKEN")
+    if not expected:
+        raise HTTPException(503, "controller sign-off is not configured (CONTROLLER_API_TOKEN)")
+    if authorization is None or not hmac.compare_digest(authorization.encode(),
+                                                        f"Bearer {expected}".encode()):
+        raise HTTPException(401, "controller token required")
+    return os.getenv("CONTROLLER_ID", "controller")
+
+
+class ConfirmIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    values: dict[str, str] = Field(description="missing required term -> the controller's value")
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class RejectIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    note: str = Field(min_length=1, max_length=1000)
+
+
+def _load(doc_id: str) -> tuple[dict, list[dict]]:
+    if not _DOC_ID.match(doc_id):
+        raise HTTPException(422, "invalid doc_id")
+    mirror = _mirror()
+    rows = mirror.query(f"SELECT * FROM agreement WHERE doc_id = '{doc_id}'")
+    if not rows:
+        raise HTTPException(404, "agreement not found")
+    rules = [{"rule_id": r["rule_id"], "rule_type": r["rule_type"], "params": json.loads(r["params"]),
+              "check": r["check"], "status": r["status"], "source_quote": r["source_quote"],
+              "location": r["location"]}
+             for r in mirror.query(f"SELECT * FROM agreement_rule WHERE doc_id = '{doc_id}'")]
+    return rows[0], rules
+
+
+def _public(row: dict, rules: list[dict]) -> dict:
+    keep = ("doc_id", "filename", "kind", "status", "vendor_name", "payment_due", "payment_amount",
+            "payment_info", "complete", "missing", "escalation_subject", "confirmed_by",
+            "controller_note")
+    return {**{k: row.get(k) for k in keep}, "rules": rules}
+
+
+@app.get("/agreements")
+def list_agreements() -> list[dict]:
+    rows = _mirror().query("SELECT * FROM agreement")
+    return [_public(r, []) for r in rows]
+
+
+@app.get("/agreements/{doc_id}")
+def get_agreement(doc_id: str) -> dict:
+    return _public(*_load(doc_id))
+
+
+def _decide(doc_id: str, decide) -> dict:
+    row, rules = _load(doc_id)
+    try:
+        result, new_rules, status, note, by = decide(row, rules)
+    except ControllerError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    error = save(result, new_rules, status, by, note)
+    if error:
+        raise HTTPException(502, f"not saved to SpacetimeDB: {error}")
+    return _public(*_load(doc_id))
+
+
+@app.post("/agreements/{doc_id}/confirm")
+def confirm_agreement(doc_id: str, body: ConfirmIn, by: str = Depends(controller)) -> dict:
+    def decide(row, _rules):
+        result, rules = confirm(row, body.values, by, body.note)
+        return result, rules, "confirmed", body.note, by
+    return _decide(doc_id, decide)
+
+
+@app.post("/agreements/{doc_id}/reject")
+def reject_agreement(doc_id: str, body: RejectIn, by: str = Depends(controller)) -> dict:
+    def decide(row, rules):
+        result, rules = reject(row, rules, by)
+        return result, rules, "rejected", body.note, by
+    return _decide(doc_id, decide)
 
 
 def main() -> None:
