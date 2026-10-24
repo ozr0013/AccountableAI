@@ -133,10 +133,10 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 | Shared | Phase 0 | `contracts/` (models, step signatures, registry, stand-ins, scenario 3 fixture), `docker-compose.yml`, `.env.example`, `pyproject.toml` |
 | Aaryan | 10 / 10 before Checkpoint A | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (all 9 scenarios, 40 vendors) |
 | Omar | 4 / 6 before Checkpoint B | answer key, verifier, scorer + `evals.run`, prohibited-action tests (pass against the fakes and the real policy gate) |
-| Kanishka | 0 / 7 | not started in the repo; workflow is LangGraph |
+| Kanishka | 3 / 7 | `workflow/` (LangGraph graph, runner, replay), payment-trail agent, delay-cause agent (LLM with rules fallback) |
 | Audrey | 0 / 8 | not started in the repo |
 
-Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the first live verifier run, and the workflow (it blocks Checkpoint A).
+Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the first live verifier run, the agreement / chaser / case agents, and an adapter from the workflow's output to the scorer's `RunResult`.
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
@@ -152,10 +152,10 @@ Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the
 11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
-1. [ ] Deterministic workflow (LangGraph, Postgres checkpointer): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first); reports results in the `evals/schema.py` `RunResult` shape
+1. [x] Deterministic workflow (LangGraph): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first). Still to do: Postgres checkpointer (in-memory today) and an adapter to the scorer's `evals/schema.py` `RunResult`
 2. [ ] Agreement agent: term sheets (vendor payment deadline, holdback rules, approval limit, allowed charges) with clause citations; human-confirm step
-3. [ ] Payment-trail agent: one timeline per item, conflicts resolved by source-trust rules (scenario 3)
-4. [ ] Delay-cause agent: five causes with evidence and confidence (scenarios 1, 5, 6 must produce no manager alert)
+3. [x] Payment-trail agent: one timeline per item, conflicts resolved by source-trust rules (scenario 3)
+4. [x] Delay-cause agent: five causes with evidence and confidence (scenarios 1, 5, 6 must produce no manager alert)
 5. [ ] Chaser agent: reminders to the middleman (polite, then firmer) from approved templates, logs replies; a "paid" reply counts only with vendor or bank proof (scenario 9)
 5b. [ ] Case agent: evidence pack and proposed hold amount for the controller
 6. [ ] Bank-detail change path (scenario 7)
