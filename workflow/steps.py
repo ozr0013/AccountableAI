@@ -24,7 +24,7 @@ from contracts.models import (
 )
 from contracts.steps import Agents, Approvals, Rails, Verifier
 
-from .book import WF_TYPES, WorkflowBook, alert_id, done_event, wf_event
+from .book import WF_TYPES, WorkflowBook, alert_id, digest, done_event, wf_event
 from .state import Assessment, Route, WorkflowState
 from .terms import terms_for
 
@@ -244,11 +244,17 @@ class Steps:
 
     # -- chase: approved-template reminder, gated by policy --------------------------------
     def chase(self, s: WorkflowState) -> dict:
+        """Remind on newly raised unexplained items; on a scan, follow up on every open one.
+        Level and timing come from the approved schedule; the policy gate has the last word."""
         book = WorkflowBook.load(self.d.rails)
+        wanted = set(s.raised)
+        if s.route == Route.scan:
+            wanted |= {a.draft.id for a in book.open_alerts(s.manager_id)}
         by_mgr: dict[str, list] = {}
-        for aid in s.raised:
+        for aid in sorted(wanted):
             a = book.alerts[aid]
-            if a.draft.kind == AlertKind.unexplained_unpaid and a.draft.amount > 0:
+            if aid in book.open_ids and a.draft.kind == AlertKind.unexplained_unpaid \
+                    and a.draft.amount > 0:
                 by_mgr.setdefault(a.draft.manager_id, []).append(a)
         sent, notes = [], []
         for mgr, alerts in sorted(by_mgr.items()):
@@ -258,23 +264,36 @@ class Steps:
             ok, why = self.d.rails.policy_check("send_chase", "chaser", {
                 "template_id": msg.template_id, "prior_levels": [p.level for p in prior],
                 "days_since_last": (s.now - last).days if last else None})
+            if not ok and ("off schedule" in why or "already sent" in why):
+                notes.append(f"{mgr}: next reminder not due yet ({why})")
+                continue
             key = f"{mgr}|{msg.template_id}|{','.join(sorted(msg.invoice_ids))}"
-            msg = msg.model_copy(update={"id": f"chase-{wf_event('x', key, s.event, {}).id[-12:]}",
+            msg = msg.model_copy(update={"id": f"chase-{digest(key, s.event.id)}",
                                          "sent_at": s.event.learned_at if ok else None})
-            kind = "chase_sent" if ok else "chase_held"
-            self.d.rails.append_event(wf_event(kind, key, s.event,
-                                               {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
+            self.d.rails.append_event(wf_event(
+                "chase_sent" if ok else "chase_held", key, s.event,
+                {"chase": msg.model_dump(mode="json"), "policy": why}, mgr))
             sent.append(msg.id)
             notes.append(f"{mgr}: {msg.level} reminder {'sent' if ok else 'held: ' + why}")
         return {"chases": sent, "trace": notes}
 
-    # -- reply: read it, then reassess the invoices it covers ------------------------------
+    # -- reply: read it (proof only from bank/vendor records), then reassess ---------------
     def read_reply(self, s: WorkflowState) -> dict:
         p = s.event.payload
-        docs = self._evidence(s.manager_id, s.invoice_ids, None)
+        docs = self._evidence(s.manager_id, s.invoice_ids, s.now)
         reply = self.d.agents.read_reply(p.get("text", ""), s.manager_id, docs)
-        proof = "with proof" if reply.proof else "no vendor or bank proof"
-        return {"trace": [f"reply read: claims_paid={reply.claims_paid}, {proof}"]}
+        if not reply.claims_paid:
+            verdict = "reply does not claim payment"
+        elif reply.proof:
+            verdict = "payment claim backed by " + ", ".join(c.source_id for c in reply.proof)
+        else:
+            verdict = "holding position: reply claims payment with no vendor or bank proof"
+        self.d.rails.append_event(wf_event(
+            "reply_read", s.event.id, s.event,
+            {"reply": reply.model_dump(mode="json", exclude={"received_at"}), "verdict": verdict},
+            s.manager_id, (reply.invoice_ids or [None])[0]))
+        ids = sorted(set(s.invoice_ids) | set(reply.invoice_ids))
+        return {"invoice_ids": ids, "trace": [f"reply read: {verdict}"]}
 
     # -- not built yet (README tasks 2, 5b, 6) ---------------------------------------------
     def pending(self, s: WorkflowState) -> dict:
