@@ -30,6 +30,7 @@ from contracts.models import (
 from contracts.steps import Agents, Approvals, Rails, Verifier
 from rails.facts import current_terms
 
+from . import patterns
 from .book import WF_TYPES, WorkflowBook, alert_id, digest, done_event, wf_event
 from .state import Assessment, Route, WorkflowState
 from .terms import terms_for
@@ -184,12 +185,34 @@ class Steps:
 
     # -- alerts: draft (code) -> verifier -> record ----------------------------------------
     def draft_alerts(self, s: WorkflowState) -> dict:
-        drafts = []
+        """Item alerts from causes; duplicate-billing alerts; on a scan, the manager's
+        recurring-lateness pattern. A manager with an open pattern alert gets no separate
+        alerts for individual late-but-paid invoices (the pattern covers them)."""
+        book = WorkflowBook.load(self.d.rails)
+        patterned = {a.draft.manager_id for a in book.open_alerts()
+                     if a.draft.kind == AlertKind.recurring_pattern}
+        drafts: list[AlertDraft] = []
+        pattern = None
+        if s.route == Route.scan and s.manager_id:
+            terms = terms_for(self.d.rails, self.d.agents, s.manager_id)
+            pattern = patterns.pattern_draft(self.d.rails, s.manager_id, s.now, terms)
+            if pattern:
+                drafts.append(pattern)
+                patterned.add(s.manager_id)
+            else:
+                patterned.discard(s.manager_id)
         for a in s.assessments:
+            if a.status == "skipped" and a.note.startswith("duplicate of"):
+                if (line := self._line(a.invoice_id)) and (d := patterns.duplicate_draft(self.d.rails, line)):
+                    drafts.append(d)
+                continue
             kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding and a.status == "delayed" else None
             if kind is None:
                 continue
-            drafts.append(self._draft(a, kind))
+            draft = self._draft(a, kind)
+            if draft.amount == 0 and a.manager_id in patterned:
+                continue                            # late-but-paid: covered by the pattern alert
+            drafts.append(draft)
         return {"drafts": drafts, "trace": [f"draft {d.id} ({d.kind.value})" for d in drafts]}
 
     def _draft(self, a: Assessment, kind: AlertKind) -> AlertDraft:
@@ -243,6 +266,7 @@ class Steps:
             notes.append(f"{draft.id}: verifier {verdict.status.value}"
                          + (" (refreshed with new evidence)" if old and ok else ""))
         withdrawn = self._withdraw_stale(s, book, {d.id for d in s.drafts})
+        withdrawn += self._fold_into_pattern(s, {d.id for d in s.drafts})
         notes += [f"{aid}: withdrawn ({why})" for aid, why in withdrawn]
         return {"raised": raised, "refreshed": refreshed, "rejected": rejected,
                 "withdrawn": [aid for aid, _ in withdrawn], "trace": notes}
@@ -266,8 +290,33 @@ class Steps:
                 out.append((al.draft.id, why))
         return out
 
+    def _fold_into_pattern(self, s: WorkflowState, still: set[str]) -> list[tuple[str, str]]:
+        """On a scan: late-but-paid item alerts fold into an open pattern alert; a pattern
+        alert whose pattern no longer holds is withdrawn."""
+        if s.route != Route.scan or not s.manager_id:
+            return []
+        book = WorkflowBook.load(self.d.rails)
+        mine = book.open_alerts(s.manager_id)
+        pattern = next((a for a in mine if a.draft.kind == AlertKind.recurring_pattern), None)
+        out = []
+        for al in mine:
+            if pattern and al.draft.kind == AlertKind.unexplained_unpaid and al.draft.amount == 0:
+                out.append((al.draft.id, f"late payment covered by recurring-pattern alert "
+                                         f"{pattern.draft.id}"))
+            elif al.draft.kind == AlertKind.recurring_pattern and al.draft.id not in still:
+                out.append((al.draft.id, "the lateness pattern no longer holds"))
+        for aid, why in out:
+            al = book.alerts[aid]
+            self.d.rails.append_event(wf_event(
+                "alert_withdrawn", aid, s.event,
+                {"alert_id": aid, "reason": why, "invoice_id": (al.draft.invoice_ids or [None])[0]},
+                s.manager_id, (al.draft.invoice_ids or [None])[0]))
+        return out
+
     @staticmethod
     def _why_not(a: Assessment) -> str:
+        if a.status == "delayed" and a.finding and a.finding.cause == Cause.unexplained:
+            return "late payment now covered by the manager's recurring-pattern alert"
         if a.finding:
             return f"now {a.finding.cause.value.replace('_', ' ')}: {a.finding.explanation}"
         if a.status == "paid":

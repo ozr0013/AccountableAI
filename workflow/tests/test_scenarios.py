@@ -20,7 +20,8 @@ def outcome():
     wf = make_workflow(rails, agents=RealAgents(None))
     wf.replay(w.events() + scan_events([m.id for m in w.managers], w.as_of))
     book = WorkflowBook.load(rails)
-    return {i: a for a in book.open_alerts() for i in a.draft.invoice_ids}, book
+    items = [a for a in book.open_alerts() if a.draft.kind != AlertKind.recurring_pattern]
+    return {i: a for a in items for i in a.draft.invoice_ids}, book
 
 
 def test_no_manager_alert_for_hold_or_owner_side(outcome):
@@ -43,6 +44,32 @@ def test_unexplained_items_alert_and_get_chased(outcome):
     assert book.chases["keyway"] and book.chases["peachtree"]
 
 
+def test_scenario_7_held_payment_is_not_blamed_on_the_manager(outcome):
+    alerts, _ = outcome
+    assert alerts["INV-SB-0701"].draft.kind == AlertKind.bank_detail_change
+
+
 def test_paid_late_electrician_alerted_before_the_moment(outcome):
     alerts, _ = outcome
     assert alerts["INV-KW-0402"].draft.kind == AlertKind.unexplained_unpaid      # scenario 5 pre-fact
+
+
+def test_scenario_4_one_pattern_alert_for_sunbelt_only(outcome):
+    _, book = outcome
+    patterns = [a for a in book.open_alerts() if a.draft.kind == AlertKind.recurring_pattern]
+    assert [a.draft.manager_id for a in patterns] == ["sunbelt"]
+    [p] = patterns
+    assert "4 of 6 months" in p.draft.headline
+    kinds = {c.kind for cl in p.draft.claims for c in cl.citations}
+    assert {"manager_bank", "agreement"} <= kinds
+    # Sunbelt's individual late-but-paid invoices are folded into the pattern
+    assert not [a for a in book.open_alerts("sunbelt")
+                if a.draft.kind == AlertKind.unexplained_unpaid and a.draft.amount == 0]
+
+
+def test_scenario_8_duplicate_billing_cites_both_fundings(outcome):
+    alerts, _ = outcome
+    d = alerts["INV-SB-0802"]
+    assert d.draft.kind == AlertKind.duplicate_billing and d.draft.amount == 320.0
+    cited = {c.source_id for cl in d.draft.claims for c in cl.citations}
+    assert {"doc-funding-sb-0801", "doc-funding-sb-0802", "doc-stmt-sb-2026-03-dup"} <= cited

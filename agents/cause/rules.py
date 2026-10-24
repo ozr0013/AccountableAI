@@ -69,6 +69,8 @@ def hard_facts(line: LedgerLine, trail: PaymentTrail, terms: AgreementTerms) -> 
         "within_holdback": 0 < _cents(unpaid) <= _cents(holdback_room(line, terms)),
         "inspection_pending": inspection_pending(trail),
         "trust_rules_winner": trail.winning_claim,
+        "bank_change_pending": any(e.kind == SourceKind.vendor_notice and "bank change" in e.claim
+                                   for e in trail.entries),
     }
 
 
@@ -98,6 +100,13 @@ def classify(line: LedgerLine, trail: PaymentTrail, terms: AgreementTerms) -> Ca
                    f"Paid {line.paid_on} against a due date of {line.due_date} "
                    f"({days.value} days from receipt, clause {days.citation.locator}): on time "
                    "under the agreement.", invoice + payment + [days.citation])
+
+    change = [e.citation for e in trail.entries
+              if e.kind == SourceKind.vendor_notice and "bank change" in e.claim]
+    if change:
+        return out(Cause.vendor_side, 0.9,
+                   "The vendor asked to change its bank details; payment is held until the "
+                   "request is verified and a controller approves it.", change + funding)
 
     if f["within_holdback"] and f["inspection_pending"] and terms.holdback_pct:
         hb = terms.holdback_pct
