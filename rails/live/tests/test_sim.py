@@ -130,3 +130,16 @@ def test_run_plan_pays_for_a_cold_cache_once_per_seed():
     assert runs(SYSTEMS, live=False) == [(s, "offline") for s in SYSTEMS]
     assert runs(SYSTEMS, live=True) == [("ours", "cold"), ("ours", "warm"), ("rules", "offline"),
                                         ("no_verifier", "warm"), ("no_checks", "warm")]
+
+
+def test_every_detected_mistake_is_rechecked_through_the_workflow():
+    public, truth = generate(13, n_clean=4, noise=Noise(late_arrivals=1, adversarial=0))
+    output = simulate(public, "rules")
+    events = output["events"]
+    requested = {e["id"] for e in events if e["type"] == "recheck_requested"}
+    rechecked = {e["payload"]["recheck_id"] for e in events
+                 if e["type"] == "scan_requested" and e["payload"].get("recheck_id")}
+    assert requested and requested == rechecked
+    ran = {e["payload"].get("trigger") for e in events if e["type"] == "assessment_recorded"}
+    assert {f"recheck-{r}" for r in requested} <= ran
+    assert output["replay_extra_events"] == 0

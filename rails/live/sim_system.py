@@ -142,8 +142,22 @@ class SimSystem:
         result = self.workflow.handle(event)
         self.last_runs.append(result)
         self._observe(event, result)
+        self._recheck()
         self.audit.check(self.day)
         return result
+
+    def _recheck(self):
+        """Each recheck the audit requests runs through Workflow once, as its own scan event,
+        so a detected mistake is corrected (withdrawn or reopened) by the workflow's own rules."""
+        if self.audit.halted:
+            return
+        done = {e.payload.get("recheck_id") for e in self.rails.events() if e.type == "scan_requested"}
+        for r in [e for e in self.rails.events() if e.type == "recheck_requested" and e.id not in done]:
+            self._run(Event(id=f"recheck-{r.id}", type="scan_requested",
+                            manager_id=self.public.get("manager_id", "keyway"),
+                            valid_from=stamp(self.day), learned_at=stamp(self.day),
+                            payload={"as_of": str(self.day), "recheck_id": r.id,
+                                     "affected": r.payload["affected"]}, source=r.source))
 
     def _settle_bank_outcomes(self, event):
         if event.type != "document_ingested" or event.payload.get("kind") not in (
