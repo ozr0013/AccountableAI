@@ -9,6 +9,7 @@ import { DemoBar } from "./DemoBar";
 import { Disclosure } from "./Disclosure";
 import { ResponsesPanel } from "./Responses";
 import { DocProvider } from "./ui";
+import "./workspace.css";
 
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
@@ -22,17 +23,21 @@ export function Shell({ children }: { children: ReactNode }) {
       .catch(() => undefined);
     return () => { current = false; };
   }, []);
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => { setMenuOpen(false); }, [path]);
+  const [query, setQuery] = useState("");
+  const matches = query.trim() ? (state?.items ?? []).filter(i => `${i.id} ${i.vendor} ${i.trade ?? ""}`.toLowerCase().includes(query.trim().toLowerCase())).slice(0, 7) : [];
   const pending = state?.cases.filter((c) => c.status === "pending").length ?? 0;
   const open = state?.items.filter((i) => i.attention).length ?? 0;
   const controllerName = account?.name || account?.given_name;
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
-    { href: "/overview", label: "Overview", icon: Home },
-    { href: "/investigation", label: "Live investigation", icon: Spark },
+    { href: "/overview", label: "Portfolio", icon: Home },
+    { href: "/investigation", label: "Agent workflow", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
-    { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
-    { href: "/keyway", label: "Keyway money trail", icon: Building },
-    { href: "/agreements", label: "Your account", icon: Shield },
+    { href: "/items", label: "Invoices", icon: ListIcon, count: open },
+    { href: "/keyway", label: "Manager payments", icon: Building },
+    { href: "/agreements", label: "Settings", icon: Shield },
   ];
   const tools = [
     { href: "/console", label: "Judge Console", icon: Gavel },
@@ -42,16 +47,24 @@ export function Shell({ children }: { children: ReactNode }) {
 
   return (
     <DocProvider>
-      <div className="shell">
-        <aside className="side">
-          <Link href="/" className="brand" aria-label="AccountableAI home">
-            <Mark className="brand-mark" />
-            <span className="brand-word">AccountableAI</span>
-          </Link>
+      <div className="workspace shell">
+        <header className="workspace-header">
+          <Link href="/" className="workspace-brand"><Mark /><span>Accountable<span>AI</span></span></Link>
+          <div className="workspace-search">
+            <span aria-hidden="true">⌕</span><input aria-label="Search invoices or vendors" placeholder="Search invoice, vendor…" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if(e.key === "Escape") setQuery(""); }} />
+            <Link href="/ask" className="assist-link">✧ AI Assist</Link>
+            {query.trim() && <div className="search-results">{matches.length ? matches.map(i => <Link key={i.id} href={`/items/${i.id}`} onClick={() => setQuery("")}><strong>{i.vendor}</strong><small>{i.id}</small></Link>) : <p>No matching invoices.</p>}</div>}
+          </div>
+          <Link className="workspace-notification" href="/cases" aria-label={`${pending} cases awaiting review`}><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg>{pending > 0 && <span>{pending}</span>}</Link>
+          <Link href="/agreements" className="workspace-account"><span>{controllerInitial}</span>Account</Link>
+        </header>
+        <button className="workspace-menu" aria-expanded={menuOpen} aria-controls="workspace-navigation" onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? "Close navigation −" : "Menu · " + (nav.find(n => active(n.href))?.label ?? "Workspace") + " +"}</button>
+        <aside id="workspace-navigation" className={`side${menuOpen ? " menu-open" : ""}`}>
           <div className="org">
             <span className="org-badge">O</span>
             <span>{state?.meta.parent ?? "Oakline Homes"}</span>
           </div>
+          <div className="workspace-nav-label">Navigation</div>
           <nav className="nav" aria-label="Main">
             {nav.map(({ href, label, icon: I, count }) => (
               <Link key={href} href={href} aria-current={active(href) ? "page" : undefined}>

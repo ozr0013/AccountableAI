@@ -36,20 +36,13 @@ export default function AccountPage() {
   };
 
   return <>
-    <PageTop title="Your account" sub="Connect Google to show your name and photo in AccountableAI." />
+    <PageTop title="Settings" sub="Connect Google to show your name and photo in AccountableAI." />
     {error && <div className="notice err">{error}</div>}
     <section className="section">
-      <div className="card block-shadow dots-panel" style={{ padding: 28 }}>
-        {account?.signed_in ? <div className="between" style={{ alignItems: "center", gap: 20 }}>
-          <div className="row" style={{ gap: 14 }}>
-            {account.picture && <img src={account.picture} alt="" referrerPolicy="no-referrer" style={{ width: 52, height: 52, borderRadius: "50%", objectFit: "cover" }} />}
-            <div className="stack" style={{ gap: 5 }}>
-              <span className="micro muted">Connected Google account</span>
-              <span className="display h3">{account.name || account.given_name || "Your account"}</span>
-              <span className="body muted">{account.email}</span>
-            </div>
-          </div>
-          <button className="pill" onClick={signOut}>Sign out</button>
+      <div className="ledger-panel"><h2>Profile</h2>
+        {account?.signed_in ? <div className="account-profile">
+          <div className="account-avatar">{account.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : (account.name || "A").charAt(0)}</div>
+          <div><div className="account-fields"><label>Full name<input className="input" readOnly value={account.name || account.given_name || "Not provided"}/></label><label>Email address<input className="input" readOnly value={account.email || "Not provided"}/></label><label>Sign-in provider<input className="input" readOnly value="Google"/></label><label>Profile management<span className="body">Your profile is managed through your Google account.</span></label></div><button className="pill" style={{marginTop:24}} onClick={signOut}>Sign out</button></div>
         </div> : <div className="between" style={{ alignItems: "center", gap: 20 }}>
           <div className="stack" style={{ gap: 7 }}>
             <span className="display h4">Make this your workspace.</span>
