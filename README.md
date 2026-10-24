@@ -99,6 +99,38 @@ Reconciliation: funded = paid + authorized holds ($200) + still owed ($8,590) + 
 
 Run the demo with the rules agents (`RealAgents`, no API key needed) or the live ones, not `AGENTS=fake`: the stand-in calls every late item unexplained and recommends holding far more than $3,140.
 
+## Messy data: the system reads real paperwork, not pre-parsed fields
+
+The generator's documents arrive with `invoice_id`, `amount` and dates already filled in. Real AP
+paperwork doesn't. `world/mess` renders the same world as what Oakline's controller actually
+receives, and `agents/extract` has to read it back:
+
+| Raw file | The mess in it |
+|---|---|
+| `inbox/*.eml`: vendor invoices forwarded by Keyway, PDF attached | 4 invoice layouts, vendor names spelled 3 ways, Keyway's reference written 6 ways or missing, invoice terms that contradict the agreement, an old balance added to the total, the same invoice forwarded twice, crooked phone scans with no text layer |
+| `inbox/*.eml`: vendor confirmations, past-due notices, Keyway replies | amount only and no invoice number, one "we got paid" email covering two invoices, weekday dates ("hit our account Tuesday"), HTML-only mail, a bank-change request from a look-alike domain, the invoice named only in the quoted thread |
+| `bank/*.csv`: Keyway's bank exports | truncated payee names, checks with no memo, one ACH paying two invoices, 90% paid with retainage held, fees, payroll and transfers mixed in |
+| `drive/wires/*.pdf`: Oakline wire confirmations | one wire covering many invoices |
+| `drive/contracts`, statements, junk | the agreement as a PDF, statements as PDF tables, a newsletter, an out-of-office reply, an estimate, a W-9, a credit memo, "statement attached" with nothing attached |
+
+The parser is rules first (column positions, regexes, fuzzy vendor match against the vendor
+master, then cross-document linking: wire remittance fills a missing reference, bank lines and
+confirmations matched by vendor and amount, combined payments split by subset sum). Scans go
+to tesseract if installed. A total that disagrees with Oakline's own wire for that invoice gets
+one Haiku re-read of the page; still unresolved, it goes to a person. It never guesses.
+
+**Result over 5 seeds:** rules only, 97.0% of documents exactly right (every miss is a flagged
+scan or what depends on it); with OCR 99.5%; with OCR + Haiku 99.9% for $0.0012 total. All 9
+scenarios and the moment still pass end to end on the parsed documents in every seed. Full
+table and caveats: `evals/extraction_results.md`.
+
+```bash
+python -m world.mess --out out/raw                  # write the raw files (open them, they're real)
+python -m evals.extraction                          # parse them back and score every field
+python -m evals.harness --systems full --messy      # all 9 scenarios on parsed documents
+EXTRACT_OCR=off EXTRACT_LLM=off ...                 # force rules only
+```
+
 ## Guardrails (code, shown in the demo)
 
 Never accuse (templates top out at "unexplained"; no "fraud"/"misuse" in the UI) · never move money · reminders to a middleman only from controller-approved templates, on an approved schedule; anything else outbound needs approval of that exact draft · agents recommend holds, only the controller holds · never alert without a cited record · append-only history · proposer can't approve · books must agree (balanced, no closed-month posting, no duplicates after replay).
@@ -197,6 +229,7 @@ The scored evaluation artifacts, strong-model baseline, adversarial verifier stu
 6. [x] Briefing agent: "What's open with Keyway?" with citations and prior rulings → `agents/briefing/` (`python -m agents.briefing`; free code briefing, or `--model` for one Sonnet call, ~$0.04; uncited or accusatory claims dropped; `registry.briefer()`, `BRIEFING=real`)
 7. [x] Checkpoint B: full scored run → `evals/results.md`; current free rules-mode re-run is 9/9 with 100% cause / precision / recall / citations
 8. [x] Checkpoint C: final numbers surfaced in dashboard `/proof`, `evals/`, and `docs/DEVPOST.md`
+9. [x] Messy data: `world/mess` renders PDFs, scans, emails and bank CSVs; `agents/extract` reads them back; `evals/extraction.py` scores it; `evals.harness --messy` runs the scenarios on parsed documents
 
 ### Audrey: dashboard and pitch (`dashboard/`, `docs/`)
 1. [ ] Figma skeleton of every screen (skipped: built straight in code)

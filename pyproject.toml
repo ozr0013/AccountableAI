@@ -18,6 +18,11 @@ dependencies = [
     "langgraph>=0.2",
     "langgraph-checkpoint-postgres>=2.0",
     "langchain-anthropic>=1.7",
+    "reportlab>=4.0",          # world.mess: render messy invoice / statement PDFs
+    "pillow>=10.1",            # world.mess: crooked scans
+    "pdfplumber>=0.11",        # agents.extract: read PDFs
+    "pypdfium2>=4.0",          # agents.extract: page images for OCR / vision
+    "pytesseract>=0.3",        # agents.extract: OCR when the tesseract binary is installed
 ]
 
 [project.optional-dependencies]

@@ -4,11 +4,11 @@
 
 “Oakline sends Keyway money for repairs. The question is whether the vendors ever got paid.”
 
-Open **Live investigation**. Point out the $3,140 proposed hold and the five-step trail.
+Open **Live investigation**. Point out the five-step trail and press **Play 15-day loop**. If the Python feed is not running, use **Watch saved 15-day replay**; it is visibly labeled as a replay and never enables a real action.
 
 ## 10–30 sec: let Keyway make a claim
 
-Click **Start investigation**. Say: “Keyway says it paid Rio Grande Plumbing, but attaches no bank record or vendor confirmation.”
+Say: “Keyway says it paid Rio Grande Plumbing, but attaches no bank record or vendor confirmation.”
 
 Point to the payment-trail card: the vendor notice and bank record outrank Keyway’s statement. Open one citation chip.
 

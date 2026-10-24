@@ -210,8 +210,13 @@ def _real_rails(system: str):
 
 
 def run_system(system: str, n_clean: int = 30, seed: int = 13,
-               budget: Budget | None = None, rails_kind: str = "memory") -> RunResult:
+               budget: Budget | None = None, rails_kind: str = "memory",
+               messy: bool = False) -> RunResult:
     world = generate(seed, ALL_SCENARIOS, n_clean)
+    if messy:
+        # The system sees only what the parser read from PDFs, scans, emails and bank CSVs.
+        from .messy import messy_world
+        world, _ = messy_world(world)
     rails = _real_rails(system) if rails_kind == "real" else MemoryRails()
     verifier = _MeteredVerifier(_verifier(system), budget or Budget(float("inf")))
     agents = _CapturingAgents(_agents(budget))
@@ -306,13 +311,17 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--save", type=Path, help="save each RunResult JSON in this folder")
     p.add_argument("--budget", type=float, default=2.0, help="max verifier spend in USD (live)")
     p.add_argument("--max-calls", type=int, help="stop after this many model calls (cost probe)")
+    p.add_argument("--messy", action="store_true",
+                   help="feed the system parsed raw files (PDFs, scans, emails, CSVs) instead "
+                        "of the generator's clean documents")
     p.add_argument("--rails", choices=["memory", "real"], default="memory",
                    help="real: Aaryan's Postgres rails (DATABASE_URL), a fresh schema per system")
     a = p.parse_args(argv)
 
     budget = Budget(a.budget, a.max_calls)
     try:
-        runs = [run_system(s, a.clean, budget=budget, rails_kind=a.rails) for s in a.systems]
+        runs = [run_system(s, a.clean, budget=budget, rails_kind=a.rails, messy=a.messy)
+                for s in a.systems]
     except BudgetExceeded as e:
         print(f"STOPPED: {e}. Spent ${budget.spent:.4f} on {budget.calls} calls "
               f"(${budget.spent / max(budget.calls, 1):.4f} per call).")
@@ -332,7 +341,9 @@ def main(argv: list[str] | None = None) -> int:
                 f"{budget.calls} verifier calls, ${budget.spent:.4f}")
     else:
         mode = "no API key: agents in rules mode, verifier code rules only"
-    md = md.replace("# Eval results\n", f"# Eval results\n\nMode: {mode}; rails: {a.rails}.\n", 1)
+    data = "messy raw files, parsed" if a.messy else "clean generator documents"
+    md = md.replace("# Eval results\n",
+                    f"# Eval results\n\nMode: {mode}; rails: {a.rails}; input: {data}.\n", 1)
     if a.out:
         a.out.write_text(md)
         print(f"wrote {a.out}")
