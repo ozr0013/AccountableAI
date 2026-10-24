@@ -1,9 +1,10 @@
-"""Pick real or fake implementations with env vars: RAILS, AGENTS, VERIFIER, APPROVALS.
+"""Pick real or fake implementations with env vars: RAILS, AGENTS, VERIFIER, APPROVALS, BRIEFING.
 
 Real modules must expose a no-arg factory named `build()` returning the Protocol:
     rails/__init__.py              -> build() -> Rails
     agents/__init__.py             -> build() -> Agents
     agents/verifier/__init__.py    -> build() -> Verifier
+    agents/briefing/__init__.py    -> build() -> Briefer
     workflow/approvals.py          -> build() -> Approvals
 """
 
@@ -12,13 +13,14 @@ from __future__ import annotations
 import importlib
 import os
 
-from .steps import Agents, Approvals, Rails, Verifier
+from .steps import Agents, Approvals, Briefer, Rails, Verifier
 
 _REAL = {
     "RAILS": "rails",
     "AGENTS": "agents",
     "VERIFIER": "agents.verifier",
     "APPROVALS": "workflow.approvals",
+    "BRIEFING": "agents.briefing",
 }
 
 
@@ -46,3 +48,8 @@ def verifier() -> Verifier:
 def approvals() -> Approvals:
     from .fakes import FakeApprovals
     return _load("APPROVALS", FakeApprovals)
+
+
+def briefer() -> Briefer:
+    from .fakes import FakeBriefer
+    return _load("BRIEFING", FakeBriefer)

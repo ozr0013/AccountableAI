@@ -157,7 +157,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 |---|---|---|
 | Shared | Phase 0 | `contracts/` (models, step signatures, registry, stand-ins, scenario 3 fixture), `docker-compose.yml`, `.env.example`, `pyproject.toml` |
 | Aaryan | 10 / 10 before Checkpoint A | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (one middleman, 20 vendors, all 9 scenarios + the moment, demo date Apr 22) |
-| Omar | 4 / 6 before Checkpoint B | answer key, verifier, scorer + `evals.run`, prohibited-action tests (pass against the fakes and the real policy gate) |
+| Omar | 5 / 6 before Checkpoint B | answer key, verifier, scorer + `evals.harness`, prohibited-action tests, briefing agent; 16-world test and planted bad drafts in `evals/` |
 | Kanishka | 3 / 7 | `workflow/` (LangGraph graph, runner, replay), payment-trail agent, delay-cause agent (LLM with rules fallback) |
 | Audrey | 0 / 8 | not started in the repo |
 
@@ -223,11 +223,11 @@ The demo world is now one middleman (Keyway), demo date Apr 22 (see **The demo w
 
 ### Omar: verification, evals, memory (`agents/verifier/`, `agents/briefing/`, `evals/`)
 1. [x] Answer key for all 9 scenarios (start here; it's the spec) → `evals/answer_key.json`
-2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed; live run not yet done)
+2. [x] Verifier: refute drafts from evidence only; block uncited claims and accusatory wording → `agents/verifier/` (code rules first, then one model call; fails closed). Live (Haiku): 9/9 on the demo world; catches 8/8 planted bad drafts (`evals/adversarial.py`) vs 0/8 without it, $0.015
 3. [x] Scorer: cause accuracy, alert precision/recall, citation rate, prohibited actions, withdrawal correctness, recon differences, cost/latency → `evals/scorer.py`; runs report in the `evals/schema.py` `RunResult` shape
-4. [ ] Baselines: single strong model with all documents; system without the verifier
+4. [ ] Baselines: single strong model with all documents (not built); system without the verifier (done: `no_verifier` column in `evals.harness` and `evals.adversarial`)
 5. [x] Prohibited-action tests (outbound send, money move, accusation, self-approval all blocked) → `evals/test_prohibited.py`; they run against whatever `RAILS`/`VERIFIER`/`APPROVALS` selects, so real rails must pass them too
-6. [ ] Briefing agent: "What's open with Keyway?" with citations and prior rulings
+6. [x] Briefing agent: "What's open with Keyway?" with citations and prior rulings → `agents/briefing/` (`python -m agents.briefing`; free code briefing, or `--model` for one Sonnet call, ~$0.04; uncited or accusatory claims dropped; `registry.briefer()`, `BRIEFING=real`)
 7. [ ] **NEEDS** Checkpoint B: first full score → `evals/results.md`
 8. [ ] **NEEDS** Checkpoint C: final numbers to Audrey
 
