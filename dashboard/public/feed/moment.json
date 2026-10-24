@@ -1,5 +1,6 @@
 {
  "ok": true,
+ "kind": "fact",
  "summary": "INV-KW-0402 ($900.00) was received Apr 15, not Mar 28; due Apr 25 under the 10-day window.",
  "affected": [
   "INV-KW-0402"
@@ -30,6 +31,128 @@
   "INV-KW-0402: not_due (due 2026-04-25)",
   "al-unexplained_unpaid-e961f657cef1: withdrawn (not due yet under the current facts (due 2026-04-25))",
   "recheck: 1 item(s) rerun, 1 changed ['INV-KW-0402'], 0 unchanged",
+  "done",
+  "scan_requested ev-scan-keyway-followup-1 -> scan (109 invoice(s))",
+  "INV-KW-0101: delayed, cause authorized_hold",
+  "INV-KW-0201: delayed, cause paperwork_pending",
+  "INV-KW-0301: delayed, cause unexplained",
+  "INV-KW-0402: not_due (due 2026-04-25)",
+  "INV-KW-0501: paid",
+  "INV-KW-0601: delayed, cause owner_side",
+  "INV-KW-0701: not_due (due 2026-04-24)",
+  "INV-KW-0801: paid, cause vendor_side",
+  "INV-KW-0901: delayed, cause unexplained",
+  "INV-KW-1001: paid",
+  "INV-KW-1002: delayed, cause unexplained",
+  "INV-KW-1003: delayed, cause unexplained",
+  "INV-KW-1004: delayed, cause unexplained",
+  "INV-KW-1005: paid",
+  "INV-KW-1006: paid",
+  "INV-KW-1007: paid",
+  "INV-KW-1008: delayed, cause unexplained",
+  "INV-KW-1009: paid",
+  "INV-KW-1010: paid",
+  "INV-KW-1011: paid",
+  "INV-KW-1012: paid",
+  "INV-KW-1013: paid",
+  "INV-KW-1014: paid",
+  "INV-KW-1015: paid",
+  "INV-KW-1016: paid",
+  "INV-KW-1017: paid",
+  "INV-KW-1018: paid",
+  "INV-KW-1019: paid",
+  "INV-KW-1020: paid",
+  "INV-KW-1021: delayed, cause unexplained",
+  "INV-KW-1022: paid",
+  "INV-KW-1023: delayed, cause unexplained",
+  "INV-KW-1024: paid",
+  "INV-KW-1025: paid",
+  "INV-KW-1026: paid",
+  "INV-KW-1027: paid",
+  "INV-KW-1028: paid",
+  "INV-KW-1029: paid",
+  "INV-KW-1030: paid",
+  "INV-KW-1031: paid",
+  "INV-KW-1032: paid",
+  "INV-KW-1033: paid",
+  "INV-KW-1034: paid",
+  "INV-KW-1035: paid",
+  "INV-KW-1036: paid",
+  "INV-KW-1037: paid",
+  "INV-KW-1038: paid",
+  "INV-KW-1039: paid",
+  "INV-KW-1040: paid",
+  "INV-KW-1041: paid",
+  "INV-KW-1042: paid",
+  "INV-KW-1043: paid",
+  "INV-KW-1044: paid",
+  "INV-KW-1045: paid",
+  "INV-KW-1046: delayed, cause unexplained",
+  "INV-KW-1047: paid",
+  "INV-KW-1048: paid",
+  "INV-KW-1049: paid",
+  "INV-KW-1050: paid",
+  "INV-KW-1051: paid",
+  "INV-KW-1052: paid",
+  "INV-KW-1053: paid",
+  "INV-KW-1054: paid",
+  "INV-KW-1055: paid",
+  "INV-KW-1056: paid",
+  "INV-KW-1057: paid",
+  "INV-KW-1058: paid",
+  "INV-KW-1059: paid",
+  "INV-KW-1060: delayed, cause unexplained",
+  "INV-KW-1061: paid",
+  "INV-KW-1062: paid",
+  "INV-KW-1063: paid",
+  "INV-KW-1064: delayed, cause unexplained",
+  "INV-KW-1065: paid",
+  "INV-KW-1066: paid",
+  "INV-KW-1067: paid",
+  "INV-KW-1068: paid",
+  "INV-KW-1069: paid",
+  "INV-KW-1070: paid",
+  "INV-KW-1071: paid",
+  "INV-KW-1072: paid",
+  "INV-KW-1073: paid",
+  "INV-KW-1074: paid",
+  "INV-KW-1075: paid",
+  "INV-KW-1076: paid",
+  "INV-KW-1077: paid",
+  "INV-KW-1078: paid",
+  "INV-KW-1079: paid",
+  "INV-KW-1080: delayed, cause unexplained",
+  "INV-KW-1081: delayed, cause unexplained",
+  "INV-KW-1082: paid",
+  "INV-KW-1083: paid",
+  "INV-KW-1084: paid",
+  "INV-KW-1085: delayed, cause unexplained",
+  "INV-KW-1086: paid",
+  "INV-KW-1087: paid",
+  "INV-KW-1088: paid",
+  "INV-KW-1089: paid",
+  "INV-KW-1090: paid",
+  "INV-KW-1091: paid",
+  "INV-KW-1092: paid",
+  "INV-KW-1093: paid",
+  "INV-KW-1094: paid",
+  "INV-KW-1095: paid",
+  "INV-KW-1096: paid",
+  "INV-KW-1097: paid",
+  "INV-KW-1098: paid",
+  "INV-KW-1099: paid",
+  "INV-KW-1100: paid",
+  "draft al-recurring_pattern-ed5cc82da55e (recurring_pattern)",
+  "draft al-paperwork_request-018d27191059 (paperwork_request)",
+  "draft al-unexplained_unpaid-daeb1b9e7b7c (unexplained_unpaid)",
+  "draft al-owner_pending_approval-b73f9611538b (owner_pending_approval)",
+  "draft al-unexplained_unpaid-368414a3450e (unexplained_unpaid)",
+  "al-recurring_pattern-ed5cc82da55e: verifier approved (refreshed with new evidence)",
+  "al-paperwork_request-018d27191059: still holds, unchanged",
+  "al-unexplained_unpaid-daeb1b9e7b7c: still holds, unchanged",
+  "al-owner_pending_approval-b73f9611538b: still holds, unchanged",
+  "al-unexplained_unpaid-368414a3450e: still holds, unchanged",
+  "keyway: next reminder for INV-KW-0301, INV-KW-0901 not due yet (off schedule: wait 5 days between reminders)",
   "done",
   "funding_review_requested ev-funding-keyway-2026-04-22-recheck-1 -> funding_review (0 invoice(s))",
   "Recommend holding $2,240.00 of the $18,400.00 funding (case case-keyway-5ab279b80c, approval appr-case-keyway-5ab279b80c)",
@@ -65,9 +188,7 @@
        "al-unexplained_unpaid-e961f657cef1",
        "al-recurring_pattern-ed5cc82da55e"
       ],
-      [
-       "al-recurring_pattern-ed5cc82da55e"
-      ]
+      []
      ]
     }
    }
@@ -265,6 +386,58 @@
    ]
   ]
  },
+ "responses": [
+  {
+   "agent": "Judge",
+   "what": "corrected invoice:INV-KW-0402.received to 2026-04-15",
+   "type": "fact_corrected",
+   "invoice_id": "INV-KW-0402"
+  },
+  {
+   "agent": "Recheck",
+   "what": "withdrew al-unexplained_unpaid-e961f657cef1: not due yet under the current facts (due 2026-04-25)",
+   "type": "alert_withdrawn",
+   "invoice_id": "INV-KW-0402"
+  },
+  {
+   "agent": "Verifier",
+   "what": "passed: keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026)",
+   "type": "alert_raised",
+   "invoice_id": "INV-KW-0101"
+  },
+  {
+   "agent": "Case agent",
+   "what": "Recommend holding $2,240.00 of the $18,400.00 funding. keyway still owes 2 vendor invoice(s) totalling $2,240.00 from money Oakline already funded (INV-KW-0901, INV-KW-0301), with no bank record or vendor confirmation of payment. Recommend holding $2,240.00 of the next funding until payment is shown. Chased 6 time(s).",
+   "type": "case_proposed",
+   "invoice_id": null
+  },
+  {
+   "agent": "Delay-cause agent",
+   "type": "assess",
+   "what": "INV-KW-0402: not due (due 2026-04-25)",
+   "invoice_id": "INV-KW-0402"
+  },
+  {
+   "agent": "Recheck",
+   "type": "recheck",
+   "what": "1 item(s) rerun, 1 changed ['INV-KW-0402'], 0 unchanged",
+   "invoice_id": null
+  },
+  {
+   "agent": "Chaser agent",
+   "type": "chase_scheduled",
+   "what": "next reminder for INV-KW-0301, INV-KW-0901 not due yet (off schedule: wait 5 days between reminders)",
+   "invoice_id": null
+  },
+  {
+   "agent": "Verifier",
+   "type": "verified",
+   "invoice_id": null,
+   "what": "4 open alerts re-checked against the new evidence: still hold"
+  }
+ ],
+ "cost": 0.0,
+ "live": false,
  "state": {
   "meta": {
    "as_of": "2026-04-22",
@@ -275,8 +448,17 @@
    "controller": "controller.dana",
    "vendors": 20,
    "documents": 342,
-   "events": 813,
+   "events": 816,
    "agents": "rules",
+   "live_available": false,
+   "meter": {
+    "limit": 1.0,
+    "spent": 0.0,
+    "calls": 0,
+    "recent": []
+   },
+   "start": "2026-04-22",
+   "actions": 1,
    "names": {
     "v-amperpro": "AmperPro Electric",
     "v-breezeway": "Breezeway HVAC",
@@ -300,7 +482,7 @@
     "v-yardpro": "YardPro Landscaping",
     "keyway": "Keyway Property Management"
    },
-   "generated_at": "2026-10-24T06:41:11"
+   "generated_at": "2026-10-24T06:57:39"
   },
   "headline": {
    "funded": 243709.65,
@@ -786,9 +968,7 @@
     "due": "2026-04-25",
     "status": "funded",
     "duplicate_of": null,
-    "alerts": [
-     "al-recurring_pattern-ed5cc82da55e"
-    ],
+    "alerts": [],
     "state": "not_due",
     "cause": null,
     "days_late": 0,
@@ -5168,7 +5348,6 @@
      "INV-KW-0101",
      "INV-KW-0201",
      "INV-KW-0301",
-     "INV-KW-0402",
      "INV-KW-0901",
      "INV-KW-1002",
      "INV-KW-1003",
@@ -5188,7 +5367,7 @@
     "recommended_action": "Recommend stricter terms: a shorter payment window, or proof of vendor payment with every monthly statement.",
     "claims": [
      {
-      "text": "Month by month, against the 10-day payment term: 2026-01: late (INV-KW-1003, INV-KW-1021); 2026-02: late (INV-KW-1002, INV-KW-1046, INV-KW-1085); 2026-03: late (INV-KW-0101, INV-KW-0201, INV-KW-0301, INV-KW-0402, INV-KW-0901, INV-KW-1004, INV-KW-1008, INV-KW-1023, INV-KW-1060, INV-KW-1064, INV-KW-1080, INV-KW-1081); 2026-04: on time.",
+      "text": "Month by month, against the 10-day payment term: 2026-01: late (INV-KW-1003, INV-KW-1021); 2026-02: late (INV-KW-1002, INV-KW-1046, INV-KW-1085); 2026-03: late (INV-KW-0101, INV-KW-0201, INV-KW-0301, INV-KW-0901, INV-KW-1004, INV-KW-1008, INV-KW-1023, INV-KW-1060, INV-KW-1064, INV-KW-1080, INV-KW-1081); 2026-04: on time.",
       "citations": [
        {
         "source_id": "doc-bank-keyway-2026-01-ops",
@@ -5911,7 +6090,7 @@
     "proposed_by": "case_agent",
     "recommendation": null,
     "funding_amount": null,
-    "requested_at": "2026-10-24T13:41:11.004779+00:00",
+    "requested_at": "2026-04-22T23:50:00+00:00",
     "status": "pending",
     "decided_by": null,
     "decided_at": null
@@ -6034,7 +6213,7 @@
     "proposed_by": "case_agent",
     "recommendation": "Recommend holding $3,140.00 of the $18,400.00 funding. keyway still owes 3 vendor invoice(s) totalling $3,140.00 from money Oakline already funded (INV-KW-0901, INV-KW-0301, INV-KW-0402), with no bank record or vendor confirmation of payment. Recommend holding $3,140.00 of the next funding until payment is shown. Chased 6 time(s).",
     "funding_amount": 18400.0,
-    "requested_at": "2026-10-24T13:41:11.078769+00:00",
+    "requested_at": "2026-04-22T23:50:00+00:00",
     "status": "superseded",
     "decided_by": null,
     "decided_at": null
@@ -6144,7 +6323,7 @@
     "proposed_by": "case_agent",
     "recommendation": "Recommend holding $2,240.00 of the $18,400.00 funding. keyway still owes 2 vendor invoice(s) totalling $2,240.00 from money Oakline already funded (INV-KW-0901, INV-KW-0301), with no bank record or vendor confirmation of payment. Recommend holding $2,240.00 of the next funding until payment is shown. Chased 6 time(s).",
     "funding_amount": 18400.0,
-    "requested_at": "2026-10-24T13:41:11.237113+00:00",
+    "requested_at": "2026-04-22T23:50:00+00:00",
     "status": "pending",
     "decided_by": null,
     "decided_at": null
@@ -6299,22 +6478,31 @@
   ],
   "audit": [
    {
-    "seq": 811,
+    "seq": 814,
     "id": "ev-wf-case_proposed-6953bfba30ee",
-    "at": "2026-04-22T12:00:00+00:00",
+    "at": "2026-04-22T12:00:02+00:00",
     "type": "case_proposed",
     "actor": "case_agent",
     "what": "Recommend holding $2,240.00 of the $18,400.00 funding. keyway still owes 2 vendor invoice(s) totalling $2,240.00 from money Oakline already funded (INV-KW-0901, INV-KW-0301), with no bank record or vendor confirmation of payment. Recommend holding $2,240.00 of the next funding until payment is shown. Chased 6 time(s).",
     "invoice_id": null
    },
    {
-    "seq": 810,
+    "seq": 813,
     "id": "ev-appr-case-keyway-5ab279b80c-requested",
-    "at": "2026-10-24T13:41:11.237113+00:00",
+    "at": "2026-04-22T23:50:00+00:00",
     "type": "approval_requested",
     "actor": "case_agent",
     "what": "asked the controller to decide appr-case-keyway-5ab279b80c",
     "invoice_id": null
+   },
+   {
+    "seq": 810,
+    "id": "ev-wf-alert_raised-5fbb9a231743",
+    "at": "2026-04-22T12:00:01+00:00",
+    "type": "alert_raised",
+    "actor": "verifier",
+    "what": "keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026)",
+    "invoice_id": "INV-KW-0101"
    },
    {
     "seq": 807,
@@ -6346,7 +6534,7 @@
    {
     "seq": 803,
     "id": "ev-appr-case-keyway-403e1ff20f-requested",
-    "at": "2026-10-24T13:41:11.078769+00:00",
+    "at": "2026-04-22T23:50:00+00:00",
     "type": "approval_requested",
     "actor": "case_agent",
     "what": "asked the controller to decide appr-case-keyway-403e1ff20f",
@@ -6598,7 +6786,7 @@
    {
     "seq": 763,
     "id": "ev-appr-case-bankchange-b08385e120ac-requested",
-    "at": "2026-10-24T13:41:11.004779+00:00",
+    "at": "2026-04-22T23:50:00+00:00",
     "type": "approval_requested",
     "actor": "case_agent",
     "what": "asked the controller to decide appr-case-bankchange-b08385e120ac",
@@ -9237,6 +9425,7 @@
   },
   "history": [
    {
+    "kind": "fact",
     "summary": "INV-KW-0402 ($900.00) was received Apr 15, not Mar 28; due Apr 25 under the 10-day window.",
     "affected": [
      "INV-KW-0402"
@@ -9271,9 +9460,7 @@
           "al-unexplained_unpaid-e961f657cef1",
           "al-recurring_pattern-ed5cc82da55e"
          ],
-         [
-          "al-recurring_pattern-ed5cc82da55e"
-         ]
+         []
         ]
        }
       }
@@ -9470,8 +9657,60 @@
        "INV-KW-0901"
       ]
      ]
-    }
+    },
+    "responses": [
+     {
+      "agent": "Judge",
+      "what": "corrected invoice:INV-KW-0402.received to 2026-04-15",
+      "type": "fact_corrected",
+      "invoice_id": "INV-KW-0402"
+     },
+     {
+      "agent": "Recheck",
+      "what": "withdrew al-unexplained_unpaid-e961f657cef1: not due yet under the current facts (due 2026-04-25)",
+      "type": "alert_withdrawn",
+      "invoice_id": "INV-KW-0402"
+     },
+     {
+      "agent": "Verifier",
+      "what": "passed: keyway paid vendors late in 3 of 4 months (Jan 2026, Feb 2026, Mar 2026)",
+      "type": "alert_raised",
+      "invoice_id": "INV-KW-0101"
+     },
+     {
+      "agent": "Case agent",
+      "what": "Recommend holding $2,240.00 of the $18,400.00 funding. keyway still owes 2 vendor invoice(s) totalling $2,240.00 from money Oakline already funded (INV-KW-0901, INV-KW-0301), with no bank record or vendor confirmation of payment. Recommend holding $2,240.00 of the next funding until payment is shown. Chased 6 time(s).",
+      "type": "case_proposed",
+      "invoice_id": null
+     },
+     {
+      "agent": "Delay-cause agent",
+      "type": "assess",
+      "what": "INV-KW-0402: not due (due 2026-04-25)",
+      "invoice_id": "INV-KW-0402"
+     },
+     {
+      "agent": "Recheck",
+      "type": "recheck",
+      "what": "1 item(s) rerun, 1 changed ['INV-KW-0402'], 0 unchanged",
+      "invoice_id": null
+     },
+     {
+      "agent": "Chaser agent",
+      "type": "chase_scheduled",
+      "what": "next reminder for INV-KW-0301, INV-KW-0901 not due yet (off schedule: wait 5 days between reminders)",
+      "invoice_id": null
+     },
+     {
+      "agent": "Verifier",
+      "type": "verified",
+      "invoice_id": null,
+      "what": "4 open alerts re-checked against the new evidence: still hold"
+     }
+    ],
+    "cost": 0.0
    }
-  ]
+  ],
+  "decisions": []
  }
 }

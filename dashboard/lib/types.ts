@@ -54,6 +54,8 @@ export type State = {
     as_of: string; parent: string; manager_id: string; manager: string; funding_pending: number;
     controller: string; vendors: number; documents: number; events: number; agents: string;
     names: Record<string, string>; generated_at: string;
+    live_available?: boolean; start?: string; actions?: number;
+    meter?: { limit: number; spent: number; calls: number; recent: { who: string; model: string; cost: number }[] };
   };
   headline: {
     funded: number; paid: number; held: number; owed: number; unfunded: number;
@@ -73,12 +75,18 @@ export type State = {
   audit: { seq: number; id: string; at: string; type: string; actor: string; what: string; invoice_id: string | null }[];
   guardrails: { label: string; action: string; actor: string; allowed: boolean; reason: string }[];
   documents: Record<string, Doc>;
-  history: { summary: string; affected: string[]; diff: Diff }[];
+  history: { kind?: string; summary: string; affected: string[]; diff: Diff; responses?: Response[]; cost?: number }[];
+  decisions?: ({ type: "funding_instruction"; release: number; hold: number; approved: boolean; by: string; at: string; approval_id: string }
+    | { type: "bank_change_decided"; vendor_id: string; allowed: boolean; reason: string; identity_verified: boolean; by: string; at: string; approval_id: string })[];
 };
 
-export type ConsoleResult =
-  | { ok: true; summary: string; affected: string[]; trace: string[]; diff: Diff; state: State; events: unknown[] }
-  | { ok: false; error: string; suggestions?: string[] };
+export type Response = { agent: string; what: string; type: string; invoice_id: string | null };
+
+export type ActionResult =
+  | { ok: true; kind: string; summary: string; affected: string[]; trace: string[]; diff: Diff; responses: Response[]; cost: number; live: boolean; state: State; events: unknown[] }
+  | { ok: false; error: string; suggestions?: string[]; state?: State };
+
+export type ConsoleResult = ActionResult;
 
 export type Briefing = {
   manager_id: string; question: string; answer: string;

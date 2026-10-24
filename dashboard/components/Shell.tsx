@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 import { useFeed } from "./Feed";
 import { Building, Gavel, Home, Inbox, ListIcon, Mark, Shield, Spark } from "./Icons";
+import { DemoBar } from "./DemoBar";
+import { Disclosure } from "./Disclosure";
+import { ResponsesPanel } from "./Responses";
 import { DocProvider } from "./ui";
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -13,11 +16,10 @@ export function Shell({ children }: { children: ReactNode }) {
   const pending = state?.cases.filter((c) => c.status === "pending").length ?? 0;
   const open = state?.items.filter((i) => i.attention).length ?? 0;
   const nav = [
-    { href: "/", label: "Overview", icon: Home },
-    { href: "/items", label: "Open items", icon: ListIcon, count: open },
-    { href: "/cases", label: "Case queue", icon: Inbox, count: pending },
-    { href: "/keyway", label: "Keyway", icon: Building },
-    { href: "/guardrails", label: "Guardrails", icon: Shield },
+    { href: "/overview", label: "Overview", icon: Home },
+    { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
+    { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
+    { href: "/keyway", label: "Keyway money trail", icon: Building },
   ];
   const tools = [
     { href: "/console", label: "Judge Console", icon: Gavel },
@@ -44,13 +46,18 @@ export function Shell({ children }: { children: ReactNode }) {
                 {count ? <span className="count">{count}</span> : null}
               </Link>
             ))}
-            <div className="nav-group micro faint" style={{ marginTop: 14, marginBottom: 4 }}>Demo</div>
+            <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
+              <Link href="/agents"><Spark /> Agents</Link>
+              <Link href="/guardrails"><Shield /> Guardrails</Link>
+            </Disclosure>
+            <div className="nav-group micro faint" style={{ marginTop: 14, marginBottom: 4 }}>Demo tools</div>
             {tools.map(({ href, label, icon: I }) => (
               <Link key={href} href={href} aria-current={active(href) ? "page" : undefined}>
                 <I /> {label}
               </Link>
             ))}
           </nav>
+          <DemoBar />
           <div className="side-foot">
             <div className="who">
               <span className="who-av">D</span>
@@ -62,6 +69,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <main className="main">
           <div className="wrap">{children}</div>
         </main>
+        <ResponsesPanel />
       </div>
     </DocProvider>
   );

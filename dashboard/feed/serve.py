@@ -3,7 +3,10 @@
     python dashboard/feed/serve.py            # http://127.0.0.1:8765, rules-mode agents, free
 
 The Next.js app proxies /api/* here. One in-memory session; POST /api/reset rebuilds it.
-The briefing uses the free code briefing unless DASHBOARD_BRIEF_MODEL=1 (one Sonnet call each).
+Rules-mode agents by default (free). POST /api/live {"on": true} sends the next events to Claude
+(Sonnet agents, verifier model stage), metered against FEED_BUDGET dollars (default 1.00, an estimated threshold);
+past the cap everything falls back to rules. The briefing uses the free code briefing unless
+DASHBOARD_BRIEF_MODEL=1 (one Sonnet call each).
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ import os
 import sys
 import threading
 from pathlib import Path
+from typing import Literal
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(Path(__file__).parent)]
@@ -30,7 +34,7 @@ _session: DemoSession | None = None
 def session() -> DemoSession:
     global _session
     if _session is None:
-        _session = DemoSession()
+        _session = DemoSession(budget=float(os.getenv("FEED_BUDGET", "1.0")))
     return _session
 
 
@@ -43,6 +47,21 @@ class ConsoleIn(BaseModel):
 class DecisionIn(BaseModel):
     approve: bool
     by: str = "controller.dana"
+    identity_verified: bool = False
+
+
+class ReplyIn(BaseModel):
+    invoice_id: str
+    text: str
+    proof: Literal["none", "bank", "vendor"] = "none"          # none | bank | vendor
+
+
+class ClockIn(BaseModel):
+    days: int = 1
+
+
+class LiveIn(BaseModel):
+    on: bool
 
 
 class BriefIn(BaseModel):
@@ -71,7 +90,26 @@ def console(body: ConsoleIn):
 @app.post("/api/approvals/{approval_id}")
 def decide(approval_id: str, body: DecisionIn):
     with _lock:
-        return session().decide(approval_id, body.approve, body.by)
+        return session().decide(approval_id, body.approve, body.by, body.identity_verified)
+
+
+@app.post("/api/reply")
+def reply(body: ReplyIn):
+    with _lock:
+        return session().reply(body.invoice_id, body.text, body.proof)
+
+
+@app.post("/api/clock")
+def clock(body: ClockIn):
+    with _lock:
+        return session().advance(body.days)
+
+
+@app.post("/api/live")
+def live_mode(body: LiveIn):
+    with _lock:
+        r = session().set_live(body.on)
+        return {**r, "state": session().snapshot()}
 
 
 @app.post("/api/brief")

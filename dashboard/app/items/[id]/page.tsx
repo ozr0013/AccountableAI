@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Disclosure } from "@/components/Disclosure";
 import { useParams } from "next/navigation";
 import { useFeed } from "@/components/Feed";
 import { causeTag, onManager } from "@/components/ItemsTable";
@@ -33,7 +34,7 @@ export default function ItemPage() {
         {causeTag(it)}
       </PageTop>
 
-      <div className="grid" style={{ gridTemplateColumns: "repeat(5, minmax(0,1fr))" }}>
+      <div className="grid invoice-facts">
         {facts.map(([k, v, s]) => (
           <div key={k} className="card" style={{ padding: 16 }}>
             <p className="card-label" style={{ fontSize: 13 }}>{k}</p>
@@ -44,8 +45,7 @@ export default function ItemPage() {
       </div>
 
       {changed.length > 0 && (
-        <div className="card flat" style={{ marginTop: 16, borderColor: "var(--o-soft)" }}>
-          <p className="card-label">Changed by a judge fact</p>
+        <Disclosure title="What changed" hint="Corrections to this invoice" meta={changed.length}>
           <div className="diff">
             {changed.flatMap((c) => Object.entries(c.delta).filter(([k]) => k !== "alerts").map(([k, [a, b]]) => (
               <div key={k} className="stack" style={{ gap: 2 }}>
@@ -54,11 +54,10 @@ export default function ItemPage() {
               </div>
             )))}
           </div>
-        </div>
+        </Disclosure>
       )}
 
-      <section className="section">
-        <SectionTitle right={it.trail?.conflict ? <span className="warn">Sources disagree</span> : undefined}>Payment timeline · one lane per source</SectionTitle>
+      <Disclosure title="Payment timeline" hint="Compare the records behind this invoice" meta={it.trail?.conflict ? "Sources disagree" : undefined}>
         <div className="card" style={{ paddingTop: 28 }}>
           <Timeline item={it} asOf={state.meta.as_of} />
           {it.trail && (
@@ -67,7 +66,7 @@ export default function ItemPage() {
             </div>
           )}
         </div>
-      </section>
+      </Disclosure>
 
       <div className="grid g2 section">
         <div>
@@ -100,12 +99,14 @@ export default function ItemPage() {
                   <div className="row"><Badge kind={a.open ? (a.kind === "unexplained_unpaid" ? "flag" : "idle") : "done"} /><span className="h4 display">{ALERT[a.kind]}</span></div>
                   <span className={`tag ${a.open ? "" : "neutral"}`}>{a.open ? "Open" : "Withdrawn"}</span>
                 </div>
+                <Disclosure title="Claims & citations" meta={a.claims.length}>
                 {a.claims.map((c, i) => (
                   <div key={i} style={{ marginBottom: 10 }}>
                     <p className="body" style={{ margin: "0 0 6px" }}>{named(c.text, names)}</p>
                     <Cites cites={c.citations} />
                   </div>
                 ))}
+                </Disclosure>
                 {!a.open && a.withdrawn_reason && <div className="notice ok">Withdrawn: {named(a.withdrawn_reason, names)}</div>}
                 <div className="between" style={{ marginTop: 8 }}>
                   <span className="micro muted">Verifier: {a.verdict.status}</span>
@@ -117,8 +118,7 @@ export default function ItemPage() {
         </div>
       </div>
 
-      <section className="section">
-        <SectionTitle right={`${docs.length} documents`}>Evidence</SectionTitle>
+      <Disclosure title="Source documents" hint="Read the underlying evidence" meta={`${docs.length} documents`}>
         <div className="grid g3">
           {docs.sort((a, b) => (a.dated ?? "").localeCompare(b.dated ?? "")).map((d) => (
             <div key={d.id} className={`doc ${it.trail?.winning.includes(d.id) ? "hl" : ""}`}>
@@ -130,7 +130,7 @@ export default function ItemPage() {
             </div>
           ))}
         </div>
-      </section>
+      </Disclosure>
     </>
   );
 }

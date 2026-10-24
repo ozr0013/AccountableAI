@@ -1,5 +1,6 @@
 "use client";
 
+import { Disclosure } from "@/components/Disclosure";
 import { useFeed } from "@/components/Feed";
 import { Badge, Loading, PageTop, SectionTitle } from "@/components/ui";
 
@@ -18,8 +19,8 @@ export default function Guardrails() {
   if (!state) return <><PageTop title="Guardrails" /><Loading /></>;
   return (
     <>
-      <PageTop title="Guardrails" sub="Enforced in code by the rails policy gate. Each row below is a live call to that gate." />
-      <SectionTitle right={`${state.guardrails.filter((g) => !g.allowed).length} refused`}>What an agent tried, and what the gate said</SectionTitle>
+      <PageTop title="Guardrails" sub="Your boundaries, enforced in code. Open a rule to learn more." />
+      <Disclosure title="Policy check results" hint="Inspect actions, actors, and reasons" meta={`${state.guardrails.filter((g) => !g.allowed).length} refused`}>
       <div className="card" style={{ padding: "16px 8px 4px" }}>
         <table className="table">
           <thead><tr><th>Attempt</th><th>Action</th><th>Actor</th><th>Gate</th><th>Reason</th></tr></thead>
@@ -36,15 +37,12 @@ export default function Guardrails() {
           </tbody>
         </table>
       </div>
+      </Disclosure>
       <section className="section">
         <SectionTitle>The rules</SectionTitle>
         <div className="grid g3">
           {RULES.map(([t, d], i) => (
-            <div key={t} className="card stack" style={{ gap: 10, minHeight: 150 }}>
-              <span className="label faint">{String(i + 1).padStart(2, "0")}</span>
-              <span className="display h4">{t}</span>
-              <span className="body muted">{d}</span>
-            </div>
+            <Disclosure key={t} title={t} meta={String(i + 1).padStart(2, "0")}><p className="body" style={{ margin: 0 }}>{d}</p></Disclosure>
           ))}
         </div>
       </section>

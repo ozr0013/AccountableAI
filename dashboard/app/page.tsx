@@ -1,151 +1,136 @@
 "use client";
 
 import Link from "next/link";
-import { useFeed } from "@/components/Feed";
-import { ItemsTable } from "@/components/ItemsTable";
-import { Badge, Loading, PageTop, SectionTitle, Spark } from "@/components/ui";
-import { ALERT, money, named } from "@/lib/format";
-import type { State } from "@/lib/types";
+import { useEffect, useState, type CSSProperties, type PointerEvent } from "react";
+import { Spotlight } from "@/components/Spotlight";
+import { Mark, Shield, ListIcon, Spark } from "@/components/Icons";
+import "./home.css";
 
-function monthly(state: State, key: "funded_on" | "paid_on", val: "funded" | "paid") {
-  const by: Record<string, number> = {};
-  for (const it of state.items) {
-    const d = it[key];
-    if (d) by[d.slice(0, 7)] = (by[d.slice(0, 7)] ?? 0) + it[val];
-  }
-  return Object.keys(by).sort().map((k) => by[k]);
+const Arrow = () => <span aria-hidden="true">↗</span>;
+
+type SnapshotRow = { label: string; value: number; note: string; progress: string; tone: string };
+
+const fallbackSnapshot: SnapshotRow[] = [
+  { label: "Funded", value: 243710, note: "to Keyway", progress: "100%", tone: "funded" },
+  { label: "Reconciled", value: 234600, note: "bank or vendor proof", progress: "96.3%", tone: "reconciled" },
+  { label: "Proof needed", value: 3140, note: "3 invoices need a receipt", progress: "1.3%", tone: "proof" },
+];
+
+function makeSnapshot(feed: { headline?: { funded?: number; paid?: number; unexplained?: number; unexplained_items?: string[] } }): SnapshotRow[] {
+  const funded = Number(feed.headline?.funded) || fallbackSnapshot[0].value;
+  const paid = Number(feed.headline?.paid) || fallbackSnapshot[1].value;
+  const proof = Number(feed.headline?.unexplained) || fallbackSnapshot[2].value;
+  const proofCount = feed.headline?.unexplained_items?.length ?? 3;
+  return [
+    { label: "Funded", value: funded, note: "to Keyway", progress: "100%", tone: "funded" },
+    { label: "Reconciled", value: paid, note: "bank or vendor proof", progress: `${((paid / funded) * 100).toFixed(1)}%`, tone: "reconciled" },
+    { label: "Proof needed", value: proof, note: `${proofCount} invoice${proofCount === 1 ? "" : "s"} need a receipt`, progress: `${Math.max(1, (proof / funded) * 100).toFixed(1)}%`, tone: "proof" },
+  ];
 }
 
-export default function Overview() {
-  const { state } = useFeed();
-  if (!state) return <><PageTop title="Overview" /><Loading /></>;
-  const h = state.headline;
-  const names = state.meta.names;
-  const moment = state.history.at(-1)?.diff;
-  const was = moment?.unexplained[0];
-  const vendors = h.unexplained_items.map((i) => state.items.find((x) => x.id === i)!).filter(Boolean);
-  const flagged = state.alerts.filter((a) => a.open);
-  const notKeyway = flagged.filter((a) => ["owner_pending_approval", "paperwork_request", "bank_detail_change"].includes(a.kind)).length;
-  const funding = state.cases.filter((c) => c.kind === "funding").at(-1);
+function HeroSnapshot() {
+  const [snapshot, setSnapshot] = useState<SnapshotRow[]>(fallbackSnapshot);
+  const [values, setValues] = useState(() => fallbackSnapshot.map(() => 0));
+  const [ready, setReady] = useState(false);
 
+  useEffect(() => {
+    let frame = 0;
+    const animate = (next: SnapshotRow[]) => {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduce) { setValues(next.map((item) => item.value)); setReady(true); return; }
+      const started = performance.now();
+      const tick = (now: number) => {
+        const progress = Math.min(1, (now - started) / 1200);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setValues(next.map((item) => Math.round(item.value * eased)));
+        if (progress < 1) frame = requestAnimationFrame(tick); else setReady(true);
+      };
+      frame = requestAnimationFrame(tick);
+    };
+    const load = async () => {
+      let next = fallbackSnapshot;
+      try {
+        const response = await fetch("/feed/state.json", { cache: "no-store" });
+        if (response.ok) next = makeSnapshot(await response.json());
+      } catch { /* the rendered fallback remains accurate for the demo */ }
+      setSnapshot(next);
+      animate(next);
+    };
+    load();
+    return () => cancelAnimationFrame(frame);
+  }, []);
+
+  return <div className="hero-ledger" data-ready={ready} aria-label="Current reconciliation snapshot">
+    <div className="ledger-head"><span>LIVE RECONCILIATION</span><i /></div>
+    {snapshot.map((item, index) => <div className={`ledger-row ${item.tone}`} style={{ "--delay": `${160 + index * 140}ms`, "--progress": item.progress } as CSSProperties} key={item.label}>
+      <div className="ledger-copy"><span>{item.label}</span><small>{item.note}</small></div>
+      <div className="ledger-value"><strong>${values[index].toLocaleString("en-US")}</strong><div className="ledger-track"><i /></div></div>
+    </div>)}
+  </div>;
+}
+
+export default function Home() {
+  const [corrected, setCorrected] = useState(false);
+  const moveLiquid = (event: PointerEvent<HTMLElement>) => {
+    const hero = event.currentTarget;
+    const bounds = hero.getBoundingClientRect();
+    hero.style.setProperty("--cursor-x", `${((event.clientX - bounds.left) / bounds.width) * 100}%`);
+    hero.style.setProperty("--cursor-y", `${((event.clientY - bounds.top) / bounds.height) * 100}%`);
+  };
+  const resetLiquid = (event: PointerEvent<HTMLElement>) => {
+    event.currentTarget.style.setProperty("--cursor-x", "74%");
+    event.currentTarget.style.setProperty("--cursor-y", "34%");
+  };
   return (
-    <>
-      <PageTop title="Overview" sub={`${state.meta.parent} funds ${state.meta.manager}, which pays ${state.meta.vendors} vendors on Oakline's behalf.`} />
+    <div className="home-page">
+      <header className="home-nav">
+        <Link href="/" className="home-logo"><Mark />AccountableAI<span className="home-beta">/ CAL HACKS</span></Link>
+        <nav aria-label="Product"><a href="#how-it-works">How it works</a><a href="#proof">The proof</a><a href="#control">Your control</a></nav>
+        <Link href="/overview" className="home-button home-button-dark">Open dashboard <Arrow /></Link>
+      </header>
 
-      <section className="moment">
-        <div>
-          <span className="label">/ Before you send Keyway {money(state.meta.funding_pending, false)}</span>
-          <div className="moment-amount num" style={{ marginTop: 14 }}>
-            {was != null && was !== h.unexplained && <span className="strike" style={{ opacity: .45, marginRight: 16 }}>{money(was, false)}</span>}
-            {money(h.proposed_hold, false)}<small>recommended hold</small>
+      <main>
+        <section className="home-hero" aria-labelledby="home-title" onPointerMove={moveLiquid} onPointerLeave={resetLiquid}>
+          <div className="hero-art" aria-hidden="true">
+            <div className="hero-grid" />
+            <div className="hero-liquid liquid-one" />
+            <div className="hero-liquid liquid-two" />
           </div>
-          <p>
-            Keyway still owes {vendors.length} vendor{vendors.length === 1 ? "" : "s"} {money(h.unexplained, false)} from money you already sent
-            {vendors.length ? ` (${vendors.map((v) => `${v.vendor} ${money(v.owed, false)}`).join(", ")})` : ""}.
-            No bank record or vendor confirmation shows them paid. Chased {h.times_chased} times.
-          </p>
-        </div>
-        <div className="moment-actions">
-          <Link href="/cases" className="btn on-wine">Review the case</Link>
-          <Link href="/console" className="pill on-wine">Judge Console</Link>
-        </div>
-      </section>
+          <HeroSnapshot />
+          <div className="hero-top"><div className="hero-top-actions"><span className="home-eyebrow">/ ACCOUNTABILITY, BUILT IN.</span><Link href="/overview" className="home-button hero-cta">See it in action <span className="button-orb"><Arrow /></span></Link></div></div>
+          <div className="hero-copy">
+            <div><h1 id="home-title">You sent the money.<br /><span>Did it reach them?</span></h1><p>AccountableAI follows your funding all the way to the vendor. It finds missing payments, checks the evidence, and brings you a clear decision before you send more.</p></div>
+          </div>
+          <div className="hero-cards" id="how-it-works">
+            <article className="sugar-card"><span className="feature-number">01 / FOLLOW</span><h2><ListIcon />Every payment.</h2><p>Bring invoices, funding records, bank statements, and vendor replies into one payment trail.</p><div className="glass-tags"><span>Invoices</span><span>Bank records</span><span>Source links</span></div></article>
+            <article className="sugar-card"><span className="feature-number">02 / QUESTION</span><h2><Spark />Every claim.</h2><p>“We paid” is a starting point. Agents look for proof, challenge conflicting records, and chase what’s missing.</p><div className="glass-tags"><span>Evidence checks</span><span>Follow-ups</span></div></article>
+            <article className="sugar-card"><span className="feature-number">03 / DECIDE</span><h2><Shield />Your next move.</h2><p>Get a proposed hold with the evidence attached. A controller makes the call. No agent moves your money.</p><div className="glass-tags"><span>Human approval</span><span>Audit trail</span></div></article>
+          </div>
+        </section>
 
-      <div className="grid g4" style={{ marginTop: 16 }}>
-        <div className="card stat">
-          <p className="card-label">Funded to Keyway</p>
-          <div className="stat-value num">{money(h.funded, false)}</div>
-          <div className="stat-sub micro warn">Jan to Apr 2026 · {state.items.length} invoices</div>
-          <div className="stat-chart"><Spark values={monthly(state, "funded_on", "funded")} /></div>
-        </div>
-        <div className="card stat">
-          <p className="card-label">Confirmed paid to vendors</p>
-          <div className="stat-value num">{money(h.paid, false)}</div>
-          <div className="stat-sub micro ok">{((h.paid / h.funded) * 100).toFixed(1)}% of funded · bank + vendor proof</div>
-          <div className="stat-chart"><Spark values={monthly(state, "paid_on", "paid")} tone="g" /></div>
-        </div>
-        <div className="card stat">
-          <p className="card-label">Still owed by Keyway</p>
-          <div className="stat-value num">{money(h.owed, false)}</div>
-          <div className="stat-sub micro warn">{money(h.unexplained, false)} unexplained · {money(h.held, false)} authorized hold</div>
-          <div className="stat-chart">
-            <div className="bar" style={{ height: 22 }}>
-              <div style={{ width: `${(h.unexplained / h.owed) * 100}%`, background: "var(--o)" }} title="Unexplained" />
-              <div style={{ width: `${(h.held / h.owed) * 100}%`, background: "var(--g-ink)" }} title="Authorized hold" />
-              <div style={{ flex: 1, background: "var(--n6)" }} title="Explained, not Keyway's" />
-            </div>
+        <section className="home-proof" id="proof" aria-labelledby="proof-title">
+          <div className="proof-copy"><span className="home-eyebrow">/ LESS GUESSWORK. MORE RECEIPTS.</span><h2 id="proof-title">The answer changes.<br /><span>The evidence says why.</span></h2><p>In our fictional demo, Oakline funds Keyway to pay its vendors. Three invoices appear overdue. But one new fact changes the picture.</p><p>Correct the electrician’s invoice date and watch the proposed hold update. The plumber and cleaner stay open—because their payment proof is still missing.</p><Link href="/console" className="home-text-link">Try your own fact in the Judge Console <Arrow /></Link></div>
+          <div className="proof-demo">
+            <div className="proof-demo-head"><span className="home-eyebrow">OAKLINE → KEYWAY</span><span className="sample-label">Illustrative demo</span></div>
+            <div className="proof-amount"><span>Recommended hold</span><strong aria-live="polite">{corrected ? "$2,240" : "$3,140"}</strong><span>of the next $18,400 in funding</span></div>
+            <div className="proof-invoice"><span><b>Rio Grande Plumbing</b><small>No bank or vendor proof</small></span><b>$1,240</b></div>
+            <div className="proof-invoice"><span><b>Brightside Cleaning</b><small>No bank or vendor proof</small></span><b>$1,000</b></div>
+            <div className={`proof-invoice ${corrected ? "invoice-corrected" : ""}`}><span><b>Sparkline Electric</b><small>{corrected ? "✓ Not due yet · received Apr 15" : "Receipt date recorded as Mar 28"}</small></span><b>{corrected ? "Cleared" : "$900"}</b></div>
+            <button className="home-button proof-toggle" aria-pressed={corrected} onClick={() => setCorrected(!corrected)}>{corrected ? "Reset the example" : "Correct invoice date to Apr 15"}<span aria-hidden="true">{corrected ? "↺" : "→"}</span></button>
+            <p className="proof-explanation" role="status">{corrected ? "$900 removed from the proposed hold. The other two invoices still need proof." : "Change one fact. See exactly which recommendation depends on it."}</p>
           </div>
-        </div>
-        <div className="card stat">
-          <p className="card-label">Open alerts</p>
-          <div className="stat-value num">{h.open_alerts}</div>
-          <div className="stat-sub micro"><span className="warn">{h.unexplained_items.length} on Keyway</span><span className="faint">·</span><span className="ok">{notKeyway} not Keyway&apos;s fault</span></div>
-          <div className="stat-chart micro muted">Every alert cites its sources · verifier checked</div>
-        </div>
-      </div>
+        </section>
 
-      <div className="grid g-main" style={{ marginTop: 16 }}>
-        <div className="card">
-          <div className="between" style={{ marginBottom: 16 }}>
-            <p className="card-label" style={{ margin: 0 }}>Agent activity</p>
-            <span className="micro muted">{state.meta.documents} documents · {state.meta.events} events</span>
-          </div>
-          <div className="rows">
-            {state.agents.map((a) => (
-              <div key={a.agent} className="arow">
-                <Badge kind={a.flagged ? "flag" : "done"} />
-                <div className="arow-main">
-                  <span className="arow-title">{a.agent}</span>
-                  <div className="arow-sub">
-                    <span className="micro ok">{a.done}</span>
-                    {a.flagged && <span className="micro warn">{a.flagged}</span>}
-                  </div>
-                </div>
-                <div className="arow-end"><span className="tag neutral">{a.kind === "code" ? "Code" : "Agent"}</span></div>
-              </div>
-            ))}
-          </div>
+        <div id="control">
+          <Spotlight className="home-control">
+            <div className="control-heading"><span className="home-eyebrow">/ AGENTS DO THE LEGWORK.</span><h2>You keep<br /><span>the last word.</span></h2><p>From the first invoice to the final recommendation, every step stays connected to its sources.</p><Link href="/guardrails" className="home-button control-button">Explore the guardrails <Arrow /></Link></div>
+            <div className="control-rules"><article><span className="rule-icon">↗</span><div><h3>Evidence you can open.</h3><p>Every alert cites a record. Click through to the source behind the claim.</p></div></article><article><span className="rule-icon">✓</span><div><h3>Claims that get challenged.</h3><p>The verifier checks citations and blocks unsupported or accusatory language.</p></div></article><article><span className="rule-icon">◎</span><div><h3>A human in the decision.</h3><p>Agents recommend. Controllers approve holds. Bank changes need identity verification.</p></div></article></div>
+          </Spotlight>
         </div>
-        <div className="card">
-          <p className="card-label" style={{ marginBottom: 16 }}>Flagged for you</p>
-          <div className="rows">
-            {flagged.map((a) => (
-              <Link key={a.id} href={a.kind === "recurring_pattern" ? "/keyway" : `/items/${a.invoice_ids[0]}`} className="arow">
-                <Badge kind={a.kind === "unexplained_unpaid" ? "flag" : "idle"} />
-                <div className="arow-main">
-                  <span className="arow-title">{ALERT[a.kind] ?? a.kind}</span>
-                  <div className="arow-sub">
-                    <span className="micro muted" style={{ whiteSpace: "normal" }}>{named(a.headline, names).split(": ").slice(-1)[0]}</span>
-                  </div>
-                </div>
-                <div className="arow-end"><span className={`tag ${a.kind === "unexplained_unpaid" ? "" : "neutral"}`}>Review</span></div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </div>
 
-      <section className="section">
-        <SectionTitle right={<Link href="/items" className="link">All open items</Link>}>Keyway&apos;s open items, by vendor money still owed</SectionTitle>
-        <div className="card" style={{ padding: "16px 8px 4px" }}>
-          <ItemsTable state={state} />
-        </div>
-      </section>
-
-      <footer className="foot">
-        <span className="label">/ Seats filled</span>
-        <p className="foot-line">
-          The accounts-payable reviewer who confirms every vendor got paid from the money we sent the middleman,
-          and the collections person who chases the middleman when they didn&apos;t.
-        </p>
-        <div className="foot-grid">
-          <div><div className="v num">{state.meta.documents}</div><div className="micro" style={{ opacity: .7 }}>documents read</div></div>
-          <div><div className="v num">{state.items.length}</div><div className="micro" style={{ opacity: .7 }}>invoices traced, funded to paid</div></div>
-          <div><div className="v num">{h.reminders_sent}</div><div className="micro" style={{ opacity: .7 }}>reminders from approved templates</div></div>
-          <div><div className="v num">0</div><div className="micro" style={{ opacity: .7 }}>dollars moved by an agent</div></div>
-        </div>
-        {funding && <p className="micro" style={{ opacity: .55, marginTop: 28 }}>Case {funding.id} · proposed by {funding.proposed_by} · {funding.status}</p>}
-      </footer>
-    </>
+        <section className="home-closing"><span className="home-eyebrow">/ FOLLOW THE MONEY. FIND THE PROOF.</span><h2>Meet your new<br />second set of eyes.</h2><Link href="/overview" className="home-button home-button-dark">Open the live demo <Arrow /></Link><p>Fictional vendors. Real workflow. You’re in control.</p></section>
+      </main>
+      <footer className="home-footer"><Link href="/" className="home-logo"><Mark />AccountableAI</Link><span>Built at Cal Hacks · 2026</span><Link href="/overview">Enter dashboard ↗</Link></footer>
+    </div>
   );
 }

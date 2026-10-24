@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useFeed } from "@/components/Feed";
+import { ResponseList } from "@/components/Responses";
 import { Badge, Loading, PageTop, SectionTitle } from "@/components/ui";
 import { ALERT, day, money, named } from "@/lib/format";
 import type { ConsoleResult } from "@/lib/types";
@@ -18,7 +19,7 @@ function fmt(k: string, v: unknown): string {
 }
 
 export default function Console() {
-  const { state, presets, runConsole, reset, mode, last } = useFeed();
+  const { state, presets, runConsole, reset, mode, last, setPanel } = useFeed();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [res, setRes] = useState<ConsoleResult | null>(last);
@@ -27,7 +28,7 @@ export default function Console() {
 
   const run = async (q: { preset?: string; text?: string }) => {
     setBusy(true);
-    try { setRes(await runConsole(q)); } catch (e) { setRes({ ok: false, error: String(e) }); }
+    try { setRes(await runConsole(q)); setPanel(false); } catch (e) { setRes({ ok: false, error: String(e) }); }
     setBusy(false);
   };
   const d = res?.ok ? res.diff : null;
@@ -84,12 +85,6 @@ export default function Console() {
                       </div>
                     </div>
                   ))}
-                  {res.trace.filter((t) => t.startsWith("reply read:")).map((t) => (
-                    <div key={t} className="arow" style={{ alignItems: "flex-start" }}>
-                      <Badge kind="flag" />
-                      <div className="arow-main"><span className="arow-title">Reply read</span><span className="body" style={{ fontSize: 13 }}>{t.replace("reply read: ", "")}. The alert stays open.</span></div>
-                    </div>
-                  ))}
                   {d.changed.length === 0 && <div className="notice">Nothing changed. {d.rechecked_unchanged.length ? `${d.rechecked_unchanged.join(", ")} rechecked and still holds.` : ""}</div>}
                   {d.withdrawn.map((a) => (
                     <div key={a.id} className="arow" style={{ alignItems: "flex-start" }}>
@@ -111,15 +106,19 @@ export default function Console() {
                   </div>
                   <p style={{ fontSize: 14, lineHeight: "20px" }}>Kept: {d.unexplained_items[1].map((i) => state.items.find((x) => x.id === i)?.vendor ?? i).join(", ") || "nothing"}.</p>
                 </div>
-                <div className="moment-actions"><Link href="/cases" className="btn on-wine">Updated case</Link><Link href="/" className="pill on-wine">Overview</Link></div>
+                <div className="moment-actions"><Link href="/cases" className="btn on-wine">Updated case</Link><Link href="/overview" className="pill on-wine">Overview</Link></div>
               </div>
             </div>
           )}
-          {res?.ok && res.trace.length > 0 && (
-            <details className="card flat">
-              <summary className="label muted" style={{ cursor: "pointer" }}>Workflow trace ({res.trace.length} lines)</summary>
-              <pre className="mono" style={{ fontSize: 11, lineHeight: "17px", whiteSpace: "pre-wrap", margin: "12px 0 0", color: "var(--n10)" }}>{res.trace.join("\n")}</pre>
-            </details>
+          {res?.ok && (
+            <div className="card dotted-card">
+              <SectionTitle right={res.live ? `Claude · $${res.cost.toFixed(4)}` : "rules · $0"}>Agent responses</SectionTitle>
+              <ResponseList responses={res.responses ?? []} />
+              <details style={{ marginTop: 16 }}>
+                <summary className="micro muted" style={{ cursor: "pointer" }}>Raw workflow trace ({res.trace.length} lines)</summary>
+                <pre className="mono" style={{ fontSize: 11, lineHeight: "17px", whiteSpace: "pre-wrap", margin: "12px 0 0", color: "var(--n10)", maxHeight: 320, overflow: "auto" }}>{res.trace.join("\n")}</pre>
+              </details>
+            </div>
           )}
         </div>
 

@@ -113,8 +113,8 @@ export function Spark({ values, height = 56, tone = "o" }: { values: number[]; h
   const w = 260, h = height, max = Math.max(...values) || 1, min = Math.min(0, ...values);
   const pts = values.map((v, i) => [(i / (values.length - 1)) * w, h - 4 - ((v - min) / (max - min || 1)) * (h - 10)]);
   const line = pts.map((p, i) => `${i ? "L" : "M"}${p[0].toFixed(1)} ${p[1].toFixed(1)}`).join(" ");
-  const stroke = tone === "o" ? "#fa6610" : "#4b8f48";
-  const fill = tone === "o" ? "#fff1e9" : "#eef5ec";
+  const stroke = tone === "o" ? "var(--o)" : "var(--g-ink)";
+  const fill = tone === "o" ? "var(--o-wash)" : "var(--g-wash)";
   return (
     <svg viewBox={`0 0 ${w} ${h}`} width="100%" height={h} preserveAspectRatio="none" aria-hidden>
       <path d={`${line} L${w} ${h} L0 ${h} Z`} fill={fill} />

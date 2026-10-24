@@ -1,6 +1,8 @@
 "use client";
 
+import { Disclosure } from "@/components/Disclosure";
 import { useFeed } from "@/components/Feed";
+import { ReplyBox } from "@/components/ReplyBox";
 import { Cites, Loading, PageTop, SectionTitle } from "@/components/ui";
 import { day, money, month, named } from "@/lib/format";
 
@@ -12,7 +14,7 @@ export default function Keyway() {
   const explained = Math.max(0, r.owed - h.unexplained);
   const parts = [
     { k: "Paid to vendors", v: r.paid, c: "var(--g-ink)", note: "bank record or vendor confirmation" },
-    { k: "Authorized holds", v: r.held, c: "#8fbf86", note: "10% until inspection · clause 7.4" },
+    { k: "Authorized holds", v: r.held, c: "#8e9fa8", note: "10% until inspection · clause 7.4" },
     { k: "Owed, explained", v: explained, c: "var(--n7)", note: "paperwork, bank-detail check, not due" },
     { k: "Owed, unexplained", v: h.unexplained, c: "var(--o)", note: "alert on Keyway" },
     { k: "Funded twice", v: r.duplicate_funded, c: "var(--wine)", note: "duplicate billing flagged" },
@@ -30,7 +32,12 @@ export default function Keyway() {
     <>
       <PageTop title={state.meta.manager} sub="The middleman Oakline funds. Every dollar from 'funded' to 'vendor confirmed paid'." />
 
-      <SectionTitle right={<span className="num">{money(r.funded)}</span>}>Funded vs paid vs owed</SectionTitle>
+      <div className="quiet-metrics">
+        <div><span>Funded</span><strong>{money(r.funded, false)}</strong></div>
+        <div><span>Paid to vendors</span><strong>{money(r.paid, false)}</strong></div>
+        <div><span>Still owed</span><strong>{money(r.owed, false)}</strong></div>
+      </div>
+      <Disclosure title="Where the money went" hint="Reconciliation and payment breakdown">
       <div className="card">
         <div className="bar" style={{ height: 36 }}>
           {parts.map((p) => <div key={p.k} style={{ width: `${(p.v / total) * 100}%`, background: p.c, minWidth: p.v ? 3 : 0 }} title={`${p.k}: ${money(p.v)}`} />)}
@@ -48,7 +55,9 @@ export default function Keyway() {
         </div>
       </div>
 
-      <div className="grid g2 section">
+      </Disclosure>
+      <Disclosure title="Payment history & agreement" hint="Late payments, confirmed terms, and aging">
+      <div className="grid g2">
         <div>
           <SectionTitle right={`${late.length} late payments`}>Paid on time? Against clause 7.2</SectionTitle>
           <div className="months">
@@ -94,9 +103,11 @@ export default function Keyway() {
         </div>
       </div>
 
-      <section className="section">
-        <SectionTitle right={`${h.reminders_sent} sent · 0 off-template`}>Chase log</SectionTitle>
-        <div className="card">
+      </Disclosure>
+      <section style={{ marginTop: 24 }}>
+        <Disclosure title="Add a reply from Keyway" hint="Demo: test a payment claim, with or without proof"><ReplyBox /></Disclosure>
+        <Disclosure title="Conversation history" hint="Reminders and Keyway’s replies" meta={`${thread.length} messages`}>
+        <div className="card" style={{ marginTop: 16 }}>
           <div className="thread">
             {thread.map((t) => t.out ? (
               <div key={t.c.id} className="msg out">
@@ -109,7 +120,7 @@ export default function Keyway() {
             ) : (
               <div key={t.r.id} className="msg in">
                 <div className="msg-meta">
-                  <span className="tag wine">Keyway reply</span>
+                  <span className="tag wine">Keyway reply{t.r.judge ? " · judge" : ""}</span>
                   <span className="micro muted">{day(t.r.on)} · {t.r.invoice_id}</span>
                 </div>
                 &ldquo;{t.r.text}&rdquo;
@@ -120,6 +131,7 @@ export default function Keyway() {
             ))}
           </div>
         </div>
+        </Disclosure>
       </section>
     </>
   );

@@ -31,7 +31,9 @@ AGENT_OF_STEP = {"alert_raised": "verifier", "alert_rejected": "verifier",
                  "case_proposed": "case_agent", "terms_proposed": "agreement_agent",
                  "bank_change_held": "workflow", "reply_read": "chaser",
                  "approval_requested": "case_agent", "approval_decided": "controller",
-                 "terms_confirmed": "controller", "fact_corrected": "judge"}
+                 "terms_confirmed": "controller", "fact_corrected": "judge",
+                 "funding_instruction": "controller", "bank_change_decided": "controller",
+                 "chase_reply": "keyway"}
 
 
 class _RulesVerifier:
@@ -46,6 +48,75 @@ class _RulesVerifier:
                        reasons=r.reasons or ["citations and wording checked"])
 
 
+def _live_available() -> bool:
+    import live
+    return live.available()
+
+
+def _sec(n: int):
+    from datetime import timedelta
+    return timedelta(seconds=n)
+
+
+def _claims_paid(text: str) -> bool:
+    from agents.chaser.rules import claims_paid
+    return claims_paid(text)
+
+
+AGENT_NAME = {"verifier": "Verifier", "recheck": "Recheck", "chaser": "Chaser agent",
+              "case_agent": "Case agent", "agreement_agent": "Agreement agent",
+              "workflow": "Workflow", "controller": "Controller", "judge": "Judge",
+              "keyway": "Keyway", "trail": "Payment-trail agent", "cause": "Delay-cause agent",
+              "policy": "Policy gate", "pattern": "Pattern check"}
+
+
+def _responses(events: list[Event], trace: list[str], names: dict,
+               focus: set[str] | None = None) -> list[dict]:
+    """What each agent did in response to an action, in order: from the events it wrote, plus
+    the trace lines that leave no event (a reminder not due yet, an alert that still holds)."""
+    import re
+    out = []
+    for a in reversed(_audit(events)):
+        if a["type"] == "approval_requested":
+            continue
+        what = a["what"]
+        if a["type"] == "alert_raised":
+            what = f"passed: {what}"
+        elif a["type"] == "alert_rejected":
+            what = f"blocked: {what}"
+        out.append({"agent": AGENT_NAME.get(a["actor"], a["actor"]), "what": what,
+                    "type": a["type"], "invoice_id": a["invoice_id"]})
+    for e in events:
+        if e.type == "document_ingested" and str(e.payload.get("id", "")).startswith("ev-judge-"):
+            out.insert(0, {"agent": "Judge", "type": "document",
+                           "what": f"new record: {e.payload.get('text', '')}", "invoice_id": e.invoice_id})
+    seen = set()
+    for line in trace:
+        m = re.match(r"(INV-[\w-]+): (\w+)(?:, cause (\w+))?(?: \((.*)\))?$", line)
+        if m and m.group(1) not in seen and (focus is None or m.group(1) in focus):
+            seen.add(m.group(1))
+            st = m.group(2).replace("_", " ")
+            what = f"{m.group(1)}: {st}" + (f", cause {m.group(3).replace('_', ' ')}" if m.group(3) else "") \
+                + (f" ({m.group(4)})" if m.group(4) else "")
+            out.append({"agent": "Delay-cause agent", "type": "assess", "what": what, "invoice_id": m.group(1)})
+        elif m:
+            continue
+        elif line.startswith(("next reminder", "keyway: next reminder")) or (
+                "reminder" in line and "not due yet" in line):
+            out.append({"agent": "Chaser agent", "type": "chase_scheduled", "what": line.split(": ", 1)[-1],
+                        "invoice_id": None})
+        elif line.startswith("recheck:"):
+            out.append({"agent": "Recheck", "type": "recheck", "what": line.removeprefix("recheck: "),
+                        "invoice_id": None})
+    held = sum(1 for line in trace if line.endswith("still holds, unchanged"))
+    if held:
+        out.append({"agent": "Verifier", "type": "verified", "invoice_id": None,
+                    "what": f"{held} open alert{'s' * (held != 1)} re-checked against the new evidence: still hold"})
+    for r in out:
+        r["what"] = re.sub(r"\bv-[a-z0-9-]+\b", lambda m: names.get(m.group(0), m.group(0)), r["what"])
+    return out
+
+
 def _iso(x) -> str | None:
     if x is None:
         return None
@@ -53,9 +124,11 @@ def _iso(x) -> str | None:
 
 
 class DemoSession:
-    def __init__(self, seed: int = 13, n_clean: int = 100):
+    def __init__(self, seed: int = 13, n_clean: int = 100, budget: float = 1.0):
+        from live import Meter
         self.seed, self.n_clean = seed, n_clean
-        self.history: list[dict] = []          # Judge Console results, oldest first
+        self.meter = Meter(budget)
+        self.live = False
         self.build()
 
     # -- setup ----------------------------------------------------------------------------
@@ -71,15 +144,84 @@ class DemoSession:
         logging.getLogger("langgraph").setLevel(logging.ERROR)
         self.world = generate(self.seed, ALL_SCENARIOS, self.n_clean)
         self.rails = MemoryRails()
-        self.approvals = RailsApprovals(self.rails)
-        self.deps = Deps(self.rails, RealAgents(None), _RulesVerifier(), self.approvals)
+        # approvals are stamped on the demo clock, not the wall clock
+        self.approvals = RailsApprovals(self.rails, clock=lambda: self._clock(23, 50))
+        self.rules_agents, self.rules_verifier = RealAgents(None), _RulesVerifier()
+        self.deps = Deps(self.rails, self.rules_agents, self.rules_verifier, self.approvals)
         self.wf = Workflow(self.deps)
         self.wf.replay(self.world.events() + scan_events([MANAGER], self.world.as_of))
         self.wf.replay([funding_event(MANAGER, FUNDING, self.world.as_of)])
-        self.history = []
+        self.history: list[dict] = []          # every action, oldest first
+        self.actions = 0
+        if self.live:
+            self.set_live(True)
 
     def reset(self) -> None:
         self.build()
+
+    def _clock(self, h: int = 12, m: int = 0, s: int = 0) -> datetime:
+        from datetime import UTC, time
+        return datetime.combine(self.rails.now(), time(h, m, s), tzinfo=UTC)
+
+    def set_live(self, on: bool) -> dict:
+        """Live: the next events go to Claude (Sonnet agents, verifier model stage), metered."""
+        import live
+
+        from agents import RealAgents
+        from workflow.names import names_from
+        if on and not live.available():
+            return {"ok": False, "error": "no ANTHROPIC_API_KEY in the feed's environment"}
+        from workflow import Deps, Workflow
+        if on:
+            agents = RealAgents(live.MeteredLLM(self.meter))
+            agents.set_names(names_from(self.rails))
+            verifier = live.MeteredVerifier(self.meter, self.rules_verifier)
+        else:
+            agents, verifier = self.rules_agents, self.rules_verifier
+        # Deps is frozen; rebind the graph while retaining paused/checkpointed runs.
+        deps = Deps(self.rails, agents, verifier, self.approvals)
+        workflow = Workflow(deps, checkpointer=self.wf.graph.checkpointer)
+        self.deps, self.wf, self.live = deps, workflow, on
+        return {"ok": True}
+
+    # -- the loop: every action runs the workflow, then the follow-ups ----------------------
+    def _act(self, kind: str, summary: str, events: list[Event], affected: list[str],
+             before: dict, appended: bool = False) -> dict:
+        """Handle the action's events, then let the other agents respond: a scan (chaser
+        follows up on schedule, pattern and causes refresh) and, when what Keyway owes changed,
+        a fresh case-agent review of the pending funding. Returns what each agent did."""
+        from workflow.run import funding_event
+        seq0 = before["meta"]["events"]
+        spent0 = self.meter.spent
+        runs = [self.wf.handle(e) if appended else self.wf.ingest(e) for e in events]
+        self.actions += 1
+        n, t = self.actions, (events[-1].learned_at if events else self._clock())
+        scan = Event(id=f"ev-scan-{MANAGER}-followup-{n}", type="scan_requested", manager_id=MANAGER,
+                     valid_from=t, learned_at=t + _sec(1),
+                     payload={"as_of": self.rails.now().isoformat()})
+        runs += self.wf.replay([scan])
+        if self._unexplained() != before["headline"]["unexplained"]:
+            ev = funding_event(MANAGER, FUNDING, self.rails.now())
+            runs += self.wf.replay([ev.model_copy(update={
+                "id": f"{ev.id}-recheck-{n}", "valid_from": t, "learned_at": t + _sec(2)})])
+        after = self.snapshot()
+        trace = [line for r in runs for line in r.trace]
+        out = {"ok": True, "kind": kind, "summary": summary, "affected": affected,
+               "events": [e.model_dump(mode="json") for e in events], "trace": trace,
+               "diff": (d := diff(before, after, affected)),
+               "responses": _responses(self.rails.events()[seq0:], trace, after["meta"]["names"],
+                                       set(affected) | {c["id"] for c in d["changed"]}),
+               "cost": round(self.meter.spent - spent0, 4), "live": self.live,
+               "state": after}
+        self.history.append({k: out[k] for k in ("kind", "summary", "affected", "diff", "responses", "cost")})
+        out["state"]["history"] = self.history
+        return out
+
+    def _unexplained(self) -> float:
+        from workflow.book import WorkflowBook
+        b = WorkflowBook.load(self.rails)
+        return round(sum(a.draft.amount for a in b.open_alerts(MANAGER)
+                         if a.draft.kind == AlertKind.unexplained_unpaid and a.draft.amount > 0), 2)
 
     # -- actions --------------------------------------------------------------------------
     def console(self, preset: str | None = None, params: dict | None = None,
@@ -92,39 +234,110 @@ class DemoSession:
             res = jc.apply_text(text, MANAGER) if text else jc.apply_preset(preset or "", params)
         except ConsoleError as e:
             return {"ok": False, "error": str(e), "suggestions": e.suggestions}
-        runs = [self.wf.handle(e) for e in res.events]
-        if self.snapshot()["headline"]["unexplained"] != before["headline"]["unexplained"]:
-            # What's owed changed, so the pending funding gets a fresh case-agent review.
-            from workflow.run import funding_event
-            ev = funding_event(MANAGER, FUNDING, self.world.as_of)
-            ev = ev.model_copy(update={"id": f"{ev.id}-recheck-{len(self.history) + 1}",
-                                       "learned_at": res.events[-1].learned_at})
-            runs += self.wf.replay([ev])
-        after = self.snapshot()
-        out = {"ok": True, "summary": res.summary, "affected": res.affected,
-               "events": [e.model_dump(mode="json") for e in res.events],
-               "trace": [line for r in runs for line in r.trace],
-               "diff": diff(before, after, res.affected),
-               "state": after}
-        self.history.append({k: out[k] for k in ("summary", "affected", "diff")})
-        return out
+        return self._act("fact", res.summary, res.events, res.affected, before, appended=True)
 
-    def decide(self, approval_id: str, approve: bool, by: str = CONTROLLER) -> dict:
-        """Controller decision. The rails policy gate refuses agents and self-approval."""
+    def reply(self, invoice_id: str, text: str, proof: str = "none") -> dict:
+        """The judge plays Keyway and answers a reminder. Proof, if attached, is the record it
+        would actually send: a bank payment line or the vendor's confirmation."""
+        import hashlib
+
+        from rails.console import ConsoleError, JudgeConsole
+        before = self.snapshot()
+        jc = JudgeConsole(self.rails)
+        text = (text or "").strip()
+        if proof not in ("none", "bank", "vendor"):
+            return {"ok": False, "error": "proof must be none, bank, or vendor"}
+        if not text:
+            return {"ok": False, "error": "write Keyway's reply first"}
+        try:
+            jc.invoice(invoice_id)
+        except ConsoleError as e:
+            return {"ok": False, "error": str(e), "suggestions": e.suggestions}
+        events: list[Event] = []
+        if proof in ("bank", "vendor"):
+            preset = "bank_shows_payment" if proof == "bank" else "vendor_confirms_paid"
+            key = "on" if proof == "bank" else "paid_on"
+            res = jc.apply_preset(preset, {"invoice_id": invoice_id, key: self.rails.now().isoformat()})
+            events += res.events
+        now = self._clock(12, 30)
+        eid = "ev-keyway-reply-" + hashlib.sha1(f"{invoice_id}|{text}|{proof}|{self.actions}".encode()).hexdigest()[:10]
+        ev = Event(id=eid, type="chase_reply", manager_id=MANAGER, invoice_id=invoice_id,
+                   valid_from=now, learned_at=now,
+                   payload={"id": eid, "manager_id": MANAGER, "invoice_ids": [invoice_id], "text": text,
+                            "received_at": now.isoformat(), "claims_paid": _claims_paid(text), "proof": []},
+                   source={"source_id": eid, "kind": SourceKind.manager_reply})
+        self.rails.append_event(ev)
+        events.append(ev)
+        attached = {"bank": " with a bank record attached", "vendor": " with the vendor's confirmation attached"}
+        return self._act("reply", f"Keyway replied on {invoice_id}{attached.get(proof, ', no attachment')}: “{text}”",
+                         events, [invoice_id], before, appended=True)
+
+    def advance(self, days: int) -> dict:
+        """Move the demo clock forward: due dates pass, the chaser's schedule moves on."""
+        from datetime import UTC, time, timedelta
+        days = max(1, min(int(days), 30))
+        before = self.snapshot()
+        new = self.rails.now() + timedelta(days=days)
+        at = datetime.combine(new, time(8), tzinfo=UTC)
+        meta = next(e for e in self.rails.events() if e.type == "world_meta")
+        ev = meta.model_copy(update={"id": f"ev-world-clock-{new.isoformat()}", "valid_from": at,
+                                     "learned_at": at, "payload": {**meta.payload, "as_of": new.isoformat()}})
+        return self._act("clock", f"Demo clock moved {days} day{'s' * (days != 1)} to {new:%b} {new.day}.",
+                         [ev], [], before)
+
+    def decide(self, approval_id: str, approve: bool, by: str = CONTROLLER,
+               identity_verified: bool = False) -> dict:
+        """Controller decision. The rails policy gate refuses agents and self-approval; a vendor
+        bank-detail change also needs identity verified before the gate lets it through."""
+        before = self.snapshot()
         case = next((c for c in self._cases(self.rails.events()) if c["approval_id"] == approval_id), None)
-        if case and case["status"] == "superseded":
-            return {"ok": False, "error": "superseded by a newer review", "state": self.snapshot()}
+        if case is None:
+            return {"ok": False, "error": f"no approval {approval_id}", "state": before}
+        if case["status"] == "superseded":
+            return {"ok": False, "error": "superseded by a newer review", "state": before}
+        # Check every decision before appending an irreversible approval event.
+        ok, why = self.rails.policy_check("approve", by, {"proposed_by": case["proposed_by"]})
+        if not ok:
+            return {"ok": False, "error": why, "state": before}
+        if case["kind"] == "bank_change" and approve and not identity_verified:
+            return {"ok": False, "error": "Verify the vendor's identity before approving bank details.",
+                    "state": before}
         try:
             self.approvals.decide(approval_id, by, approve)
         except (PermissionError, ValueError, KeyError) as e:
-            return {"ok": False, "error": str(e), "state": self.snapshot()}
-        return {"ok": True, "state": self.snapshot()}
+            return {"ok": False, "error": str(e), "state": before}
+        t = self._clock(23, 55)
+        if case["kind"] == "funding":
+            hold = case["proposed_hold"] if approve else 0.0
+            release = round((case["funding_amount"] or FUNDING) - hold, 2)
+            summary = (f"Funding instruction recorded: send ${release:,.2f} to Keyway now"
+                       + (f", hold ${hold:,.2f} until payment proof." if hold else " (hold declined)."))
+            payload = {"approval_id": approval_id, "release": release, "hold": hold,
+                       "approved": approve, "by": by, "note": "a recorded instruction for a person; no money moved"}
+            ev = Event(id=f"ev-funding-instruction-{approval_id}", type="funding_instruction",
+                       manager_id=MANAGER, valid_from=t, learned_at=t, payload=payload)
+        else:
+            vendor = next((d.vendor_id for d in self.rails.documents(MANAGER)
+                           if d.id in {c["source_id"] for c in case["evidence"]}), None)
+            ok, why = self.rails.policy_check("update_bank_details", by, {
+                "identity_verified": identity_verified and approve, "approved_by": by if approve else None,
+                "requested_by": vendor})
+            summary = ("Bank-detail change approved: identity verified, new details may be used."
+                       if ok else f"Bank-detail change stays held: {why}.")
+            ev = Event(id=f"ev-bank-change-decided-{approval_id}", type="bank_change_decided",
+                       manager_id=MANAGER, valid_from=t, learned_at=t,
+                       payload={"approval_id": approval_id, "vendor_id": vendor, "allowed": ok,
+                                "reason": why, "identity_verified": identity_verified, "by": by})
+        return self._act("decision", summary, [ev], [], before)
 
     def brief(self, question: str, use_model: bool = False) -> dict:
         from agents.briefing import Briefer
-        b = Briefer(self.rails, use_model=use_model)
+        b = Briefer(self.rails, use_model=use_model and self.meter.ok())
         out = b.brief(MANAGER, question)
-        return {**out.model_dump(mode="json"), "meta": b.last}
+        m = b.last or {}
+        if m.get("mode") == "model" and "input_tokens" in m:
+            self.meter.add("Briefing", m.get("model", "claude-sonnet-5-5"), m["input_tokens"], m.get("output_tokens", 0))
+        return {**out.model_dump(mode="json"), "meta": m}
 
     # -- read model -----------------------------------------------------------------------
     def snapshot(self) -> dict:
@@ -142,7 +355,9 @@ class DemoSession:
         vendors = {e.payload["id"]: e.payload for e in events
                    if e.type == "entity_registered" and e.payload.get("kind") == "vendor"}
         docs = {d.id: d for d in r.documents(MANAGER)}
-        steps = Steps(self.deps)
+        from workflow import Deps
+        # Rendering a read model must never invoke paid agents.
+        steps = Steps(Deps(r, self.rules_agents, self.rules_verifier, self.approvals))
 
         alerts = [_alert(a, a.draft.id in book.open_ids) for a in book.alerts.values()]
         open_by_item: dict[str, list[str]] = {}
@@ -201,7 +416,7 @@ class DemoSession:
                     for e in events if e.type == "reply_read"}
         for rep in replies:
             # a judge reply is an event whose document id is "<event id>:<invoice id>"
-            rep["judge"] = rep["id"].startswith("ev-judge-")
+            rep["judge"] = rep["id"].startswith(("ev-judge-", "ev-keyway-reply-"))
             rep["verdict"] = (verdicts.get(rep["id"].split(":")[0])
                               or verdicts.get(f"ev-doc-{rep['id']}"))
 
@@ -220,7 +435,9 @@ class DemoSession:
                      "manager": name(MANAGER), "funding_pending": FUNDING,
                      "controller": CONTROLLER, "vendors": len(vendors),
                      "documents": len(docs), "events": len(events),
-                     "agents": "rules",
+                     "agents": "live" if self.live else "rules",
+                     "live_available": _live_available(), "meter": self.meter.to_json(),
+                     "start": _iso(self.world.as_of), "actions": self.actions,
                      "names": {**{v: name(v) for v in vendors}, MANAGER: name(MANAGER)},
                      "generated_at": datetime.now().isoformat(timespec="seconds")},
             "headline": {
@@ -251,6 +468,8 @@ class DemoSession:
             "guardrails": self._guardrails(chases),
             "documents": {i: _doc(docs[i]) for i in sorted(cited) if i in docs},
             "history": self.history,
+            "decisions": [{"type": e.type, "at": _iso(e.learned_at), **e.payload}
+                          for e in events if e.type in ("funding_instruction", "bank_change_decided")],
         }
 
     def _cases(self, events: list[Event]) -> list[dict]:
@@ -400,6 +619,13 @@ def _audit(events: list[Event]) -> list[dict]:
             what = f"corrected {p['fact_key']} to {p['value']}"
         elif e.type == "reply_read":
             what = p.get("verdict") or "reply read"
+        elif e.type == "funding_instruction":
+            what = (f"funding instruction: send ${p['release']:,.2f} to Keyway"
+                    + (f", hold ${p['hold']:,.2f}" if p["hold"] else "") + " (no money moved)")
+        elif e.type == "bank_change_decided":
+            what = ("bank-detail change approved" if p["allowed"] else f"bank-detail change still held: {p['reason']}")
+        elif e.type == "chase_reply":
+            what = f"replied: \u201c{p.get('text')}\u201d"
         else:
             what = e.type.replace("_", " ")
         out.append({"seq": seq, "id": e.id, "at": _iso(e.learned_at), "type": e.type,
