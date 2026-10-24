@@ -162,7 +162,15 @@ class Steps:
         state = f"{a.days_late} days past due" if a.days_late > 0 else "open"
         claims = [Claim(text=a.finding.explanation, citations=a.finding.citations)]
         if a.trail and a.trail.winning_sources:
-            claims.append(Claim(text=a.trail.reasoning, citations=a.trail.winning_sources))
+            # Cite every source that spoke to payment, winners and overruled ones alike.
+            payment = {SourceKind.manager_statement, SourceKind.manager_bank,
+                       SourceKind.vendor_confirmation, SourceKind.vendor_notice,
+                       SourceKind.manager_reply}
+            cites = {c.source_id: c for c in a.trail.winning_sources}
+            for e in a.trail.entries:
+                if e.kind in payment:
+                    cites.setdefault(e.citation.source_id, e.citation)
+            claims.append(Claim(text=a.trail.reasoning, citations=list(cites.values())))
         return AlertDraft(
             id=alert_id(kind.value, a.manager_id, [a.invoice_id]), kind=kind,
             manager_id=a.manager_id, invoice_ids=[a.invoice_id],
