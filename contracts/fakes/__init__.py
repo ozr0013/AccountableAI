@@ -88,6 +88,14 @@ class FakeRails:
             return False, f"{action} is never allowed"
         if action == "approve" and payload.get("proposed_by") == actor:
             return False, "proposer cannot approve"
+        if action == "send_reminder" and not payload.get("template_approved"):
+            return False, "reminders only from controller-approved templates"
+        if action == "update_bank_details" and not (
+            payload.get("identity_verified") and payload.get("approved_by") not in (None, actor)
+        ):
+            return False, "bank-detail change needs identity check and controller approval"
+        if action == "post_entry" and payload.get("month_closed"):
+            return False, "no posting to a closed month"
         return True, "ok"
 
 

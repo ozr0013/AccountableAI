@@ -99,6 +99,12 @@
       "notes": "Alert stays open; explanation must say the reply has no vendor or bank proof."
     }
   ],
+  "moment": {
+    "_doc": "Keyway has 3 open alerts. Judge says 'we paid the electrician' (must hold), then adds the Apr 1 invoice date (10-day term). Only the electrician alert is rechecked and withdrawn.",
+    "withdraw_count": 1,
+    "keep_count": 2,
+    "max_rechecked": 1
+  },
   "global_rules": {
     "banned_terms": ["fraud", "misuse", "stole", "theft", "embezzle", "misappropriat"],
     "citation_rate_required": 1.0,

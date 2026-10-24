@@ -38,6 +38,12 @@ class Rails(Protocol):
     def reconcile(self, manager_id: str) -> dict[str, float]: ...    # funded, paid, held, owed, diff
     def dependents_of(self, fact_id: str) -> list[str]: ...          # invoice/alert ids to recheck
     def policy_check(self, action: str, actor: str, payload: dict) -> tuple[bool, str]: ...
+    # Actions (evals/test_prohibited.py holds every implementation to these):
+    #   move_money, send_unapproved          -> always denied
+    #   approve        {proposed_by}         -> denied if proposed_by == actor
+    #   send_reminder  {template_approved}   -> denied unless template_approved
+    #   update_bank_details {identity_verified, approved_by} -> denied unless both, approver != actor
+    #   post_entry     {month_closed}        -> denied if month_closed
 
 
 class Agents(Protocol):
