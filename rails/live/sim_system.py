@@ -194,13 +194,30 @@ class SimSystem:
             source = Citation(source_id=invoice.id, kind=invoice.kind)
             self.audit.emit("assessment_recorded", [event.id, iid], self.day, iid,
                             {"assessment": assessment.model_dump(mode="json"), "trigger": event.id}, source)
+            alerts = [a for a in book.open_alerts() if iid in a.draft.invoice_ids]
+            unpaid = next((a for a in alerts if a.draft.kind.value == "unexplained_unpaid"
+                           and a.draft.amount > 0), None)
             if assessment.finding:
+                self._late_evidence(event, iid, "cause", assessment.finding.cause.value)
                 self.audit.predict(iid, "cause", assessment.finding.cause.value, self.day,
                                    assessment.finding.citations)
-            alerts = [a for a in book.open_alerts() if iid in a.draft.invoice_ids]
-            unpaid = next((a for a in alerts if a.draft.kind.value == "unexplained_unpaid"), None)
             self.audit.predict(iid, "alert", unpaid is not None, self.day, [source],
                                context={"alert_kind": "unexplained_unpaid" if unpaid else None})
+
+    def _late_evidence(self, event, iid, target, value):
+        """A document dated on or before an earlier cause prediction that changes it shows the
+        prediction was made without evidence that already existed: an outcome mistake.
+        A change from a later document, or from time passing, is a state change, not a mistake."""
+        if event.type != "document_ingested":
+            return
+        previous = self.audit.predictions().get((iid, target))
+        line = next((l for l in self.rails.ledger(event.manager_id) if l.invoice_id == iid), None)
+        # Only an invoice already due at the old prediction: before that, a change can come
+        # from the clock reaching the due date rather than from the evidence.
+        if not line or not line.due_date or line.due_date > (previous.valid_from.date() if previous else line.due_date):
+            return
+        if previous and previous.payload["value"] != value:
+            self.audit.settle(iid, {target: value}, event.valid_from.date(), self.day, event.source)
 
     def pending_terms(self):
         return {eid: self.workflow.graph.get_state(self.workflow._cfg(eid)).interrupts[0].value

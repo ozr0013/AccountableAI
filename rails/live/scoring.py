@@ -110,7 +110,7 @@ def score(public, truth, output):
         on = date.fromisoformat(pred["valid_from"][:10])
         true_at_prediction = oracle(row, on, payments[pred["invoice_id"]], w9_dates[pred["invoice_id"]])
         target = pred["payload"]["target"]
-        correct = bool(true_at_prediction["alert"]) if target == "alert" else true_at_prediction["cause"]
+        correct = true_at_prediction["alert"] == "unexplained_unpaid" if target == "alert" else true_at_prediction["cause"]
         if pred["payload"]["value"] != correct:
             errors.add(pred["id"])
     caught = {e["payload"]["evidence"].get("prediction_id") for e in by_type["mistake_detected"]}
@@ -127,7 +127,7 @@ def score(public, truth, output):
             on = date.fromisoformat(pred["valid_from"][:10])
             true_value = oracle(row, on, payments[pred["invoice_id"]], w9_dates[pred["invoice_id"]])
             target = pred["payload"]["target"]
-            expected_value = bool(true_value["alert"]) if target == "alert" else true_value["cause"]
+            expected_value = true_value["alert"] == "unexplained_unpaid" if target == "alert" else true_value["cause"]
             wrong_corrections += correction["payload"]["value"] != expected_value
             correction_delays.append((date.fromisoformat(correction["learned_at"][:10])-on).days)
     from rails.guards.policy import NEVER

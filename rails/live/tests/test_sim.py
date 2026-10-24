@@ -143,3 +143,11 @@ def test_every_detected_mistake_is_rechecked_through_the_workflow():
     ran = {e["payload"].get("trigger") for e in events if e["type"] == "assessment_recorded"}
     assert {f"recheck-{r}" for r in requested} <= ran
     assert output["replay_extra_events"] == 0
+
+
+def test_late_evidence_that_changes_a_prediction_is_caught_and_never_miscorrected():
+    public, truth = generate(13, n_clean=4, noise=Noise(late_arrivals=1, adversarial=0))
+    metrics = score(public, truth, simulate(public, "rules"))
+    assert metrics["prediction_errors"] > 0
+    assert metrics["errors_caught"] > 0
+    assert metrics["wrong_corrections"] == 0
