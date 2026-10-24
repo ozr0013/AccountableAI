@@ -127,10 +127,21 @@ def test_rebuild_matches_incremental_and_ties_unlabelled_payment(parts):
     inc = {r for r in deps.conn.execute("SELECT * FROM dependencies").fetchall()}
     deps.rebuild(store.events(current_only=True))
     assert inc <= set(deps.conn.execute("SELECT * FROM dependencies").fetchall())
-    assert deps.dependents_of("ev-doc-bank-2") == ["INV-KW-0402"]   # matched without an invoice id
+    # matched without an invoice id, and it also reports "no payment" for the two open items
+    assert deps.dependents_of("ev-doc-bank-2") == ["INV-KW-0301", "INV-KW-0402", "INV-KW-0403"]
+    assert "INV-KW-0402" in deps.dependents_of("invoice:INV-KW-0402.payment")
 
 
 def test_explicit_dependency_for_alert_items(parts):
     _, deps = parts
     deps.record_dependency("alert-pattern-keyway", "invoice:INV-KW-0402.received")
     assert "alert-pattern-keyway" in deps.dependents_of("invoice:INV-KW-0402.received")
+
+
+def test_bank_record_without_payment_is_tied_to_open_items_only(parts):
+    store, deps = parts
+    evs = moment_world()
+    for e in evs:
+        store.append(e)
+    deps.rebuild(store.events(current_only=True))
+    assert deps.dependents_of("ev-doc-bank-kw") == ["INV-KW-0301", "INV-KW-0402", "INV-KW-0403"]

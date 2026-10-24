@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from datetime import date, datetime, time, timezone
 
@@ -14,6 +15,9 @@ from .docs import documents_from_events
 from .events import EventStore
 from .ledger import build_ledger
 from .recon import reconcile as _reconcile
+
+
+log = logging.getLogger(__name__)
 
 
 class RealRails:
@@ -81,8 +85,29 @@ class RealRails:
         from .guards import policy_check
         return policy_check(action, actor, payload)
 
+    def sync_memory(self) -> bool:
+        """Mirror dependencies to Neo4j for memory/briefing. Best effort: returns False (and
+        carries on) when MEMORY isn't neo4j or Neo4j is down. Recheck never depends on this."""
+        if os.getenv("MEMORY", "neo4j").lower() != "neo4j":
+            return False
+        try:
+            from .deps.neo4j_mirror import Neo4jMirror
+            m = Neo4jMirror()
+            try:
+                c = self.store.conn
+                m.sync(self.store.events(current_only=True),
+                       c.execute("SELECT item_id, fact_key FROM dependencies").fetchall(),
+                       c.execute("SELECT event_id, fact_key FROM event_facts").fetchall())
+            finally:
+                m.close()
+            return True
+        except Exception as e:      # noqa: BLE001 - mirror must never break the rails
+            log.warning("neo4j mirror skipped: %s", e)
+            return False
+
     # -- loading a generated world --------------------------------------------------------
     def load(self, events: list[Event]) -> int:
         new = sum(self.store.append(e) for e in events)
         self.deps.rebuild(self.store.events())
+        self.sync_memory()
         return new
