@@ -20,8 +20,9 @@ def test_scenario_3_matches_shared_fixture():
     assert w.ledger == [LedgerLine(**r) for r in load("ledger.json")]
     exp = load("expected.json")
     assert w.truth == [{k: v for k, v in exp.items()}]
-    meta = load("world.json")
-    assert meta["as_of"] == w.as_of.isoformat() and meta["owner"] == w.owner
+    meta = load("world.json")              # the fixture keeps its own as_of (Apr 25)
+    assert meta["owner"] == w.owner and meta["managers"] == [m.model_dump() for m in w.managers]
+    assert all(d.dated <= w.as_of for d in fixture_docs)
 
 
 def test_deterministic_and_seed_sensitive():
@@ -34,7 +35,8 @@ def test_clean_invoices_are_clean():
     w = generate()
     clean = [l for l in w.ledger if l.invoice_id != "INV-KW-0301"]
     assert len(clean) == 100
-    assert {l.manager_id for l in clean} == {"keyway", "sunbelt", "peachtree"}
+    assert {l.manager_id for l in clean} == {"keyway"}
+    assert {l.vendor_id for l in clean}.isdisjoint({"v-sparkline", "v-amperpro"})   # no electricians
     assert len({l.invoice_id for l in w.ledger}) == len(w.ledger)
     ids = [d.id for d in w.documents]
     assert len(ids) == len(set(ids))
@@ -52,11 +54,17 @@ def test_clean_statements_agree_with_bank():
         assert [l["invoice_id"] for l in stmts[k].data["lines"]] == [p["invoice_id"] for p in banks[k].data["payments"]]
 
 
-def test_scenario_5_moment_changes_only_the_receipt_date():
+def test_moment_receipt_date_comes_from_the_statement():
+    from datetime import date
     from rails.ledger import build_ledger
-    w = generate(scenarios=(3, 5), n_clean=5)
+    from world.generator import MOMENT, MOMENT_RECORDED
+    w = generate(scenarios=(3,), n_clean=5, moment=True)
     line = next(l for l in build_ledger(w.events()) if l.invoice_id == "INV-KW-0402")
-    assert line.paid_on > line.due_date                       # looks late on the invoice date
-    moment = next(t for t in w.truth if t["scenario"] == 5)["moment"]
-    assert moment["keep"] == ["INV-KW-0301"] and moment["withdraw"] == ["INV-KW-0402"]
-    assert line.invoice_received.isoformat() == "2026-03-20" and moment["value"] == "2026-04-01"
+    assert (line.invoice_received, line.due_date) == (date(2026, 3, 28), date(2026, 4, 7))
+    assert line.paid_amount == 0 and line.funded_amount == 900.0
+    fact = next(e for e in w.events() if e.id == MOMENT_RECORDED)
+    assert fact.type == "fact_recorded" and fact.payload["fact_key"] == MOMENT["fact_key"]
+    assert fact.source.source_id == "doc-stmt-kw-2026-03-elec"
+    inv = next(d for d in w.documents if d.id == "doc-inv-kw-0402")
+    assert "received" not in inv.data          # the receipt date is only on the statement
+    assert generate(scenarios=(3,)).moment is None
