@@ -40,7 +40,7 @@ def _number_in(value, quote: str) -> bool:
     n = int(value) if float(value).is_integer() else value
     words = {v: k for k, v in rules.WORDS.items()}
     flat = quote.replace(",", "")
-    return str(n) in flat or words.get(n, "\0") in quote.lower()
+    return bool(re.search(r"(?<![\d.+-])" + re.escape(str(n)) + r"(?![\d.])", flat)) or bool(re.search(r"(?<![\w-])" + re.escape(words.get(n, "\0")) + r"(?![\w-])", quote.lower()))
 
 
 class AgreementAgent:
@@ -63,6 +63,9 @@ class AgreementAgent:
             for name, t in terms:
                 if t.clause not in numbers:
                     p.append(f"{name}: clause {t.clause!r} is not in the agreement")
+                clause_text = rules.clauses(agreement.text).get(t.clause, "")
+                if not t.quote.strip() or " ".join(t.quote.split()) not in " ".join(clause_text.split()):
+                    p.append(f"{name}: quote does not belong to cited clause")
                 if not _number_in(t.value, t.quote):
                     p.append(f"{name}: the quote does not contain the value {t.value}")
             p += citation_problems([Citation(source_id=agreement.id, kind=SourceKind.agreement,
@@ -70,6 +73,8 @@ class AgreementAgent:
             if not isinstance(a.vendor_payment_days.value, (int, float)) \
                     or not isinstance(a.approval_limit.value, (int, float)):
                 p.append("vendor_payment_days and approval_limit must be numbers")
+            if not rules.deadline_supported(a.vendor_payment_days.quote):
+                p.append("unsupported deadline trigger requires human review")
             return p
 
         ans, problems = guarded_call(self.llm, AgreementAnswer, SYSTEM,
@@ -90,6 +95,8 @@ class AgreementAgent:
                                                    locator=t.clause, quote=re.sub(r"\s+", " ", t.quote)))
 
         return AgreementTerms(
+            deadline_basis="business" if re.search(r"\bbusiness days\b", ans.vendor_payment_days.quote, re.IGNORECASE) else "calendar",
+            effective_from=agreement.data.get("effective_from") or agreement.dated, vendor_id=agreement.vendor_id,
             manager_id=agreement.manager_id or "", vendor_payment_days=term(ans.vendor_payment_days),
             holdback_pct=term(ans.holdback_pct), holdback_condition=term(ans.holdback_condition),
             approval_limit=term(ans.approval_limit),

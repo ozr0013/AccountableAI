@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from contracts.models import Alert, ChaseMessage, ChaseReply, Citation, Document, SourceKind
+from contracts.models import Alert, ChaseMessage, ChaseReply, Citation, Document
 from rails.guards import APPROVED_TEMPLATES, render
 from rails.guards.templates import LEVEL_ORDER
 
@@ -53,13 +53,8 @@ def draft_chase(manager_id: str, alerts: list[Alert], prior: list[ChaseMessage],
 
 def proof_docs(invoice_ids: list[str], docs: list[Document]) -> list[Citation]:
     """Records that actually show payment: a bank payment or a vendor 'paid' confirmation."""
-    out = []
-    for d in docs:
-        if d.kind == SourceKind.manager_bank and any(
-                p.get("invoice_id") in invoice_ids for p in d.data.get("payments", [])) or d.kind == SourceKind.vendor_confirmation and d.data.get("status") == "paid" \
-                and d.data.get("invoice_id") in invoice_ids:
-            out.append(Citation(source_id=d.id, kind=d.kind))
-    return out
+    from rails.guards.payments import payment_proof
+    return payment_proof(invoice_ids, docs)
 
 
 def claims_paid(text: str) -> bool:

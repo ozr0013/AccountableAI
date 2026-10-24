@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from contracts.models import Citation, Document, LedgerLine, PaymentTrail, SourceKind, TrailEntry
+from rails.guards.payments import identified_payment_documents
 from rails.matcher import gather_evidence
 from rails.trust import TrustDecision, decide
 
@@ -23,7 +24,7 @@ def _entry(d: Document, claim: str, on: date | None = None, locator: str | None 
 
 
 def trust_decision(line: LedgerLine, docs: list[Document]) -> TrustDecision | None:
-    ev = gather_evidence(docs).evidence.get(line.invoice_id)
+    ev = gather_evidence(identified_payment_documents(docs)).evidence.get(line.invoice_id)
     return decide(ev) if ev else None
 
 
@@ -64,7 +65,7 @@ def timeline(line: LedgerLine, docs: list[Document], dec: TrustDecision | None) 
 
 def build_trail(line: LedgerLine, docs: list[Document]) -> PaymentTrail:
     dec = trust_decision(line, docs)
-    entries = timeline(line, docs, dec)
+    entries = timeline(line, identified_payment_documents(docs), dec)
     if dec is None:
         return PaymentTrail(invoice_id=line.invoice_id, entries=entries, conflict=False,
                             winning_claim="unknown", winning_sources=[],

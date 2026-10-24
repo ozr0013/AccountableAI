@@ -99,6 +99,11 @@ class AgreementTerms(BaseModel):
     approval_limit: Term                 # $ above which Oakline must approve/fund first
     allowed_charges: list[Term] = Field(default_factory=list)
     confirmed_by_human: bool = False
+    deadline_basis: Literal["calendar", "business"] = "calendar"
+    effective_from: date | None = None
+    vendor_id: str | None = None
+    proposal_version: str | None = None
+    confirmation_id: str | None = None
 
 
 # ---------------------------------------------------------------------------

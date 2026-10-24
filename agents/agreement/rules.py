@@ -13,7 +13,9 @@ WORDS = {"one": 1, "two": 2, "three": 3, "five": 5, "seven": 7, "ten": 10, "fift
 
 def clauses(text: str) -> dict[str, str]:
     """clause number -> clause text (one numbered line per clause)."""
-    return {m.group(1): m.group(2).strip() for m in CLAUSE.finditer(text)}
+    matches = list(CLAUSE.finditer(text))
+    return {m.group(1): text[m.start(2):matches[i + 1].start() if i + 1 < len(matches) else len(text)].strip()
+            for i, m in enumerate(matches)}
 
 
 def _sentence(clause: str, pattern: re.Pattern) -> str | None:
@@ -35,7 +37,7 @@ def _find(cl: dict[str, str], must: str) -> tuple[str, str] | None:
     return None
 
 
-DAYS = re.compile(r"within\s+(?:(\w+(?:-\w+)?)\s+)?(?:\((\d+)\)\s+)?(\d+\s+)?days", re.IGNORECASE)
+DAYS = re.compile(r"within\s+(?:(\w+(?:-\w+)?)\s+)?(?:\((\d+)\)\s+)?(\d+\s+)?(?:business\s+|calendar\s+)?days", re.IGNORECASE)
 PCT = re.compile(r"(\d+(?:\.\d+)?)\s*(?:%|percent)", re.IGNORECASE)
 DOLLARS = re.compile(r"\$\s?([\d,]+(?:\.\d+)?)")
 
@@ -51,6 +53,8 @@ def payment_days(doc: Document, cl: dict[str, str]) -> Term | None:
         return None
     word = (m.group(1) or "").lower()
     n = m.group(2) or (m.group(3) or "").strip() or (word if word.isdigit() else WORDS.get(word))
+    if not deadline_supported(s or ""):
+        raise ValueError(f"{doc.id}: unsupported deadline trigger requires human review")
     return _term(doc, num, int(n), s) if n else None
 
 
@@ -82,7 +86,8 @@ def allowed_charges(doc: Document, cl: dict[str, str]) -> list[Term]:
     out = []
     for num, text in cl.items():
         if re.search(r"\b(fee|markup|charge)s?\b", text, re.IGNORECASE):
-            out.append(_term(doc, num, text.split(".")[0].strip(), text.split(". ")[0] + "."))
+            sentence = re.split(r"(?<=\.)\s+", text)[0].strip()
+            out.append(_term(doc, num, sentence, sentence))
     return out
 
 
@@ -96,5 +101,17 @@ def extract_terms(doc: Document) -> AgreementTerms:
         raise ValueError(f"{doc.id}: no approval limit found")
     pct, cond = holdback(doc, cl)
     return AgreementTerms(manager_id=doc.manager_id or "", vendor_payment_days=days,
+                          deadline_basis="business" if re.search(r"\bbusiness days\b", days.citation.quote or "", re.IGNORECASE) else "calendar",
+                          effective_from=doc.data.get("effective_from") or doc.dated, vendor_id=doc.vendor_id,
                           holdback_pct=pct, holdback_condition=cond, approval_limit=limit,
                           allowed_charges=allowed_charges(doc, cl), confirmed_by_human=False)
+
+
+def deadline_supported(quote: str) -> bool:
+    """Only invoice-receipt deadlines can be calculated from the available facts."""
+    q = quote.lower()
+    if re.search(r"excluding weekends|next business day|bank holiday|public holiday|working days", q):
+        return False
+    if re.search(r"(?:after|until|following|subject to|provided that|if)\s+(?:the\s+)?(?:owner|approval|inspection|sign|fund)", q):
+        return False
+    return bool(re.search(r"receipt|receiv", q))

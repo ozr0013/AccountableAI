@@ -60,7 +60,7 @@ def fact_problems(ans: CauseAnswer, facts: dict) -> list[str]:
     if ans.cause == Cause.authorized_hold and not facts["within_holdback"]:
         p.append("the unpaid amount is larger than the agreement's holdback allows")
     if ans.cause == Cause.unexplained and facts["trust_rules_winner"] == "paid" \
-            and not facts["paid_on_time"] and facts["unpaid_amount"] <= 0:
+            and not facts["paid_late"] and facts["unpaid_amount"] <= 0:
         p.append("unexplained needs an unpaid amount or a late payment")
     return p
 

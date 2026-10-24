@@ -9,9 +9,9 @@ optional `fuzzy` hook (a Haiku call later) or stays unmatched; we never guess.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, timedelta
-from typing import Callable
 
 from contracts.models import Citation, Document, SourceKind
 
@@ -46,6 +46,7 @@ class InvoiceEvidence:
 class MatchResult:
     evidence: dict[str, InvoiceEvidence]
     unmatched_payments: list[tuple[str, Payment]]   # (doc id, payment) tied to no invoice
+    matched_payments: list[tuple[str, str, Payment]] = field(default_factory=list)
 
 
 def _cite(doc: Document, locator: str | None = None) -> Citation:
@@ -57,6 +58,7 @@ def gather_evidence(docs: list[Document], fuzzy: Fuzzy | None = None) -> MatchRe
                 if d.kind == SourceKind.vendor_invoice and d.data.get("invoice_id")}
     ev = {iid: InvoiceEvidence(iid) for iid in invoices}
     unmatched: list[tuple[str, Payment]] = []
+    matched: list[tuple[str, str, Payment]] = []
 
     def get(iid: str) -> InvoiceEvidence | None:
         return ev.get(iid)
@@ -70,7 +72,14 @@ def gather_evidence(docs: list[Document], fuzzy: Fuzzy | None = None) -> MatchRe
                 if e is None:
                     unmatched.append((d.id, p))
                     continue
+                invoice = invoices[iid]
+                if (d.manager_id != invoice.manager_id
+                        or (p.get("vendor_id") is not None
+                            and p["vendor_id"] != invoice.vendor_id)):
+                    unmatched.append((d.id, p))
+                    continue
                 e.bank_cents += cents(p["amount"])
+                matched.append((iid, d.id, p))
                 if _d(p.get("on")):
                     e.bank_on.append(_d(p["on"]))
                 e.cites.setdefault("bank", []).append(_cite(d))
@@ -99,7 +108,7 @@ def gather_evidence(docs: list[Document], fuzzy: Fuzzy | None = None) -> MatchRe
             for iid, inv_doc in invoices.items():
                 if inv_doc.manager_id == d.manager_id:
                     ev[iid].bank_docs.append((d.dated, _cite(d)))
-    return MatchResult(ev, unmatched)
+    return MatchResult(ev, unmatched, matched)
 
 
 def _fallback(p: Payment, bank: Document, invoices: dict[str, Document],

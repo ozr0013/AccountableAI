@@ -163,6 +163,20 @@ def reset():
         return session().snapshot()
 
 
+# Keep one database connection per API thread; each thread handles one sync request at a time.
+from workflow.autonomy_api import create_router
+
+_autonomy_connections = threading.local()
+
+def autonomy_rails():
+    from rails.real import RealRails
+    if not hasattr(_autonomy_connections, "rails"):
+        _autonomy_connections.rails = RealRails()
+    return _autonomy_connections.rails
+
+app.include_router(create_router(autonomy_rails), prefix="/api")
+
+
 if __name__ == "__main__":
     import uvicorn
     session()                                    # build before the first request

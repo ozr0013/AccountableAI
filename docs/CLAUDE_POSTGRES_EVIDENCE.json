@@ -1,0 +1,2610 @@
+{
+  "schema": "probe_claude_b79d038cce",
+  "started_at": "2026-10-24T19:13:06.962380+00:00",
+  "architecture": "Python RealRails queries PostgreSQL and supplies evidence to Claude; Claude does not call SQL tools.",
+  "synthetic_data_only": true,
+  "model_calls": [
+    {
+      "schema": "TrailDraft",
+      "phase": "daily_scan",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2071,
+      "output_tokens": 513,
+      "ms": 5720,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "entries": [
+          {
+            "source_id": "doc-inv-kw-0301",
+            "on": "2026-03-03",
+            "claim": "Rio Grande Plumbing invoiced $1,240.00, Net 10",
+            "locator": null
+          },
+          {
+            "source_id": "doc-funding-kw-0305",
+            "on": "2026-03-05",
+            "claim": "Oakline wired funds to Keyway including INV-KW-0301 $1,240.00",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "on": "2026-03-10",
+            "claim": "Manager statement lists INV-KW-0301 $1,240.00 as PAID on 03/10",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "on": "2026-04-05",
+            "claim": "Bank record 03/01-04/05 shows no outgoing payment to Rio Grande Plumbing",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "on": "2026-04-20",
+            "claim": "Vendor notice: invoice past due and unpaid as of 04/20",
+            "locator": null
+          }
+        ],
+        "reasoning": "Oakline funded the $1,240.00 on 2026-03-05, and Keyway's March statement lists the invoice as paid on 03/10. The bank record shows no outgoing payment to the vendor, and the vendor's 04/20 notice says the invoice is unpaid. Under the source-trust rules, the bank record and vendor notice outrank the manager statement, so the invoice is treated as unpaid and the statement's PAID line is unexplained."
+      }
+    },
+    {
+      "schema": "CauseAnswer",
+      "phase": "daily_scan",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3094,
+      "output_tokens": 322,
+      "ms": 2595,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "cause": "unexplained",
+        "confidence": 0.93,
+        "explanation": "Oakline funded the full $1,240.00 on 2026-03-05, and the invoice was due 2026-03-13 (10 days from receipt under clause 7.2). The bank record shows no outgoing payment to the vendor and the vendor's 04/20 notice says it is unpaid, which outrank the manager statement's PAID line under the source-trust rules. No authorized holdback, vendor paperwork item, or owner-side reason is on file, so the delay is unexplained.",
+        "citations": [
+          {
+            "source_id": "doc-funding-kw-0305",
+            "locator": null
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-agreement-keyway",
+            "locator": "7.2"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "_Refutation",
+      "phase": "daily_scan",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2812,
+      "output_tokens": 506,
+      "ms": 4578,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "claim_checks": [
+          {
+            "index": 0,
+            "supported": true,
+            "why": "Funding doc shows the $1,240.00 wired 2026-03-05 including INV-KW-0301. Invoice was received 2026-03-03, so the 10-day deadline under clause 7.2 is 2026-03-13. The bank record shows no payment to Rio Grande, and the vendor notice says unpaid (not_received); both outrank the manager's PAID statement line. No holdback, missing paperwork, or approval issue appears in the evidence."
+          },
+          {
+            "index": 1,
+            "supported": true,
+            "why": "Funding on 03/05 is documented. The statement's L14 PAID line dated 03/10 is contradicted by the bank record (no outgoing payment) and the vendor's 04/20 notice (unpaid). Under the source-trust rules, those outrank the manager statement, so the invoice is treated as unpaid."
+          }
+        ],
+        "refuted": false,
+        "refutation": "No refutation condition is met. The vendor was not paid per bank record and vendor notice. The invoice is not a holdback: the $1,240 is a repair invoice, and the 10% holdback under 7.4 would cover at most $124, not the full amount, and no inspection hold is documented. Payment was due 2026-03-13 and is past due. No vendor paperwork is missing, and Oakline funded the invoice, with no approval issue since $1,240 is under the $5,000 limit. The manager's PAID claim is not backed by any bank record or vendor confirmation.",
+        "counter_evidence": []
+      }
+    },
+    {
+      "schema": "ReplyReading",
+      "phase": "manager_claims_paid_without_proof",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 1404,
+      "output_tokens": 105,
+      "ms": 2033,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "claims_paid": true,
+        "invoice_ids": [
+          "INV-KW-0301"
+        ],
+        "proof_source_ids": [],
+        "summary": "The reply states that invoice INV-KW-0301 has already been paid and asks for the reminder to be closed, but no bank record or vendor confirmation in the records shows the payment."
+      }
+    },
+    {
+      "schema": "TrailDraft",
+      "phase": "manager_claims_paid_without_proof",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2160,
+      "output_tokens": 543,
+      "ms": 5393,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "entries": [
+          {
+            "source_id": "doc-inv-kw-0301",
+            "on": "2026-03-03",
+            "claim": "Rio Grande Plumbing invoiced $1,240.00, Net 10",
+            "locator": null
+          },
+          {
+            "source_id": "doc-funding-kw-0305",
+            "on": "2026-03-05",
+            "claim": "Oakline wired funds to Keyway including $1,240.00 for this invoice",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "on": "2026-03-10",
+            "claim": "Manager statement lists invoice as PAID $1,240.00",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "on": "2026-04-05",
+            "claim": "Bank record 03/01-04/05 shows no outgoing payment to Rio Grande Plumbing",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "on": "2026-04-20",
+            "claim": "Vendor notice: past due, remains unpaid as of 04/20",
+            "locator": null
+          },
+          {
+            "source_id": "probe-paid-claim:INV-KW-0301",
+            "on": "2026-04-22",
+            "claim": "Manager reply says invoice already paid; no proof given",
+            "locator": null
+          }
+        ],
+        "reasoning": "Oakline funded the $1,240.00 on 2026-03-05, and the manager's March statement lists it as paid on 03/10. The bank record shows no outgoing payment to the vendor, and the vendor's 04/20 notice says it was not received. The bank record and vendor notice outrank the manager's statement and later reply, so the invoice is treated as unpaid, and the paid claim is unexplained."
+      }
+    },
+    {
+      "schema": "CauseAnswer",
+      "phase": "manager_claims_paid_without_proof",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3183,
+      "output_tokens": 352,
+      "ms": 2708,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "cause": "unexplained",
+        "confidence": 0.93,
+        "explanation": "Oakline funded the full $1,240.00 on 2026-03-05, and the invoice was due 2026-03-13 under the 10-day term in clause 7.2. The bank record shows no outgoing payment to the vendor and the vendor's 04/20 notice says it was not received, which outrank the manager's statement and reply that list it as paid without proof. No authorized holdback, vendor paperwork issue, or owner-side approval reason is on file, so the delay is unexplained.",
+        "citations": [
+          {
+            "source_id": "doc-funding-kw-0305",
+            "locator": null
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "locator": "L14"
+          },
+          {
+            "source_id": "probe-paid-claim:INV-KW-0301",
+            "locator": null
+          },
+          {
+            "source_id": "doc-agreement-keyway",
+            "locator": "7.2"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "_Refutation",
+      "phase": "manager_claims_paid_without_proof",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2949,
+      "output_tokens": 564,
+      "ms": 6015,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "claim_checks": [
+          {
+            "index": 0,
+            "supported": true,
+            "why": "Funding of $1,240.00 on 2026-03-05 is shown in doc-funding-kw-0305. The invoice was received 2026-03-03, so clause 7.2 (10 days) made it due 2026-03-13. The bank record shows no payment to Rio Grande, and the vendor's 04/20 notice says it is unpaid. Both outrank the manager's statement and reply, which have no bank or vendor backing. Nothing in the evidence shows a holdback, missing vendor paperwork or an approval problem. The invoice is $1,240, far below the $5,000 approval limit, and the holdback is capped at 10% of a repair invoice, not the whole amount."
+          },
+          {
+            "index": 1,
+            "supported": true,
+            "why": "The funding, the statement's 03/10 'paid' line, the bank record with no outgoing payment, and the vendor's not-received notice are all in the evidence. Under the trust rules the bank record and vendor notice override the manager's statement and the unsupported reply, so the invoice is unpaid and the paid claim is unexplained."
+          }
+        ],
+        "refuted": false,
+        "refutation": "No refutation condition is met. No bank record or vendor confirmation shows payment; the evidence points the other way. The funding was received on 2026-03-05, so Oakline did fund it. The due date of 2026-03-13 has passed. The 10% holdback cannot cover the whole invoice, and no inspection issue is documented. No missing vendor paperwork or owner-side approval problem appears. The manager's 'paid' statement and reply are not backed by a bank record or vendor confirmation and are contradicted by both.",
+        "counter_evidence": []
+      }
+    },
+    {
+      "schema": "TrailDraft",
+      "phase": "wrong_vendor_bank_payment",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2271,
+      "output_tokens": 653,
+      "ms": 4902,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "entries": [
+          {
+            "source_id": "doc-inv-kw-0301",
+            "on": "2026-03-03",
+            "claim": "Rio Grande Plumbing invoices $1,240.00, Net 10",
+            "locator": null
+          },
+          {
+            "source_id": "doc-funding-kw-0305",
+            "on": "2026-03-05",
+            "claim": "Oakline wires $1,240.00 to Keyway in batch 2026-03-A, including this invoice",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "on": "2026-03-10",
+            "claim": "Manager statement lists $1,240.00 to Rio Grande as PAID",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "on": "2026-04-05",
+            "claim": "Bank record 03/01-04/05 shows no outgoing payment to Rio Grande Plumbing",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "on": "2026-04-20",
+            "claim": "Vendor notice: invoice past due and unpaid as of 04/20",
+            "locator": null
+          },
+          {
+            "source_id": "probe-paid-claim:INV-KW-0301",
+            "on": "2026-04-22",
+            "claim": "Manager reply says invoice was already paid, no proof given",
+            "locator": null
+          },
+          {
+            "source_id": "probe-wrong-vendor",
+            "on": "2026-04-22",
+            "claim": "Bank transfer of $1,240 for this invoice went to v-other, not Rio Grande Plumbing",
+            "locator": null
+          }
+        ],
+        "reasoning": "Oakline funded $1,240.00 on 2026-03-05, and the manager's statement shows the invoice as PAID on 03/10. The bank record shows no payment to Rio Grande, a transfer for this invoice went to a different vendor (v-other), and the vendor says it is unpaid. Under the trust rules, bank records and vendor notices outrank the manager's statement and reply, so the invoice is treated as unpaid, and the payment to v-other is unexplained."
+      }
+    },
+    {
+      "schema": "CauseAnswer",
+      "phase": "wrong_vendor_bank_payment",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3442,
+      "output_tokens": 412,
+      "ms": 3437,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "cause": "unexplained",
+        "confidence": 0.93,
+        "explanation": "Oakline funded $1,240.00 on 2026-03-05, and the invoice was due 2026-03-13 under the 10-day term in clause 7.2. The bank record shows no payment to Rio Grande Plumbing, the vendor reports it as unpaid, and a $1,240 transfer tied to this invoice went to a different vendor (v-other). Under the trust rules the invoice is treated as unpaid, and no holdback, paperwork, vendor-side or owner-side reason is on file, so the delay is unexplained and the manager should be asked to clarify the v-other transfer.",
+        "citations": [
+          {
+            "source_id": "doc-funding-kw-0305",
+            "locator": null
+          },
+          {
+            "source_id": "doc-agreement-keyway",
+            "locator": "7.2"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "locator": null
+          },
+          {
+            "source_id": "probe-wrong-vendor",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "locator": "L14"
+          },
+          {
+            "source_id": "probe-paid-claim:INV-KW-0301",
+            "locator": null
+          }
+        ]
+      }
+    },
+    {
+      "schema": "_Refutation",
+      "phase": "wrong_vendor_bank_payment",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3179,
+      "output_tokens": 675,
+      "ms": 5862,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "claim_checks": [
+          {
+            "index": 0,
+            "supported": true,
+            "why": "Funding of $1,240 on 2026-03-05 (doc-funding-kw-0305), invoice received 2026-03-03 with 10-day term under 7.2 gives due date 2026-03-13. The manager bank record shows no payment to Rio Grande, and the vendor notice says it is unpaid. The only transfer tied to the invoice (probe-wrong-vendor) went to v-other, not the vendor. The manager's statement and reply claiming paid are outranked by bank and vendor records. No holdback, missing paperwork, or approval issue is in evidence ($1,240 is below the $5,000 limit, and a holdback of up to 10% would not cover the full amount)."
+          },
+          {
+            "index": 1,
+            "supported": true,
+            "why": "The statement L14 shows PAID on 03/10, but the bank record (no payment to Rio Grande) and the vendor notice (not received) outrank it, and the manager's reply is not backed by a bank record or vendor confirmation. The transfer to v-other is on the record and does not constitute payment to the vendor. The claim's central assertion that the invoice is unpaid is supported."
+          }
+        ],
+        "refuted": false,
+        "refutation": "No refutation ground is met. The vendor was not paid: the bank record shows no payment to Rio Grande Plumbing and the vendor notice of 04/20 says the invoice is unpaid. The only $1,240 transfer for this invoice went to v-other, a different vendor. The invoice was funded by Oakline on 03/05 and was due 03/13 under clause 7.2, so it is past due. The full amount is not an authorized holdback, since clause 7.4 allows at most 10% and only for repair invoices pending inspection, with no inspection issue shown. No vendor paperwork is shown missing, and Oakline funded the invoice, with a $1,240 amount below the $5,000 approval limit. The manager's 'paid' statement and reply are not backed by bank or vendor proof.",
+        "counter_evidence": []
+      }
+    },
+    {
+      "schema": "TrailDraft",
+      "phase": "corrected_bank_payment",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2249,
+      "output_tokens": 626,
+      "ms": 7528,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-corrected-bank",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "entries": [
+          {
+            "source_id": "doc-inv-kw-0301",
+            "on": "2026-03-03",
+            "claim": "Vendor invoiced $1,240.00, Net 10",
+            "locator": null
+          },
+          {
+            "source_id": "doc-funding-kw-0305",
+            "on": "2026-03-05",
+            "claim": "Owner wired $1,240.00 to manager for this invoice in funding batch 2026-03-A",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "on": "2026-03-10",
+            "claim": "Manager statement lists invoice as PAID on 03/10, $1,240.00",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "on": "2026-04-05",
+            "claim": "Bank record for 03/01-04/05 shows no outgoing payment to Rio Grande Plumbing",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "on": "2026-04-20",
+            "claim": "Vendor past-due notice says invoice unpaid as of 04/20",
+            "locator": null
+          },
+          {
+            "source_id": "probe-corrected-bank",
+            "on": "2026-04-22",
+            "claim": "Corrected bank record shows $1,240 paid to Rio Grande Plumbing on Apr 22",
+            "locator": null
+          },
+          {
+            "source_id": "probe-paid-claim:INV-KW-0301",
+            "on": "2026-04-22",
+            "claim": "Manager reply says invoice already paid, no proof attached",
+            "locator": null
+          }
+        ],
+        "reasoning": "The invoice was funded on 03/05 and the manager statement shows it paid on 03/10, but the bank record through 04/05 shows no payment and the vendor reported it unpaid on 04/20. The corrected bank record shows payment on 04/22, and under the source-trust rules the bank record outranks the manager's statement and reply, so the invoice is treated as paid on 2026-04-22. The 03/10 paid date on the statement is unexplained, and the vendor should confirm receipt."
+      }
+    },
+    {
+      "schema": "CauseAnswer",
+      "phase": "corrected_bank_payment",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3378,
+      "output_tokens": 348,
+      "ms": 4113,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-corrected-bank",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "cause": "unexplained",
+        "confidence": 0.85,
+        "explanation": "Oakline funded $1,240.00 on 2026-03-05, and the invoice was due 2026-03-13 (10 days from receipt under clause 7.2). The bank record, which outranks the manager's statement, shows payment on 2026-04-22, about 40 days after the due date. No holdback, paperwork hold, owner-side approval issue or late-arrival reason is on file to explain the gap, and the 03/10 paid date on the manager statement is not supported by bank or vendor records.",
+        "citations": [
+          {
+            "source_id": "doc-funding-kw-0305",
+            "locator": null
+          },
+          {
+            "source_id": "doc-agreement-keyway",
+            "locator": "7.2"
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "locator": null
+          },
+          {
+            "source_id": "probe-corrected-bank",
+            "locator": null
+          }
+        ]
+      }
+    },
+    {
+      "schema": "_Refutation",
+      "phase": "corrected_bank_payment",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3133,
+      "output_tokens": 1160,
+      "ms": 8986,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "claim_checks": [
+          {
+            "index": 0,
+            "supported": true,
+            "why": "The funding wire of 03/05 covers INV-KW-0301 for $1,240. The invoice was received 03/03, so clause 7.2 makes it due 03/13. The bank record through 04/05 shows no payment, and the vendor's 04/20 notice says it was unpaid. The corrected bank record shows payment on 04/22, about 40 days after the due date. The 03/10 'paid' line on the manager statement is contradicted by the bank record and the vendor notice. The invoice is for the full amount, so no 10% holdback applies, and nothing in the evidence shows an approval issue or missing vendor paperwork."
+          },
+          {
+            "index": 1,
+            "supported": true,
+            "why": "The sequence is consistent: funded 03/05, statement claims paid 03/10, no bank payment through 04/05, vendor reports unpaid 04/20, and the corrected bank record shows payment on 04/22. Under the trust rules the bank record and vendor notice outrank the statement and the manager's reply, so treating the invoice as paid on 04/22 is correct. The reply saying 'already paid' has no backing for any date before 04/22."
+          }
+        ],
+        "refuted": false,
+        "refutation": "The alert is not refuted. The corrected bank record shows payment on 04/22, but that is after the 03/13 due date. The vendor was therefore unpaid and past due for about 40 days. None of the refutation conditions is met: the payment was not made on time, there was no holdback on the full invoice, the invoice was already due, no missing vendor paperwork is on file, and Oakline funded it on 03/05. The manager's 03/10 'paid' claim is contradicted by the bank record and the vendor notice.",
+        "counter_evidence": []
+      }
+    },
+    {
+      "schema": "TrailDraft",
+      "phase": "statement_arrives",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 2341,
+      "output_tokens": 703,
+      "ms": 5036,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-corrected-bank",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-payment-statement"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "entries": [
+          {
+            "source_id": "doc-inv-kw-0301",
+            "on": "2026-03-03",
+            "claim": "Vendor invoice KW-0301 issued for $1,240.00, Net 10",
+            "locator": null
+          },
+          {
+            "source_id": "doc-funding-kw-0305",
+            "on": "2026-03-05",
+            "claim": "Oakline wired funding batch including INV-KW-0301 $1,240.00 to Keyway",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "on": "2026-03-10",
+            "claim": "Manager statement lists INV-KW-0301 $1,240.00 as PAID on 03/10",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "on": "2026-04-05",
+            "claim": "Operating account 03/01-04/05 shows no outgoing payment to Rio Grande Plumbing",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "on": "2026-04-20",
+            "claim": "Vendor notice says KW-0301 $1,240.00 unpaid and past due as of 04/20",
+            "locator": null
+          },
+          {
+            "source_id": "probe-corrected-bank",
+            "on": "2026-04-22",
+            "claim": "Corrected bank record shows $1,240 paid to Rio Grande Plumbing on Apr 22",
+            "locator": null
+          },
+          {
+            "source_id": "probe-paid-claim:INV-KW-0301",
+            "on": "2026-04-22",
+            "claim": "Manager reply says invoice already paid, no proof attached",
+            "locator": null
+          },
+          {
+            "source_id": "probe-payment-statement",
+            "on": "2026-04-22",
+            "claim": "Manager statement says $1,240 paid on Apr 22, 2026",
+            "locator": null
+          }
+        ],
+        "reasoning": "The invoice was funded on 03/05 and the March statement showed it paid on 03/10, but the bank record through 04/05 showed no payment and the vendor reported it unpaid on 04/20. The corrected bank record shows payment on 04/22, and the bank record ranks highest under the trust rules, so the invoice is treated as paid on that date. The earlier 03/10 paid entry on the statement is unexplained, and the vendor's not-received notice should be confirmed with the vendor."
+      }
+    },
+    {
+      "schema": "CauseAnswer",
+      "phase": "statement_arrives",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3529,
+      "output_tokens": 377,
+      "ms": 3271,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-funding-kw-0305",
+        "doc-inv-kw-0301",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-corrected-bank",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-payment-statement"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "cause": "unexplained",
+        "confidence": 0.85,
+        "explanation": "Oakline funded the full $1,240.00 on 2026-03-05, and the invoice was due 2026-03-13 (10 days from receipt under clause 7.2). The bank record shows payment on 2026-04-22, which is late. Nothing on file shows a holdback, vendor paperwork issue, owner-side approval gap or late-arriving invoice that accounts for the gap, and the earlier 03/10 'paid' entry on the manager statement is not supported by bank records. The vendor's 04/20 not-received notice and the payment timing should be confirmed with the manager.",
+        "citations": [
+          {
+            "source_id": "doc-agreement-keyway",
+            "locator": "7.2"
+          },
+          {
+            "source_id": "doc-funding-kw-0305",
+            "locator": null
+          },
+          {
+            "source_id": "doc-stmt-kw-2026-03",
+            "locator": "L14"
+          },
+          {
+            "source_id": "doc-bank-kw-2026-03",
+            "locator": null
+          },
+          {
+            "source_id": "doc-notice-riogrande-0420",
+            "locator": null
+          },
+          {
+            "source_id": "probe-corrected-bank",
+            "locator": null
+          }
+        ]
+      }
+    },
+    {
+      "schema": "_Refutation",
+      "phase": "statement_arrives",
+      "model": "claude-sonnet-5-5",
+      "input_tokens": 3310,
+      "output_tokens": 1034,
+      "ms": 10888,
+      "error": null,
+      "returned_answer": true,
+      "prompt_document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ],
+      "prompt_invoice_ids": [
+        "INV-KW-0301"
+      ],
+      "outside_manager_canary_present": false,
+      "answer": {
+        "claim_checks": [
+          {
+            "index": 0,
+            "supported": true,
+            "why": "Funding of $1,240.00 on 2026-03-05 is shown in doc-funding-kw-0305. The invoice was received 03/03, so clause 7.2 makes it due 03/13. The March bank record shows no payment through 04/05, and the corrected bank record shows payment on 04/22, which is 40 days after the due date. The 03/10 'paid' line on the statement has no bank backing. The documents show no holdback, approval gap, missing vendor paperwork or late invoice."
+          },
+          {
+            "index": 1,
+            "supported": true,
+            "why": "The sequence matches the documents. The invoice was funded 03/05, the statement claimed payment 03/10, and the bank record showed none through 04/05. The vendor reported it unpaid on 04/20, and the corrected bank record shows payment on 04/22. The manager's 'paid' reply and the 04/22 statement do not show any earlier payment. Bank records outrank the statement under the trust rules, so treating 04/22 as the payment date is correct."
+          }
+        ],
+        "refuted": false,
+        "refutation": "The evidence does not refute the alert. The invoice was funded and due 03/13, and the vendor's 04/20 notice and the bank record through 04/05 show it unpaid at that time. The only bank-confirmed payment is on 04/22, about 40 days late. No holdback, owner-approval gap, missing vendor paperwork or late invoice appears in the documents to excuse the delay. The 04/22 payment confirms the invoice is now settled, but it does not make the payment timely.",
+        "counter_evidence": []
+      }
+    }
+  ],
+  "database_reads": [
+    {
+      "method": "documents",
+      "manager_id": null,
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-outside-manager"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "outside-manager",
+      "lines": [
+        {
+          "invoice_id": "INV-OUTSIDE-9999",
+          "manager_id": "outside-manager",
+          "vendor_id": "outside-vendor",
+          "amount": 999999.0,
+          "invoice_received": "2026-04-22",
+          "funded_amount": 0.0,
+          "funded_on": null,
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": null,
+          "status": "unfunded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "outside-manager",
+      "lines": [
+        {
+          "invoice_id": "INV-OUTSIDE-9999",
+          "manager_id": "outside-manager",
+          "vendor_id": "outside-vendor",
+          "amount": 999999.0,
+          "invoice_received": "2026-04-22",
+          "funded_amount": 0.0,
+          "funded_on": null,
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": null,
+          "status": "unfunded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "outside-manager",
+      "lines": [
+        {
+          "invoice_id": "INV-OUTSIDE-9999",
+          "manager_id": "outside-manager",
+          "vendor_id": "outside-vendor",
+          "amount": 999999.0,
+          "invoice_received": "2026-04-22",
+          "funded_amount": 0.0,
+          "funded_on": null,
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": null,
+          "status": "unfunded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "outside-manager",
+      "invoice_id": null,
+      "document_ids": [
+        "probe-outside-manager"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "outside-manager",
+      "lines": [
+        {
+          "invoice_id": "INV-OUTSIDE-9999",
+          "manager_id": "outside-manager",
+          "vendor_id": "outside-vendor",
+          "amount": 999999.0,
+          "invoice_received": "2026-04-22",
+          "funded_amount": 0.0,
+          "funded_on": null,
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": null,
+          "status": "unfunded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "outside-manager",
+      "invoice_id": null,
+      "document_ids": [
+        "probe-outside-manager"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "outside-manager",
+      "lines": [
+        {
+          "invoice_id": "INV-OUTSIDE-9999",
+          "manager_id": "outside-manager",
+          "vendor_id": "outside-vendor",
+          "amount": 999999.0,
+          "invoice_received": "2026-04-22",
+          "funded_amount": 0.0,
+          "funded_on": null,
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": null,
+          "status": "unfunded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": null,
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-outside-manager",
+        "probe-paid-claim:INV-KW-0301"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 0.0,
+          "paid_on": null,
+          "due_date": "2026-03-13",
+          "status": "funded",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": null,
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-outside-manager",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-wrong-vendor"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": null,
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-outside-manager",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "ledger",
+      "manager_id": "keyway",
+      "lines": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "manager_id": "keyway",
+          "vendor_id": "v-riogrande",
+          "amount": 1240.0,
+          "invoice_received": "2026-03-03",
+          "funded_amount": 1240.0,
+          "funded_on": "2026-03-05",
+          "paid_amount": 1240.0,
+          "paid_on": "2026-04-22",
+          "due_date": "2026-03-13",
+          "status": "paid",
+          "duplicate_of": null
+        }
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": "INV-KW-0301",
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": null,
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-outside-manager",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": null,
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-outside-manager",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    },
+    {
+      "method": "documents",
+      "manager_id": "keyway",
+      "invoice_id": null,
+      "document_ids": [
+        "doc-agreement-keyway",
+        "doc-inv-kw-0301",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-paid-claim:INV-KW-0301",
+        "probe-corrected-bank",
+        "probe-payment-statement"
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "agent": "trail",
+      "trigger": "ev-monitor-scan-keyway-2026-04-22",
+      "phase": "daily_scan",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2071,
+      "tokens_out": 513,
+      "answer": {
+        "winning_claim": "unpaid",
+        "conflict": true
+      },
+      "source_ids": [
+        "doc-notice-riogrande-0420",
+        "doc-bank-kw-2026-03"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "cause",
+      "trigger": "ev-monitor-scan-keyway-2026-04-22",
+      "phase": "daily_scan",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3094,
+      "tokens_out": 322,
+      "answer": {
+        "cause": "unexplained"
+      },
+      "source_ids": [
+        "doc-funding-kw-0305",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "doc-agreement-keyway"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "verifier",
+      "trigger": "ev-monitor-scan-keyway-2026-04-22",
+      "phase": "daily_scan",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2812,
+      "tokens_out": 506,
+      "answer": {
+        "alert_id": "al-unexplained_unpaid-daeb1b9e7b7c",
+        "status": "approved"
+      },
+      "source_ids": [],
+      "guards": [
+        "survived refutation: No refutation condition is met. The vendor was not paid per bank record and vendor notice. The invoice is not a holdback: the $1,240 is a repair invoice, and the 10% holdback under 7.4 would cover at most $124, not the full amount, and no inspection hold is documented. Payment was due 2026-03-13 and is past due. No vendor paperwork is missing, and Oakline funded the invoice, with no approval issue since $1,240 is under the $5,000 limit. The manager's PAID claim is not backed by any bank record or vendor confirmation."
+      ]
+    },
+    {
+      "agent": "chaser",
+      "trigger": "ev-monitor-scan-keyway-2026-04-22",
+      "phase": "daily_scan",
+      "invoice_id": "INV-KW-0301",
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "level": "polite",
+        "template_id": "tpl-polite",
+        "invoice_ids": [
+          "INV-KW-0301"
+        ]
+      },
+      "source_ids": [],
+      "guards": []
+    },
+    {
+      "agent": "workflow",
+      "trigger": "ev-monitor-scan-keyway-2026-04-22",
+      "phase": "daily_scan",
+      "invoice_id": null,
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "route": "scan",
+        "raised": [
+          "al-unexplained_unpaid-daeb1b9e7b7c"
+        ],
+        "withdrawn": [],
+        "chases": [
+          "chase-349d61959449"
+        ],
+        "blocked": []
+      },
+      "source_ids": [],
+      "guards": []
+    },
+    {
+      "agent": "workflow",
+      "trigger": "ev-monitor-scan-outside-manager-2026-04-22",
+      "phase": "daily_scan",
+      "invoice_id": null,
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "route": "scan",
+        "raised": [],
+        "withdrawn": [],
+        "chases": [],
+        "blocked": []
+      },
+      "source_ids": [],
+      "guards": []
+    },
+    {
+      "agent": "chaser",
+      "trigger": "probe-paid-claim",
+      "phase": "manager_claims_paid_without_proof",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 1404,
+      "tokens_out": 105,
+      "answer": {
+        "claims_paid": true,
+        "proof": []
+      },
+      "source_ids": [],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "trail",
+      "trigger": "probe-paid-claim",
+      "phase": "manager_claims_paid_without_proof",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2160,
+      "tokens_out": 543,
+      "answer": {
+        "winning_claim": "unpaid",
+        "conflict": true
+      },
+      "source_ids": [
+        "doc-notice-riogrande-0420",
+        "doc-bank-kw-2026-03"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "cause",
+      "trigger": "probe-paid-claim",
+      "phase": "manager_claims_paid_without_proof",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3183,
+      "tokens_out": 352,
+      "answer": {
+        "cause": "unexplained"
+      },
+      "source_ids": [
+        "doc-funding-kw-0305",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301",
+        "doc-agreement-keyway"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "verifier",
+      "trigger": "probe-paid-claim",
+      "phase": "manager_claims_paid_without_proof",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2949,
+      "tokens_out": 564,
+      "answer": {
+        "alert_id": "al-unexplained_unpaid-daeb1b9e7b7c",
+        "status": "approved"
+      },
+      "source_ids": [],
+      "guards": [
+        "survived refutation: No refutation condition is met. No bank record or vendor confirmation shows payment; the evidence points the other way. The funding was received on 2026-03-05, so Oakline did fund it. The due date of 2026-03-13 has passed. The 10% holdback cannot cover the whole invoice, and no inspection issue is documented. No missing vendor paperwork or owner-side approval problem appears. The manager's 'paid' statement and reply are not backed by a bank record or vendor confirmation and are contradicted by both."
+      ]
+    },
+    {
+      "agent": "workflow",
+      "trigger": "probe-paid-claim",
+      "phase": "manager_claims_paid_without_proof",
+      "invoice_id": "INV-KW-0301",
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "route": "reply",
+        "raised": [],
+        "withdrawn": [],
+        "chases": [],
+        "blocked": []
+      },
+      "source_ids": [],
+      "guards": []
+    },
+    {
+      "agent": "trail",
+      "trigger": "ev-doc-probe-wrong-vendor",
+      "phase": "wrong_vendor_bank_payment",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2271,
+      "tokens_out": 653,
+      "answer": {
+        "winning_claim": "unpaid",
+        "conflict": true
+      },
+      "source_ids": [
+        "doc-notice-riogrande-0420",
+        "doc-bank-kw-2026-03",
+        "probe-wrong-vendor"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "cause",
+      "trigger": "ev-doc-probe-wrong-vendor",
+      "phase": "wrong_vendor_bank_payment",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3442,
+      "tokens_out": 412,
+      "answer": {
+        "cause": "unexplained"
+      },
+      "source_ids": [
+        "doc-funding-kw-0305",
+        "doc-agreement-keyway",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-wrong-vendor",
+        "doc-stmt-kw-2026-03",
+        "probe-paid-claim:INV-KW-0301"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "verifier",
+      "trigger": "ev-doc-probe-wrong-vendor",
+      "phase": "wrong_vendor_bank_payment",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3179,
+      "tokens_out": 675,
+      "answer": {
+        "alert_id": "al-unexplained_unpaid-daeb1b9e7b7c",
+        "status": "approved"
+      },
+      "source_ids": [],
+      "guards": [
+        "survived refutation: No refutation ground is met. The vendor was not paid: the bank record shows no payment to Rio Grande Plumbing and the vendor notice of 04/20 says the invoice is unpaid. The only $1,240 transfer for this invoice went to v-other, a different vendor. The invoice was funded by Oakline on 03/05 and was due 03/13 under clause 7.2, so it is past due. The full amount is not an authorized holdback, since clause 7.4 allows at most 10% and only for repair invoices pending inspection, with no inspection issue shown. No vendor paperwork is shown missing, and Oakline funded the invoice, with a $1,240 amount below the $5,000 approval limit. The manager's 'paid' statement and reply are not backed by bank or vendor proof."
+      ]
+    },
+    {
+      "agent": "workflow",
+      "trigger": "ev-doc-probe-wrong-vendor",
+      "phase": "wrong_vendor_bank_payment",
+      "invoice_id": null,
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "route": "assess",
+        "raised": [],
+        "withdrawn": [],
+        "chases": [],
+        "blocked": []
+      },
+      "source_ids": [],
+      "guards": []
+    },
+    {
+      "agent": "trail",
+      "trigger": "ev-doc-probe-corrected-bank",
+      "phase": "corrected_bank_payment",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2249,
+      "tokens_out": 626,
+      "answer": {
+        "winning_claim": "paid",
+        "conflict": true
+      },
+      "source_ids": [
+        "probe-corrected-bank",
+        "doc-notice-riogrande-0420"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "cause",
+      "trigger": "ev-doc-probe-corrected-bank",
+      "phase": "corrected_bank_payment",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3378,
+      "tokens_out": 348,
+      "answer": {
+        "cause": "unexplained"
+      },
+      "source_ids": [
+        "doc-funding-kw-0305",
+        "doc-agreement-keyway",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-corrected-bank"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "verifier",
+      "trigger": "ev-doc-probe-corrected-bank",
+      "phase": "corrected_bank_payment",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3133,
+      "tokens_out": 1160,
+      "answer": {
+        "alert_id": "al-unexplained_unpaid-daeb1b9e7b7c",
+        "status": "approved"
+      },
+      "source_ids": [],
+      "guards": [
+        "survived refutation: The alert is not refuted. The corrected bank record shows payment on 04/22, but that is after the 03/13 due date. The vendor was therefore unpaid and past due for about 40 days. None of the refutation conditions is met: the payment was not made on time, there was no holdback on the full invoice, the invoice was already due, no missing vendor paperwork is on file, and Oakline funded it on 03/05. The manager's 03/10 'paid' claim is contradicted by the bank record and the vendor notice."
+      ]
+    },
+    {
+      "agent": "workflow",
+      "trigger": "ev-doc-probe-corrected-bank",
+      "phase": "corrected_bank_payment",
+      "invoice_id": null,
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "route": "assess",
+        "raised": [],
+        "withdrawn": [],
+        "chases": [],
+        "blocked": []
+      },
+      "source_ids": [],
+      "guards": []
+    },
+    {
+      "agent": "trail",
+      "trigger": "ev-doc-probe-payment-statement",
+      "phase": "statement_arrives",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 2341,
+      "tokens_out": 703,
+      "answer": {
+        "winning_claim": "paid",
+        "conflict": true
+      },
+      "source_ids": [
+        "probe-corrected-bank",
+        "doc-notice-riogrande-0420"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "cause",
+      "trigger": "ev-doc-probe-payment-statement",
+      "phase": "statement_arrives",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3529,
+      "tokens_out": 377,
+      "answer": {
+        "cause": "unexplained"
+      },
+      "source_ids": [
+        "doc-agreement-keyway",
+        "doc-funding-kw-0305",
+        "doc-stmt-kw-2026-03",
+        "doc-bank-kw-2026-03",
+        "doc-notice-riogrande-0420",
+        "probe-corrected-bank"
+      ],
+      "guards": [
+        "Guards passed: real citations, consistent with the hard facts, neutral wording."
+      ]
+    },
+    {
+      "agent": "verifier",
+      "trigger": "ev-doc-probe-payment-statement",
+      "phase": "statement_arrives",
+      "invoice_id": "INV-KW-0301",
+      "mode": "llm",
+      "model": "claude-sonnet-5-5",
+      "tokens_in": 3310,
+      "tokens_out": 1034,
+      "answer": {
+        "alert_id": "al-unexplained_unpaid-daeb1b9e7b7c",
+        "status": "approved"
+      },
+      "source_ids": [],
+      "guards": [
+        "survived refutation: The evidence does not refute the alert. The invoice was funded and due 03/13, and the vendor's 04/20 notice and the bank record through 04/05 show it unpaid at that time. The only bank-confirmed payment is on 04/22, about 40 days late. No holdback, owner-approval gap, missing vendor paperwork or late invoice appears in the documents to excuse the delay. The 04/22 payment confirms the invoice is now settled, but it does not make the payment timely."
+      ]
+    },
+    {
+      "agent": "workflow",
+      "trigger": "ev-doc-probe-payment-statement",
+      "phase": "statement_arrives",
+      "invoice_id": null,
+      "mode": "rules",
+      "model": null,
+      "tokens_in": null,
+      "tokens_out": null,
+      "answer": {
+        "route": "assess",
+        "raised": [],
+        "withdrawn": [],
+        "chases": [],
+        "blocked": []
+      },
+      "source_ids": [],
+      "guards": []
+    }
+  ],
+  "phases": [
+    {
+      "name": "daily_scan",
+      "new_model_calls": 3,
+      "input_event_id": null,
+      "workflow_results": [
+        {
+          "event_id": "ev-monitor-scan-keyway-2026-04-22",
+          "route": "scan",
+          "raised": [
+            "al-unexplained_unpaid-daeb1b9e7b7c"
+          ],
+          "withdrawn": [],
+          "chases": [
+            "chase-349d61959449"
+          ]
+        },
+        {
+          "event_id": "ev-monitor-scan-outside-manager-2026-04-22",
+          "route": "scan",
+          "raised": [],
+          "withdrawn": [],
+          "chases": []
+        }
+      ]
+    },
+    {
+      "name": "manager_claims_paid_without_proof",
+      "new_model_calls": 4,
+      "input_event_id": "probe-paid-claim",
+      "workflow_results": [
+        {
+          "event_id": "probe-paid-claim",
+          "route": "reply",
+          "raised": [],
+          "withdrawn": [],
+          "chases": []
+        }
+      ]
+    },
+    {
+      "name": "wrong_vendor_bank_payment",
+      "new_model_calls": 3,
+      "input_event_id": "ev-doc-probe-wrong-vendor",
+      "workflow_results": [
+        {
+          "event_id": "ev-doc-probe-wrong-vendor",
+          "route": "assess",
+          "raised": [],
+          "withdrawn": [],
+          "chases": []
+        }
+      ]
+    },
+    {
+      "name": "corrected_bank_payment",
+      "new_model_calls": 3,
+      "input_event_id": "ev-doc-probe-corrected-bank",
+      "workflow_results": [
+        {
+          "event_id": "ev-doc-probe-corrected-bank",
+          "route": "assess",
+          "raised": [],
+          "withdrawn": [],
+          "chases": []
+        }
+      ]
+    },
+    {
+      "name": "statement_arrives",
+      "new_model_calls": 3,
+      "input_event_id": "ev-doc-probe-payment-statement",
+      "workflow_results": [
+        {
+          "event_id": "ev-doc-probe-payment-statement",
+          "route": "assess",
+          "raised": [],
+          "withdrawn": [],
+          "chases": []
+        }
+      ]
+    }
+  ],
+  "checks": [
+    {
+      "name": "daily_scan_detects_correct_1240_unpaid_invoice",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "daily_scan_calls_real_claude_trail_and_cause",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "real_claude_verifier_approves_unpaid_alert",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "unproven_paid_claim_keeps_1240_open",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "chaser_really_calls_claude_to_read_reply",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "wrong_vendor_bank_trigger_creates_review_and_keeps_invoice_unpaid",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "correct_bank_payment_updates_postgres_ledger_and_stops_unpaid_chase",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "late_payment_and_missing_statement_are_detected",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "statement_trigger_clears_missing_statement_and_preserves_lateness",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "repeated_poll_makes_no_model_calls_or_duplicate_records",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "all_decision_citations_reference_keyway_database_documents",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "claude_citations_are_limited_to_each_agents_supplied_evidence",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "other_manager_canary_never_reaches_claude",
+      "passed": true,
+      "details": null
+    },
+    {
+      "name": "no_agent_needed_rules_fallback",
+      "passed": true,
+      "details": null
+    }
+  ],
+  "database_counts": {
+    "agent_decision": 23,
+    "alert_raised": 5,
+    "chase_reply": 1,
+    "chase_sent": 1,
+    "document_ingested": 10,
+    "entity_registered": 21,
+    "finance_update_queued": 3,
+    "payment_reviewed": 3,
+    "reply_read": 1,
+    "scan_requested": 2,
+    "statement_request_drafted": 1,
+    "terms_confirmed": 1,
+    "workflow_done": 36,
+    "world_meta": 1
+  },
+  "accepted_claude_decisions": 16,
+  "fallback_decisions": [],
+  "passed": true,
+  "test_schema_removed": true,
+  "finished_at": "2026-10-24T19:14:30.494562+00:00",
+  "background_worker_test": {
+    "schema": "probe_worker_bd18dff1b9",
+    "poll_interval_seconds": 1,
+    "started_at": "2026-10-24T19:15:25.221971+00:00",
+    "passed": true,
+    "daily_scan_llm_agents": [
+      "trail",
+      "cause",
+      "verifier"
+    ],
+    "reply_trigger": "probe-background-paid-claim",
+    "reply_workflow_done": "ev-wf-workflow_done-df9975f2b927",
+    "reply_llm_agents": [
+      "chaser",
+      "trail",
+      "cause",
+      "verifier"
+    ],
+    "automatic_polling_verified": true,
+    "repeated_poll_writes": 0,
+    "token_receipts": [
+      {
+        "trigger": "ev-monitor-scan-keyway-2026-04-22",
+        "agent": "trail",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 2071,
+        "tokens_out": 499
+      },
+      {
+        "trigger": "ev-monitor-scan-keyway-2026-04-22",
+        "agent": "cause",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 3064,
+        "tokens_out": 331
+      },
+      {
+        "trigger": "ev-monitor-scan-keyway-2026-04-22",
+        "agent": "verifier",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 2805,
+        "tokens_out": 862
+      },
+      {
+        "trigger": "probe-background-paid-claim",
+        "agent": "chaser",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 1406,
+        "tokens_out": 107
+      },
+      {
+        "trigger": "probe-background-paid-claim",
+        "agent": "trail",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 2164,
+        "tokens_out": 576
+      },
+      {
+        "trigger": "probe-background-paid-claim",
+        "agent": "cause",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 3230,
+        "tokens_out": 380
+      },
+      {
+        "trigger": "probe-background-paid-claim",
+        "agent": "verifier",
+        "mode": "llm",
+        "model": "claude-sonnet-5-5",
+        "tokens_in": 2996,
+        "tokens_out": 495
+      }
+    ],
+    "test_schema_removed": true,
+    "worker_stopped": true,
+    "finished_at": "2026-10-24T19:16:01.572119+00:00"
+  },
+  "regression_suite": {
+    "passed": 387,
+    "skipped": 2,
+    "failed": 0,
+    "duration_seconds": 248.94
+  },
+  "runtime_configuration": {
+    "rails": "real",
+    "agents": "real",
+    "agents_llm": "on",
+    "verifier": "real",
+    "approvals": "real",
+    "continuous_worker_running": false,
+    "worktree_uses_existing_project_env": true
+  }
+}

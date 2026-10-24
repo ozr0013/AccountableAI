@@ -16,7 +16,8 @@ from contracts.models import Alert, ChaseMessage, Event
 
 WF_TYPES = {"workflow_done", "alert_raised", "alert_rejected", "alert_withdrawn",
             "chase_sent", "chase_held", "case_proposed", "terms_proposed", "bank_change_held", "reply_read",
-            "agent_decision"}
+            "agent_decision", "payment_reviewed", "finance_update_queued",
+            "statement_request_drafted"}
 
 
 def digest(*parts: str) -> str:

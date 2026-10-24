@@ -41,7 +41,7 @@ def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g = StateGraph(WorkflowState)
     for name in ("route", "assess", "draft_alerts", "verify", "chase", "read_reply",
                  "funding_review", "extract_terms", "confirm_terms", "bank_change", "pending",
-                 "finish"):
+                 "payment_review", "finish"):
         g.add_node(name, getattr(steps, name))
     g.add_edge(START, "route")
     g.add_conditional_edges("route", lambda s: _AFTER_ROUTE[s.route],
@@ -50,7 +50,8 @@ def build_graph(steps: Steps, checkpointer: BaseCheckpointSaver | None = None):
     g.add_edge("extract_terms", "confirm_terms")
     g.add_conditional_edges("confirm_terms", lambda s: "assess" if s.invoice_ids else "finish",
                             ["assess", "finish"])
-    g.add_edge("assess", "draft_alerts")
+    g.add_edge("assess", "payment_review")
+    g.add_edge("payment_review", "draft_alerts")
     g.add_edge("draft_alerts", "verify")
     g.add_edge("verify", "chase")
     g.add_edge("chase", "finish")

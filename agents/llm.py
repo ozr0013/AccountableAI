@@ -131,7 +131,9 @@ class AnthropicLLM:
             full = chunk if full is None else full + chunk
         content = getattr(full, "content", "")
         text = content if isinstance(content, str) else "".join(
-            b.get("text", "") for b in content if isinstance(b, dict) and b.get("type") == "text")
+            b if isinstance(b, str) else b.get("text", "")
+            for b in content if isinstance(b, str)
+            or (isinstance(b, dict) and b.get("type") == "text"))
         try:
             return schema.model_validate_json(text), full, None
         except Exception as e:      # noqa: BLE001 - a malformed answer is a rejected answer

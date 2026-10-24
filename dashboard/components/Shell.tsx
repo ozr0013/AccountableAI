@@ -24,6 +24,7 @@ export function Shell({ children }: { children: ReactNode }) {
   ];
   const tools = [
     { href: "/console", label: "Judge Console", icon: Gavel },
+    { href: "/autonomy", label: "Autonomous cases", icon: Spark },
     { href: "/ask", label: "Ask about Keyway", icon: Spark },
   ];
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
@@ -59,7 +60,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <DemoBar />
+          {!path.startsWith("/autonomy") && <DemoBar />}
           <div className="side-foot">
             <div className="who">
               <span className="who-av">D</span>

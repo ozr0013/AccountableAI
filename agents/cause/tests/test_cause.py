@@ -136,3 +136,23 @@ def test_claude_rewording_the_trail_cannot_hide_a_data_fact():
     claude_says = _answer(Cause.unexplained, ("doc-funding-kw-0101",), "10% still unpaid.")
     f = CauseAgent(ScriptedLLM(claude_says, claude_says)).classify_cause(line, trail, terms)
     assert f.cause == Cause.authorized_hold                  # guard fired, rules decided
+
+
+def test_claude_can_explain_a_proven_late_payment_without_fallback():
+    from datetime import date
+
+    from contracts.models import Document
+
+    line, docs = invoice("INV-KW-0301", "keyway")
+    line = line.model_copy(update={"paid_amount": 1240, "paid_on": date(2026, 4, 22)})
+    bank = Document(id="late-bank-proof", kind="manager_bank", manager_id="keyway",
+                    dated=date(2026, 4, 22), data={"payments": [{
+                        "invoice_id": line.invoice_id, "vendor_id": line.vendor_id,
+                        "amount": 1240, "on": "2026-04-22"}]})
+    trail = TrailAgent(None).build_trail(line, docs + [bank])
+    terms = terms_for(world_rails(), FakeAgents(), "keyway")
+    explanation = "Bank proof confirms full payment on Apr 22, after the March 13 deadline."
+    llm = ScriptedLLM(_answer(Cause.unexplained, (bank.id, "doc-agreement-keyway"), explanation))
+    result = CauseAgent(llm).classify_cause(line, trail, terms)
+    assert result.explanation == explanation
+    assert len(llm.prompts) == 1

@@ -30,7 +30,7 @@ def fund(iid, amt):
 
 def bank(*pays):
     return Document(id="b", kind=SourceKind.manager_bank, manager_id="m", dated=date(2026, 4, 1),
-                    data={"payments": [{"invoice_id": i, "amount": a, "on": "2026-03-05"} for i, a in pays]})
+                    data={"payments": [{"invoice_id": i, "vendor_id": "v", "amount": a, "on": "2026-03-05"} for i, a in pays]})
 
 
 @pytest.mark.parametrize("seed", range(8))
@@ -72,3 +72,10 @@ def test_overfunding_and_duplicates_surface_in_diff():
                          dup, fund("b", 100.0)), "m")
     assert r["duplicate_funded"] == 100.0 and r["diff"] == 100.0
     assert [l.invoice_id for l in breakdown(events(inv("a", 1.0)), "m")] == ["a"]
+
+
+def test_owner_signoff_condition_does_not_become_inspection_hold():
+    evs = events(inv('a', 2000.0, inspection='pending'), fund('a', 2000.0), bank(('a', 1800.0)), holdback=10)
+    evs[-1].payload.update(holdback_condition='until the owner signs off', terms={})
+    result = reconcile(evs, 'm')
+    assert result['held'] == 0 and result['owed'] == 200

@@ -185,3 +185,28 @@ def test_workflow_announces_each_step_as_it_finishes(world):
     assert steps[:2] == ["route", "read_reply"] and steps[-1] == "finish"
     started = [m["agent"] for m in live if m["type"] == "agent_started"]
     assert started[0] == "chaser" and "trail" in started and "cause" in started
+
+
+def test_claude_stream_keeps_strings_inside_mixed_content():
+    from langchain_core.messages import AIMessageChunk
+
+    from agents.cause.agent import CauseAnswer
+    from agents.llm import AnthropicLLM
+
+    answer = ('{"cause":"unexplained","confidence":0.9,"explanation":"Paid late.",'
+              '"citations":[{"source_id":"bank"}]}')
+
+    class MixedChat:
+        def bind(self, **kwargs):
+            return self
+
+        def stream(self, messages):
+            yield AIMessageChunk(content="")
+            yield AIMessageChunk(content=[{"type": "thinking", "thinking": "", "index": 0}])
+            yield AIMessageChunk(content=answer)
+
+    llm = AnthropicLLM.__new__(AnthropicLLM)
+    llm.chat = MixedChat()
+    parsed, _, error = llm._stream(CauseAnswer, [], lambda _: None)
+    assert error is None
+    assert parsed.explanation == "Paid late."

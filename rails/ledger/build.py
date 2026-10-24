@@ -15,7 +15,7 @@ from datetime import date, timedelta
 from contracts.models import Document, Event, InvoiceStatus, LedgerLine, SourceKind
 
 from ..docs import documents_from_events
-from ..facts import current_terms
+from ..facts import terms_at
 from ..matcher import find_duplicates, gather_evidence
 
 
@@ -29,9 +29,10 @@ def _d(s: str | None) -> date | None:
 
 def build_ledger(events: list[Event]) -> list[LedgerLine]:
     """Pass current events (superseded ones already dropped). Returns lines sorted by invoice id."""
-    terms = {m: int(t["vendor_payment_days"]) for m, t in current_terms(events).items()}
 
-    docs = documents_from_events(events)
+
+    from ..guards.payments import identified_payment_documents
+    docs = identified_payment_documents(documents_from_events(events))
     result = gather_evidence(docs)
     dups = find_duplicates(docs)
     funded: dict[str, list[tuple[int, date | None]]] = {}
@@ -55,8 +56,19 @@ def build_ledger(events: list[Event]) -> list[LedgerLine]:
             paid_c, paid_on = ev.vendor_paid
         else:
             paid_c, paid_on = 0, None
-        days = terms.get(d.manager_id)
-        due = received + timedelta(days=days) if days and received else None
+        terms = terms_at(events, d.manager_id, received, d.vendor_id) or {}
+        days = terms.get("vendor_payment_days")
+        due = received
+        if days is None or received is None:
+            due = None
+        elif terms.get("deadline_basis", "calendar") == "business":
+            remaining = int(days)
+            while remaining > 0:
+                due += timedelta(days=1)
+                if due.weekday() < 5:
+                    remaining -= 1
+        else:
+            due += timedelta(days=int(days))
         if paid_c >= amount_c > 0:
             status = InvoiceStatus.paid
         elif paid_c > 0:

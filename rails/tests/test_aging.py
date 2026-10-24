@@ -19,7 +19,7 @@ def invoice(iid, received, amount=100.0, paid_on=None, funded=True, manager="m")
     if paid_on:
         docs.append(Document(id=f"b-{iid}", kind=SourceKind.manager_bank, manager_id=manager,
                              dated=date.fromisoformat(paid_on),
-                             data={"payments": [{"invoice_id": iid, "amount": amount, "on": paid_on}]}))
+                             data={"payments": [{"invoice_id": iid, "vendor_id": "v", "amount": amount, "on": paid_on}]}))
     return docs
 
 

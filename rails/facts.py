@@ -83,3 +83,26 @@ def fact_keys(e: Event) -> set[str]:
     if kind in ("vendor_confirmation", "vendor_notice", "manager_reply") and iid:
         return {f"invoice:{iid}.payment"}
     return set()
+
+
+def terms_at(events, manager_id, invoice_date=None, vendor_id=None):
+    """Select a confirmed revision by applicability date, retaining historical revisions."""
+    candidates = []
+    for e in effective(events):
+        if e.type != "terms_confirmed" or e.manager_id != manager_id:
+            continue
+        p = e.payload
+        scope = p.get("vendor_id")
+        if scope and scope != vendor_id:
+            continue
+        start = p.get("effective_from")
+        if start and invoice_date and str(start) > str(invoice_date):
+            continue
+        candidates.append(e)
+    if not candidates:
+        return None
+    selected = max(enumerate(candidates), key=lambda item: (bool(item[1].payload.get("vendor_id")),
+                   str(item[1].payload.get("effective_from") or "0001-01-01"),
+                   item[1].learned_at, item[0]))[1]
+    return {**selected.payload, "confirmation_id": selected.id,
+            "source_id": selected.source.source_id if selected.source else None}

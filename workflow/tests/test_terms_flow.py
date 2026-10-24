@@ -64,3 +64,47 @@ def test_controller_can_decline_or_edit(wf):
     wf.resume(r.event_id, {"approve": True, "by": "controller.dana",
                            "edits": {"vendor_payment_days": 12}})
     assert _days(wf) == 12
+
+
+def test_amendment_removal_conditions_fees_and_provenance(wf):
+    from workflow.terms import terms_for
+    text = ('4.1 Pay all vendors within fifteen (15) days of invoice receipt.\n'
+            '6.2 Owner approval above $5,000.\n'
+            '9.1 A monthly administration fee of $25 is allowed.')
+    d = Document(id='amend-remove', kind=SourceKind.agreement, manager_id='keyway',
+                 dated=datetime(2026,4,26,tzinfo=UTC).date(), text=text)
+    [r] = wf.replay([document_event(d)])
+    assert r.waiting['proposed']['holdback_pct'] is None
+    wf.resume(r.event_id, {'approve':True,'by':'controller.dana'})
+    t = terms_for(wf.deps.rails, wf.deps.agents, 'keyway', datetime(2026,4,27).date())
+    assert t.holdback_pct is None and t.holdback_condition is None
+    assert t.allowed_charges
+    assert t.vendor_payment_days.citation.source_id == 'amend-remove'
+    assert t.vendor_payment_days.citation.locator == '4.1'
+    assert t.vendor_payment_days.citation.quote in text
+
+
+def test_older_pending_proposal_cannot_revert_latest(wf):
+    first = _amendment()
+    [older] = wf.replay([first])
+    newer = first.model_copy(update={'id': 'newer-event', 'payload': {
+        **first.payload, 'id':'newer-doc', 'text': NEW.replace('fifteen (15)', 'twenty (20)')}})
+    [latest] = wf.replay([newer])
+    wf.resume(latest.event_id, {'approve':True,'by':'controller.dana'})
+    assert _days(wf) == 20
+    result = wf.resume(older.event_id, {'approve':True,'by':'controller.dana'})
+    assert _days(wf) == 20
+    assert any('stale' in x for x in result.trace)
+
+
+def test_condition_only_amendment_requires_confirmation_and_persists(wf):
+    from workflow.terms import terms_for
+    original = next(d for d in wf.deps.rails.documents('keyway') if d.kind == SourceKind.agreement)
+    amended = original.model_copy(update={'id':'condition-amendment',
+        'text': original.text.replace('until the work passes inspection', 'until the owner signs off')})
+    [result] = wf.replay([document_event(amended)])
+    assert result.waiting is not None
+    wf.resume(result.event_id, {'approve':True,'by':'controller.dana'})
+    confirmed = terms_for(wf.deps.rails, wf.deps.agents, 'keyway')
+    assert confirmed.holdback_condition.value == 'until the owner signs off'
+    assert confirmed.holdback_condition.citation.source_id == 'condition-amendment'

@@ -44,8 +44,8 @@ def _cites(trail: PaymentTrail, *kinds: SourceKind) -> list[Citation]:
 
 
 def holdback_room(line: LedgerLine, terms: AgreementTerms) -> float:
-    pct = float(terms.holdback_pct.value) if terms.holdback_pct else 0.0
-    return round(line.amount * pct / 100, 2)
+    from rails.guards.payments import payable_cents
+    return (round(line.amount * 100) - payable_cents(line.amount, terms, {"inspection": "pending"})) / 100
 
 
 def inspection_pending(trail: PaymentTrail) -> bool:
@@ -65,6 +65,8 @@ def hard_facts(line: LedgerLine, trail: PaymentTrail, terms: AgreementTerms) -> 
         "funded": line.funded_amount > 0,
         "paid_on_time": bool(line.paid_on and line.due_date and line.paid_on <= line.due_date
                              and _cents(line.paid_amount) >= _cents(line.amount)),
+        "paid_late": bool(line.paid_on and line.due_date and line.paid_on > line.due_date
+                          and _cents(line.paid_amount) >= _cents(line.amount)),
         "unpaid_amount": unpaid,
         "within_holdback": 0 < _cents(unpaid) <= _cents(holdback_room(line, terms)),
         "inspection_pending": inspection_pending(trail),
@@ -109,7 +111,8 @@ def classify(line: LedgerLine, trail: PaymentTrail, terms: AgreementTerms) -> Ca
                    "The vendor asked to change its bank details; payment is held until the "
                    "request is verified and a controller approves it.", change + funding)
 
-    if f["within_holdback"] and f["inspection_pending"] and terms.holdback_pct:
+    if (f["within_holdback"] and f["inspection_pending"] and terms.holdback_pct
+            and terms.holdback_condition and "inspection" in str(terms.holdback_condition.value).lower()):
         hb = terms.holdback_pct
         return out(Cause.authorized_hold, 0.9,
                    f"{_money(line.paid_amount)} paid; the remaining {_money(f['unpaid_amount'])} "

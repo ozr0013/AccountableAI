@@ -1,6 +1,6 @@
 """RAILS=real must answer the same calls as the stand-in on the shared scenario 3 fixture."""
 
-from datetime import date
+from datetime import UTC, date
 
 import pytest
 
@@ -68,11 +68,12 @@ def test_stand_in_chaser_templates_pass_the_real_gate(real):
 
 
 def test_reply_from_stand_in_reader_reaches_trust_rules(real):
-    from datetime import datetime, timezone
+    from datetime import datetime
+
     from contracts.fakes import FakeAgents
     from contracts.models import Event
     reply = FakeAgents().read_reply("We paid it.", "keyway", [])       # invoice_ids == []
-    ts = datetime(2026, 4, 24, tzinfo=timezone.utc)
+    ts = datetime(2026, 4, 24, tzinfo=UTC)
     real.append_event(Event(id=reply.id, type="chase_reply", manager_id="keyway",
                             invoice_id="INV-KW-0301", valid_from=ts, learned_at=ts,
                             payload=reply.model_dump(mode="json")))
@@ -105,3 +106,28 @@ def test_memory_rails_answers_like_real_rails_on_the_demo_world(schema):
     for k in keys:
         assert real.dependents_of(k) == mem.dependents_of(k), k
     assert {d.id for d in real.documents("keyway")} == {d.id for d in mem.documents("keyway")}
+
+
+def test_append_and_dependency_index_rollback_together(schema, monkeypatch):
+    from datetime import UTC, datetime
+
+    from contracts.models import Event
+    from rails.real import RealRails
+    rails = RealRails(schema=schema)
+    event = Event(id='atomic-index-test', type='terms_confirmed', manager_id='m',
+                  valid_from=datetime(2026,4,1,tzinfo=UTC), learned_at=datetime(2026,4,1,tzinfo=UTC),
+                  payload={'vendor_payment_days':10})
+    original = rails.deps.index_event
+    def fail_after_index(event):
+        original(event)
+        raise RuntimeError('index write failed')
+    monkeypatch.setattr(rails.deps, 'index_event', fail_after_index)
+    import pytest
+    with pytest.raises(RuntimeError, match='index write failed'):
+        rails.append_event(event)
+    assert rails.store.get(event.id) is None
+    assert not rails.store.conn.execute('SELECT 1 FROM event_facts WHERE event_id=%s', (event.id,)).fetchall()
+    monkeypatch.setattr(rails.deps, 'index_event', original)
+    rails.append_event(event)
+    assert rails.store.get(event.id) is not None
+    rails.store.conn.close()

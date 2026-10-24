@@ -72,8 +72,12 @@ def _material(d: AlertDraft) -> tuple:
 
 
 def _term_values(t) -> dict:
-    return {k: getattr(t, k).value for k in ("vendor_payment_days", "holdback_pct", "approval_limit")
-            if getattr(t, k) is not None}
+    vals = {k: getattr(t, k).value if getattr(t, k) is not None else None
+            for k in ("vendor_payment_days", "holdback_pct", "holdback_condition", "approval_limit")}
+    vals.update(allowed_charges=[x.model_dump(mode="json") for x in t.allowed_charges],
+                deadline_basis=t.deadline_basis, effective_from=str(t.effective_from) if t.effective_from else None,
+                vendor_id=t.vendor_id)
+    return vals
 
 
 def _cents(x: float) -> int:
@@ -126,7 +130,8 @@ class Steps:
                                                    if (l := self._line(i))}
             return sorted({l.invoice_id for m in managers for l in self.d.rails.ledger(m)
                            if not l.duplicate_of} | named)
-        return sorted(set(self.d.rails.dependents_of(e.id)) | named)
+        replaced = set(self.d.rails.dependents_of(e.supersedes)) if e.supersedes else set()
+        return sorted(set(self.d.rails.dependents_of(e.id)) | replaced | named)
 
     # -- assess: payment trail + delay cause per invoice ----------------------------------
     def assess(self, s: WorkflowState) -> dict:
@@ -172,7 +177,7 @@ class Steps:
                               note=f"paid {(line.paid_on - line.due_date).days} days late")
         if unpaid and (line.due_date is None or now <= line.due_date):
             return Assessment(**base, status="not_due", note=f"due {line.due_date}")
-        terms = terms_for(self.d.rails, self.d.agents, line.manager_id)
+        terms = terms_for(self.d.rails, self.d.agents, line.manager_id, line.invoice_received, line.vendor_id)
         if terms is None:
             return Assessment(**base, status="skipped", note="no agreement terms on file")
         docs = self._evidence(line.manager_id, [line.invoice_id], now)
@@ -191,6 +196,13 @@ class Steps:
                 if now is None or d.dated is None or d.dated <= now:
                     seen.setdefault(d.id, d)
         return list(seen.values())
+
+    def payment_review(self, s: WorkflowState) -> dict:
+        from .payment_review import review_payments
+        managers = {line.manager_id for line in self._lines(s)}
+        notes = [note for manager in sorted(managers)
+                 for note in review_payments(self.d.rails, s.event, manager, s.invoice_ids, s.now)]
+        return {"trace": notes}
 
     # -- alerts: draft (code) -> verifier -> record ----------------------------------------
     def draft_alerts(self, s: WorkflowState) -> dict:
@@ -459,22 +471,45 @@ class Steps:
         """Pause until a controller confirms. Identical to what's already confirmed -> no pause."""
         vals = _term_values(s.terms)
         current = current_terms(self.d.rails.events(s.manager_id)).get(s.manager_id) or {}
-        if current and all(current.get(k) == v for k, v in vals.items()):
+        if current and "terms" not in current:
+            legacy = terms_for(self.d.rails, self.d.agents, s.manager_id)
+            if legacy:
+                expanded = _term_values(legacy)
+                current = {**expanded, **current}
+                # Legacy rules were already confirmed without an explicit effective date.
+                current["effective_from"] = vals["effective_from"]
+                from rails.guards.payments import inspection_condition
+                if inspection_condition(current.get("holdback_condition")) and inspection_condition(vals.get("holdback_condition")):
+                    current["holdback_condition"] = vals["holdback_condition"]
+        if current and all(current.get(k) == v for k, v in vals.items()
+                           if k in current or k in ("vendor_payment_days", "holdback_pct", "approval_limit")):
             return {"trace": ["matches the confirmed terms; nothing to confirm"]}
         decision = interrupt({"manager_id": s.manager_id, "proposed": vals, "current": current,
                               "clauses": {k: getattr(s.terms, k).citation.locator
-                                          for k in vals if getattr(s.terms, k)}})
+                                          for k in ("vendor_payment_days", "holdback_pct", "holdback_condition", "approval_limit") if getattr(s.terms, k)}})
         by, approve = decision.get("by", ""), bool(decision.get("approve"))
         ok, why = self.d.rails.policy_check("approve", by, {"proposed_by": "agreement_agent"})
         if not approve or not ok:
             return {"trace": [f"terms not confirmed ({why if approve else 'declined by ' + by})"]}
+        proposals = [e for e in self.d.rails.events(s.manager_id) if e.type == "terms_proposed"
+                     and e.payload.get("terms", {}).get("vendor_id") == s.terms.vendor_id]
+        if proposals and proposals[-1].payload.get("terms") != s.terms.model_dump(mode="json"):
+            return {"trace": ["terms not confirmed: stale proposal; review latest proposal"]}
         final = {**vals, **{k: v for k, v in (decision.get("edits") or {}).items() if k in vals}}
-        prev = [e for e in self.d.rails.events(s.manager_id) if e.type == "terms_confirmed"]
+        if (not isinstance(final["vendor_payment_days"], (int, float))
+                or final["vendor_payment_days"] < 0
+                or int(final["vendor_payment_days"]) != final["vendor_payment_days"]
+                or final.get("deadline_basis") not in ("calendar", "business")
+                or (final.get("holdback_pct") is not None and not 0 <= float(final["holdback_pct"]) <= 100)):
+            return {"trace": ["terms not confirmed: invalid deadline or holdback edits"]}
         ev = Event(id=f"ev-terms-confirmed-{s.manager_id}-{digest(str(sorted(final.items())), s.event.id)}",
                    type="terms_confirmed", manager_id=s.manager_id, valid_from=s.event.valid_from,
-                   learned_at=s.event.learned_at, supersedes=prev[-1].id if prev else None,
-                   payload={"manager_id": s.manager_id, **final, "confirmed_by": by},
+                   learned_at=s.event.learned_at, supersedes=None,
+                   payload={"manager_id": s.manager_id, **final, "confirmed_by": by,
+                            "terms": s.terms.model_dump(mode="json"),
+                            "proposal_version": s.event.id},
                    source=s.terms.vendor_payment_days.citation)
+        ev.payload["confirmation_id"] = ev.id
         self.d.rails.append_event(ev)
         ids = sorted(i for i in self.d.rails.dependents_of(ev.id) if i.startswith("INV-"))
         return {"invoice_ids": ids,

@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from contracts.models import Event, SourceKind
 
 from ..docs import documents_from_events
-from ..facts import current_terms
+from ..facts import terms_at
 from ..ledger import build_ledger
 
 
@@ -44,9 +44,9 @@ class ReconLine:
 
 
 def breakdown(events: list[Event], manager_id: str | None = None) -> list[ReconLine]:
-    holdback = {m: t.get("holdback_pct", 0) for m, t in current_terms(events).items()}
-    pending = {d.data["invoice_id"] for d in documents_from_events(events)
-               if d.kind == SourceKind.vendor_invoice and d.data.get("inspection") == "pending"}
+    from ..guards.payments import payable_cents
+    invoices = {d.data["invoice_id"]: d.data for d in documents_from_events(events)
+                if d.kind == SourceKind.vendor_invoice and d.data.get("invoice_id")}
     out = []
     for l in build_ledger(events):
         if manager_id and l.manager_id != manager_id:
@@ -55,10 +55,9 @@ def breakdown(events: list[Event], manager_id: str | None = None) -> list[ReconL
         if l.duplicate_of:
             out.append(ReconLine(l.invoice_id, l.manager_id, funded, paid, 0, 0, 0, funded))
             continue
-        pct = holdback.get(l.manager_id, 0)
-        held = 0
-        if l.invoice_id in pending and pct:
-            held = min(max(funded - paid, 0), round(amount * pct / 100))
+        terms = terms_at(events, l.manager_id, l.invoice_received, l.vendor_id) or {}
+        permitted = amount - payable_cents(l.amount, terms, invoices.get(l.invoice_id, {}))
+        held = min(max(funded - paid, 0), permitted)
         owed = max(min(amount, funded) - paid - held, 0)
         out.append(ReconLine(l.invoice_id, l.manager_id, funded, paid, held, owed,
                              max(amount - funded, 0) if paid < amount else 0, 0))

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date, datetime, time, timezone
+from datetime import UTC, date, datetime, time
 
 from contracts.models import Document, Event, LedgerLine
 
@@ -15,7 +15,6 @@ from .docs import documents_from_events
 from .events import EventStore
 from .ledger import build_ledger
 from .recon import reconcile as _reconcile
-
 
 log = logging.getLogger(__name__)
 
@@ -50,13 +49,14 @@ class RealRails:
         return max((e.valid_from.date() for e in evs), default=date(2026, 1, 1))
 
     def _events(self, as_of: date | None = None) -> list[Event]:
-        cutoff = datetime.combine(as_of, time.max, tzinfo=timezone.utc) if as_of else None
+        cutoff = datetime.combine(as_of, time.max, tzinfo=UTC) if as_of else None
         return self.store.events(as_of=cutoff, current_only=True)
 
     # -- Rails protocol -------------------------------------------------------------------
     def append_event(self, event: Event) -> None:
-        if self.store.append(event):
-            self.deps.index_event(event)
+        with self.store.conn.transaction():
+            if self.store.append(event):
+                self.deps.index_event(event)
 
     def events(self, manager_id: str | None = None) -> list[Event]:
         return self.store.events(manager_id=manager_id)
