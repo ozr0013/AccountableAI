@@ -128,14 +128,14 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [ ] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
-2. [ ] Funding ledger: per manager and vendor invoice, amount Oakline funded, amount paid to the vendor, due date (from confirmed terms)
-3. [ ] Matcher: vendor payments in the manager's bank records vs statement lines vs vendor confirmations; duplicate flag (scenario 8)
-4. [ ] Aging, per-manager patterns (scenario 4)
+2. [ ] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (final target: Oakline, 3 managers, ~40 vendors, 6 months of funded repairs)
+3. [ ] Funding ledger: per manager and vendor invoice, amount Oakline funded, amount paid to the vendor, due date (from confirmed terms)
+4. [ ] Matcher: vendor payments in the manager's bank records vs statement lines vs vendor confirmations; duplicate detection (scenario 8)
 5. [ ] Source-trust rules (bank > manager statement; vendor confirmation > manager "paid" claim)
 6. [ ] Reconciliation per manager: money funded = paid to vendors + authorized holds + still owed
-7. [ ] Policy check, accounting check, guardrails (no money tool, approved-template reminders only, segregation of duties)
-8. [ ] Neo4j memory with source links; `dependents_of()` for selective recheck
-9. [ ] World generator: Oakline, 3 managers, ~40 vendors, 6 months of funded repairs, all 9 scenarios
+7. [ ] Aging, per-manager patterns (scenario 4)
+8. [ ] `dependents_of()` for selective recheck: build on a Postgres dependency table first, then mirror to Neo4j (memory with source links, briefing view) so recheck doesn't depend on Neo4j being up
+9. [ ] Policy check, accounting check, guardrails and gates (no money tool, approved-template reminders only, segregation of duties)
 10. [ ] Judge Console backend: presets + free text → events
 11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
 

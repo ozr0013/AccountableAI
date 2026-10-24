@@ -1,0 +1,11 @@
+{
+  "scenario": 3,
+  "invoice_id": "INV-KW-0301",
+  "cause": "unexplained",
+  "alert": true,
+  "alert_kind": "unexplained_unpaid",
+  "conflict": true,
+  "winning_claim": "unpaid",
+  "must_cite": ["doc-stmt-kw-2026-03", "doc-bank-kw-2026-03", "doc-notice-riogrande-0420"],
+  "chaser_starts": true
+}
