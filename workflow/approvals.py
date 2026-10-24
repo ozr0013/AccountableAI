@@ -18,8 +18,11 @@ def _now() -> datetime:
 
 
 class RailsApprovals:
-    def __init__(self, rails=None):
+    def __init__(self, rails=None, clock=None):
+        """clock: optional callable returning the moment to stamp events with. Default is the
+        wall clock; a demo or test passes the world's clock so events stay inside the demo date."""
         self.rails = rails or registry.rails()
+        self._clock = clock or _now
 
     def _events(self, type_: str) -> list[Event]:
         return [e for e in self.rails.events() if e.type == type_]
@@ -28,7 +31,7 @@ class RailsApprovals:
         aid = f"appr-{case.id}"
         if any(e.payload.get("approval_id") == aid for e in self._events("approval_requested")):
             return aid                                  # idempotent: replay asks once
-        when = _now()
+        when = self._clock()
         self.rails.append_event(Event(
             id=f"ev-{aid}-requested", type="approval_requested", manager_id=case.manager_id,
             valid_from=when, learned_at=when,
@@ -55,7 +58,7 @@ class RailsApprovals:
                 if not ok:
                     raise PermissionError(why)
             case = case.model_copy(update={"approved_by": approver})
-        when = _now()
+        when = self._clock()
         self.rails.append_event(Event(
             id=f"ev-{approval_id}-decided", type="approval_decided", manager_id=case.manager_id,
             valid_from=when, learned_at=when,
