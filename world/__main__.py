@@ -1,17 +1,17 @@
-"""python -m world --seed 13 --out out/world [--clean 100] [--scenarios 3]"""
+"""python -m world --seed 13 --out out/world [--clean 100] [--scenarios 1 2 ... 9 (default: all)]"""
 
 import argparse
 import json
 from pathlib import Path
 
-from .generator import generate
+from .generator import ALL_SCENARIOS, generate
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--clean", type=int, default=100)
-    ap.add_argument("--scenarios", type=int, nargs="*", default=[3])
+    ap.add_argument("--scenarios", type=int, nargs="*", default=list(ALL_SCENARIOS))
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     w = generate(a.seed, tuple(a.scenarios), a.clean)
