@@ -1,0 +1,11 @@
+{
+  "scenario": 3,
+  "as_of": "2026-04-25",
+  "owner": {"id": "oakline", "name": "Oakline Homes"},
+  "managers": [
+    {"id": "keyway", "name": "Keyway Property Management"}
+  ],
+  "vendors": [
+    {"id": "v-riogrande", "name": "Rio Grande Plumbing", "trade": "plumber"}
+  ]
+}
