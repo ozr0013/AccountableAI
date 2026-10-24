@@ -43,6 +43,8 @@ class WorkflowState(BaseModel):
     assessments: list[Assessment] = Field(default_factory=list)
     drafts: list[AlertDraft] = Field(default_factory=list)
     raised: list[str] = Field(default_factory=list)       # alert ids opened by this run
+    refreshed: list[str] = Field(default_factory=list)    # open alerts re-verified on new evidence
     rejected: list[str] = Field(default_factory=list)     # alert ids the verifier stopped
+    withdrawn: list[str] = Field(default_factory=list)    # alerts the new facts no longer support
     chases: list[str] = Field(default_factory=list)       # chase ids sent or held
     trace: Annotated[list[str], operator.add] = Field(default_factory=list)  # the "why" log
