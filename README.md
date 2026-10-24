@@ -147,7 +147,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 5. [x] Chaser agent: reminders to the middleman (polite, then firmer) from approved templates, logs replies; a "paid" reply counts only with vendor or bank proof (scenario 9)
 5b. [x] Case agent: evidence pack and proposed hold amount for the controller
 6. [x] Bank-detail change path (scenario 7)
-7. [ ] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)
+7. [x] Selective recheck: rerun only `dependents_of()`; withdraw alerts that no longer hold (the moment)
 8. [ ] **NEEDS** Checkpoint A: swap stand-ins for real rails and verifier
 9. [ ] **NEEDS** Checkpoint B fallback: rerun all items for the affected manager and show which changed
 

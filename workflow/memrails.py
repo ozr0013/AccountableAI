@@ -105,6 +105,12 @@ class MemoryRails:
     def policy_check(self, action: str, actor: str, payload: dict) -> tuple[bool, str]:
         return _policy_check(action, actor, payload)
 
+    @property
+    def store(self) -> _Store:
+        """The slice of rails.events.EventStore the Judge Console uses, so the console runs
+        against memory rails too (demo without Postgres)."""
+        return _Store(self)
+
     # -- dependency index (mirrors rails/deps/index.py rebuild) ---------------------------
     def _index(self) -> tuple[dict[str, set[str]], set[tuple[str, str]]]:
         key = ("index", len(self._events), len(self._extra))
@@ -134,3 +140,24 @@ class MemoryRails:
                 deps |= {(dup, f"invoice:{orig}.{a}"), (orig, f"invoice:{dup}.{a}")}
         self._cache[key] = (facts, deps)
         return facts, deps
+
+
+class _Store:
+    def __init__(self, rails: MemoryRails):
+        self._r = rails
+
+    def get(self, event_id: str) -> Event | None:
+        return next((e for e in self._r._events if e.id == event_id), None)
+
+    def events(self, manager_id: str | None = None, invoice_id: str | None = None,
+               type: str | None = None, as_of=None, known_at=None,
+               current_only: bool = False) -> list[Event]:
+        out = [e for e in self._r._events
+               if manager_id in (None, e.manager_id) and invoice_id in (None, e.invoice_id)
+               and type in (None, e.type)
+               and (as_of is None or e.valid_from <= as_of)
+               and (known_at is None or e.learned_at <= known_at)]
+        if current_only:
+            replaced = {e.supersedes for e in out if e.supersedes}
+            out = [e for e in out if e.id not in replaced]
+        return out

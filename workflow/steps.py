@@ -112,13 +112,14 @@ class Steps:
     # -- assess: payment trail + delay cause per invoice ----------------------------------
     def assess(self, s: WorkflowState) -> dict:
         lines = {l.invoice_id: l for l in self._lines(s)}
+        alerted = {i for a in WorkflowBook.load(self.d.rails).open_alerts() for i in a.draft.invoice_ids}
         out, notes = [], []
         for iid in s.invoice_ids:
             line = lines.get(iid)
             if line is None:
                 notes.append(f"{iid}: not on a ledger yet")
                 continue
-            a = self._assess_one(line, s.now)
+            a = self._assess_one(line, s.now, explain=iid in alerted)
             out.append(a)
             notes.append(f"{iid}: {a.status}" + (f", cause {a.finding.cause.value}" if a.finding else "")
                          + (f" ({a.note})" if a.note else ""))
@@ -131,13 +132,15 @@ class Steps:
                         if d.kind == SourceKind.vendor_invoice and d.data.get("invoice_id") in s.invoice_ids}
         return [l for m in sorted(x for x in managers if x) for l in self.d.rails.ledger(m)]
 
-    def _assess_one(self, line: LedgerLine, now: date) -> Assessment:
+    def _assess_one(self, line: LedgerLine, now: date, explain: bool = False) -> Assessment:
+        """explain=True: an alert is open on this item, so even an on-time payment gets a cause
+        (e.g. vendor_side) to state why the alert no longer holds."""
         base = {"invoice_id": line.invoice_id, "manager_id": line.manager_id}
         if line.duplicate_of:
             return Assessment(**base, status="skipped", note=f"duplicate of {line.duplicate_of}")
         unpaid = _cents(line.paid_amount) < _cents(line.amount)
         paid_late = (not unpaid and line.paid_on and line.due_date and line.paid_on > line.due_date)
-        if not unpaid and not paid_late:
+        if not unpaid and not paid_late and not explain:
             return Assessment(**base, status="paid")
         if unpaid and (line.due_date is None or now <= line.due_date):
             return Assessment(**base, status="not_due", note=f"due {line.due_date}")
@@ -147,6 +150,8 @@ class Steps:
         docs = self._evidence(line.manager_id, [line.invoice_id], now)
         trail = self.d.agents.build_trail(line, docs)
         finding = self.d.agents.classify_cause(line, trail, terms)
+        if not unpaid and not paid_late:
+            return Assessment(**base, status="paid", trail=trail, finding=finding)
         end = line.paid_on if not unpaid else now
         return Assessment(**base, status="delayed", days_late=(end - line.due_date).days,
                           trail=trail, finding=finding)
@@ -163,7 +168,7 @@ class Steps:
     def draft_alerts(self, s: WorkflowState) -> dict:
         drafts = []
         for a in s.assessments:
-            kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding else None
+            kind = ALERT_FOR_CAUSE.get(a.finding.cause) if a.finding and a.status == "delayed" else None
             if kind is None:
                 continue
             drafts.append(self._draft(a, kind))

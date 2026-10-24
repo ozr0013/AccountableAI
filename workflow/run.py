@@ -43,6 +43,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=13)
     ap.add_argument("--funding", metavar="MANAGER:AMOUNT",
                     help="after the replay, Oakline is about to fund e.g. keyway:18400")
+    ap.add_argument("--moment", action="store_true",
+                    help="then the judge says the electrician's invoice arrived Apr 1")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
 
@@ -63,12 +65,22 @@ def main() -> None:
         mgr, amount = a.funding.split(":")
         results += wf.replay([funding_event(mgr, float(amount), world.as_of)])
 
+    if a.moment:
+        from rails.console import JudgeConsole
+        res = JudgeConsole(rails).apply_preset("invoice_arrived")
+        print(f"JUDGE: {res.summary}  -> recheck only {res.affected}")
+        results += [wf.handle(e) for e in res.events]
+
     book = WorkflowBook.load(rails)
     for r in results:
-        if a.verbose or r.raised or r.rejected or r.chases or r.route == "funding_review":
+        if a.verbose or r.raised or r.rejected or r.chases or r.withdrawn \
+                or r.route == "funding_review":
             print(f"[{r.route}] {r.event_id}")
             for line in r.trace:
                 print(f"    {line}")
+    withdrawn = [x for x in book.alerts.values() if x.state == "withdrawn"]
+    for al in withdrawn:
+        print(f"  WITHDRAWN {al.draft.id}: {al.withdrawn_reason}")
     print(f"\n{len(results)} events, {len(book.open_ids)} open alert(s):")
     for al in book.open_alerts():
         print(f"  {al.draft.id}  {al.draft.headline}")
