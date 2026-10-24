@@ -1,9 +1,18 @@
-"""Smoke test: scenario 3 flows end to end through the stand-ins."""
+"""Smoke test: scenario 3 flows end to end through the stand-ins (always the fakes: this checks
+the contracts and contracts/fixtures/sample, whatever RAILS/AGENTS/VERIFIER say)."""
 
 from datetime import date
 
+import pytest
+
 from contracts import registry
 from contracts.models import AlertDraft, AlertKind, Cause, Claim, VerdictStatus
+
+
+@pytest.fixture(autouse=True)
+def _fakes(monkeypatch):
+    for var in ("RAILS", "AGENTS", "VERIFIER", "APPROVALS"):
+        monkeypatch.setenv(var, "fake")
 
 
 def test_scenario_3_through_fakes():

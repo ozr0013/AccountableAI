@@ -21,6 +21,7 @@ DEFAULT_MODEL = "claude-opus-5-5"
 # Models that accept the server-side refusal fallback on the Claude API.
 _FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"}
 
+
 SYSTEM = """You are the verifier for AccountableAI. Oakline Homes funds a property manager, \
 who must pay vendors from that money. Other agents draft alerts for Oakline's controller. Your \
 job is to try to prove each alert WRONG, using only the evidence documents provided. Alerts come \
