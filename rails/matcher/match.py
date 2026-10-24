@@ -37,6 +37,8 @@ class InvoiceEvidence:
     statement_paid: list[tuple[int, date | None]] = field(default_factory=list)  # manager's claim
     vendor_paid: tuple[int, date | None] | None = None                          # vendor confirmed
     vendor_not_received: bool = False                                           # past-due notice
+    reply_paid: list[Citation] = field(default_factory=list)                    # manager reply "paid"
+    bank_docs: list[tuple[date | None, Citation]] = field(default_factory=list)  # bank records seen
     cites: dict[str, list[Citation]] = field(default_factory=dict)  # bank|statement|vendor
 
 
@@ -88,6 +90,15 @@ def gather_evidence(docs: list[Document], fuzzy: Fuzzy | None = None) -> MatchRe
             if e and data.get("status") == "not_received":
                 e.vendor_not_received = True
                 e.cites.setdefault("vendor", []).append(_cite(d))
+        elif d.kind == SourceKind.manager_reply:
+            e = get(data.get("invoice_id"))
+            if e and data.get("status") == "paid":
+                e.reply_paid.append(_cite(d))
+    for d in docs:   # which bank records could have shown a payment for each invoice
+        if d.kind == SourceKind.manager_bank:
+            for iid, inv_doc in invoices.items():
+                if inv_doc.manager_id == d.manager_id:
+                    ev[iid].bank_docs.append((d.dated, _cite(d)))
     return MatchResult(ev, unmatched)
 
 
