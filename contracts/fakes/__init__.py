@@ -84,18 +84,25 @@ class FakeRails:
         return [l.invoice_id for l in self._ledger]
 
     def policy_check(self, action, actor, payload):
-        if action in ("move_money", "send_unapproved"):
+        """Mirrors the main gates of rails/guards/policy.py (the real, authoritative one)."""
+        p = payload or {}
+        is_controller = p.get("actor_role", "controller" if actor.startswith("controller") else "agent") == "controller"
+        if action in ("move_money", "pay", "transfer", "wire", "send_unapproved"):
             return False, f"{action} is never allowed"
-        if action == "approve" and payload.get("proposed_by") == actor:
-            return False, "proposer cannot approve"
-        if action == "send_reminder" and not payload.get("template_approved"):
-            return False, "reminders only from controller-approved templates"
+        if action == "approve" and (p.get("proposed_by") == actor or not is_controller):
+            return False, "proposer cannot approve; only the controller approves"
+        if action == "hold" and not is_controller:
+            return False, "agents recommend holds; only the controller places one"
+        if action == "send_chase" and p.get("template_id") not in ("tpl-polite", "tpl-firm", "tpl-escalation"):
+            return False, "reminders may only use a controller-approved template"
+        if action == "send_outbound" and not (p.get("approval") or {}).get("approved_by"):
+            return False, "outbound needs approval of this exact draft"
+        if action == "create_alert" and not p.get("citations"):
+            return False, "no alert without a cited record"
         if action == "update_bank_details" and not (
-            payload.get("identity_verified") and payload.get("approved_by") not in (None, actor)
+            p.get("identity_verified") and p.get("approved_by") not in (None, p.get("requested_by"))
         ):
             return False, "bank-detail change needs identity check and controller approval"
-        if action == "post_entry" and payload.get("month_closed"):
-            return False, "no posting to a closed month"
         return True, "ok"
 
 

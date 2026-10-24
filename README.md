@@ -126,6 +126,18 @@ git push -u origin omar/verifier     # open a PR on GitHub
 
 Each list starts with work that needs nobody. **NEEDS** items wait for a checkpoint.
 
+### Progress (Fri night)
+
+| Person | Done | What's in `main` |
+|---|---|---|
+| Shared | Phase 0 | `contracts/` (models, step signatures, registry, stand-ins, scenario 3 fixture), `docker-compose.yml`, `.env.example`, `pyproject.toml` |
+| Aaryan | 10 / 10 before Checkpoint A | `rails/` (event log, ledger, matcher, trust rules, recon, aging, `dependents_of()`, policy + accounting gates, Judge Console backend) and `world/` (all 9 scenarios, 40 vendors) |
+| Omar | 4 / 6 before Checkpoint B | answer key, verifier, scorer + `evals.run`, prohibited-action tests (pass against the fakes and the real policy gate) |
+| Kanishka | 0 / 7 | not started in the repo; workflow is LangGraph |
+| Audrey | 0 / 8 | not started in the repo |
+
+Still open tonight: Docker on every laptop, the Anthropic API key in `.env`, the first live verifier run, and the workflow (it blocks Checkpoint A).
+
 ### Aaryan: rails and data world (`rails/`, `world/`)
 1. [x] Event log (append-only, `valid_from` + `learned_at`, `supersedes`) and ingestion
 2. [x] World generator, early version: scenario 3 plus ~100 clean invoices; expand to all 9 scenarios through the night (built: Oakline, 3 managers, 40 vendors, all 9 scenarios; 6 months of history for Sunbelt and Peachtree, Keyway from Jan 2026 to match the sample fixture)
@@ -140,7 +152,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 11. [ ] **NEEDS** Checkpoint A: Kanishka and Omar switch to `RAILS=real`
 
 ### Kanishka: workflow and judgment agents (`workflow/`, `agents/agreement|trail|cause|chaser|case/`)
-1. [ ] Deterministic workflow: event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first)
+1. [ ] Deterministic workflow (LangGraph, Postgres checkpointer): event → fixed next steps, checkpointing, replay without duplicates (all steps stand-ins first); reports results in the `evals/schema.py` `RunResult` shape
 2. [ ] Agreement agent: term sheets (vendor payment deadline, holdback rules, approval limit, allowed charges) with clause citations; human-confirm step
 3. [ ] Payment-trail agent: one timeline per item, conflicts resolved by source-trust rules (scenario 3)
 4. [ ] Delay-cause agent: five causes with evidence and confidence (scenarios 1, 5, 6 must produce no manager alert)
@@ -187,7 +199,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 
 | When | Checkpoint |
 |---|---|
-| Fri ~8:30 pm | **0: Contracts.** Review `contracts/`, fill scenario 3, push; everyone branches |
+| Fri ~8:30 pm | **0: Contracts.** ✅ Done. Review `contracts/`, fill scenario 3, push; everyone branches |
 | Fri ~10 pm | **Hyphenate booth check:** pitch the one-liner and the moment |
 | Sat 9 am | **A: Stand-ins out.** Real rails, agents, verifier merged |
 | Sat 2 pm | **B: First full scored run** on all 9 scenarios; keep selective recheck or use fallback |
@@ -202,7 +214,7 @@ Each list starts with work that needs nobody. **NEEDS** items wait for a checkpo
 cp .env.example .env            # add ANTHROPIC_API_KEY
 docker compose up -d            # postgres + neo4j
 python -m venv .venv && source .venv/bin/activate && pip install -e '.[dev]'
-pytest -q                                           # contracts + verifier tests, offline
+pytest -q                                           # all tests, offline (Postgres tests skip without docker)
 set -a; source .env; set +a; LIVE=1 pytest -s agents/verifier -k live   # one real verifier call
 RAILS=fake AGENTS=fake VERIFIER=fake python -m workflow.run --scenario 3
 python -m evals.run evals/runs/full.json evals/runs/no_verifier.json --out evals/results.md
