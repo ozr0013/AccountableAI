@@ -70,7 +70,7 @@ export function ResponsesPanel() {
       {last.ok ? (
         <div className="stack" style={{ gap: 14 }}>
           <ResultHead res={last} />
-          <Disclosure title="What the agents did" meta={last.responses?.length ?? 0}><div className="dock-scroll"><ResponseList responses={last.responses ?? []} dense /></div></Disclosure>
+          <Disclosure title="What the agents did" meta={last.responses?.length ?? 0}><div className="dock-scroll" data-lenis-prevent><ResponseList responses={last.responses ?? []} dense /></div></Disclosure>
         </div>
       ) : (
         <div className="notice err">{last.error}</div>

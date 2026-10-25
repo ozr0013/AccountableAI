@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Aura } from "@/components/Aura";
 import { Mark, Shield, ListIcon, Spark } from "@/components/Icons";
+import { Story } from "@/components/Story";
 import "./home.css";
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
@@ -76,9 +77,9 @@ export default function Home() {
     <div className="home-page">
       <Aura variant="hero" />
       <header className="home-nav">
-        <Link href="/" className="home-logo"><Mark />AccountableAI<span className="home-beta">/ CAL HACKS</span></Link>
-        <nav aria-label="Product"><a href="#how-it-works">How it works</a><a href="#proof">The proof</a><a href="#control">Your control</a></nav>
-        <Link href="/overview" className="home-button home-button-dark">Open dashboard <Arrow /></Link>
+        <Link href="/" className="home-logo nav-cell"><Mark />AccountableAI<span className="home-beta">/ CAL HACKS</span></Link>
+        <nav aria-label="Product" className="nav-links"><a href="#story">The story</a><a href="#how-it-works">How it works</a><a href="#proof">The proof</a><a href="#control">Your control</a></nav>
+        <Link href="/overview" className="nav-cell nav-cta">Open dashboard <Arrow /></Link>
       </header>
 
       <main>
@@ -89,19 +90,21 @@ export default function Home() {
             <p>AccountableAI follows your funding all the way to the vendor. It finds missing payments, checks the evidence, and brings you a clear decision before you send more.</p>
             <div className="hero-actions">
               <Link href="/overview" className="home-button home-button-dark hero-cta">See it in action <span className="button-orb"><Arrow /></span></Link>
-              <a href="#how-it-works" className="home-text-link">How it works <span aria-hidden="true">↓</span></a>
+              <a href="#story" className="home-text-link">See the story <span aria-hidden="true">↓</span></a>
             </div>
           </div>
           <HeroSnapshot />
         </section>
 
-        <section className="home-steps" id="how-it-works" aria-label="How it works">
+        <Story />
+
+        <section className="home-steps ruled" id="how-it-works" aria-label="How it works">
           <article><span className="feature-number">01 / FOLLOW</span><h2><ListIcon />Every payment.</h2><p>Bring invoices, funding records, bank statements, and vendor replies into one payment trail.</p><div className="line-tags"><span>Invoices</span><span>Bank records</span><span>Source links</span></div></article>
           <article><span className="feature-number">02 / QUESTION</span><h2><Spark />Every claim.</h2><p>“We paid” is a starting point. Agents look for proof, challenge conflicting records, and chase what’s missing.</p><div className="line-tags"><span>Evidence checks</span><span>Follow-ups</span></div></article>
           <article><span className="feature-number">03 / DECIDE</span><h2><Shield />Your next move.</h2><p>Get a proposed hold with the evidence attached. A controller makes the call. No agent moves your money.</p><div className="line-tags"><span>Human approval</span><span>Audit trail</span></div></article>
         </section>
 
-        <section className="home-proof" id="proof" aria-labelledby="proof-title">
+        <section className="home-proof ruled" id="proof" aria-labelledby="proof-title">
           <div className="proof-copy"><span className="home-eyebrow">/ LESS GUESSWORK. MORE RECEIPTS.</span><h2 id="proof-title">The answer changes.<em>The evidence says why.</em></h2><p>In our fictional demo, Oakline funds Keyway to pay its vendors. Three invoices appear overdue. But one new fact changes the picture.</p><p>Correct the electrician’s invoice date and watch the proposed hold update. The plumber and cleaner stay open—because their payment proof is still missing.</p><Link href="/console" className="home-text-link">Try your own fact in the Judge Console <Arrow /></Link></div>
           <div className="proof-demo">
             <div className="proof-demo-head"><span className="home-eyebrow">OAKLINE → KEYWAY</span><span className="sample-label">Illustrative demo</span></div>
@@ -114,12 +117,12 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="home-control" id="control" aria-labelledby="control-title">
+        <section className="home-control ruled" id="control" aria-labelledby="control-title">
           <div className="control-heading"><span className="home-eyebrow">/ AGENTS DO THE LEGWORK.</span><h2 id="control-title">You keep<em>the last word.</em></h2><p>From the first invoice to the final recommendation, every step stays connected to its sources.</p><Link href="/guardrails" className="home-button home-button-dark control-button">Explore the guardrails <Arrow /></Link></div>
           <div className="control-rules"><article><span className="rule-icon">↗</span><div><h3>Evidence you can open.</h3><p>Every alert cites a record. Click through to the source behind the claim.</p></div></article><article><span className="rule-icon">✓</span><div><h3>Claims that get challenged.</h3><p>The verifier checks citations and blocks unsupported or accusatory language.</p></div></article><article><span className="rule-icon">◎</span><div><h3>A human in the decision.</h3><p>Agents recommend. Controllers approve holds. Bank changes need identity verification.</p></div></article></div>
         </section>
 
-        <section className="home-closing"><span className="home-eyebrow">/ FOLLOW THE MONEY. FIND THE PROOF.</span><h2>Meet your new<em>second set of eyes.</em></h2><Link href="/overview" className="home-button home-button-dark">Open the live demo <Arrow /></Link><p>Fictional vendors. Real workflow. You’re in control.</p></section>
+        <section className="home-closing ruled"><span className="home-eyebrow">/ FOLLOW THE MONEY. FIND THE PROOF.</span><h2>Meet your new<em>second set of eyes.</em></h2><Link href="/overview" className="home-button home-button-dark">Open the live demo <Arrow /></Link><p>Fictional vendors. Real workflow. You’re in control.</p></section>
       </main>
       <footer className="home-footer"><Link href="/" className="home-logo"><Mark />AccountableAI</Link><span>Built at Cal Hacks · 2026</span><Link href="/overview">Enter dashboard ↗</Link></footer>
     </div>

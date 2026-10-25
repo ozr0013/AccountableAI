@@ -61,7 +61,7 @@ export function DocProvider({ children }: { children: ReactNode }) {
       {open && (
         <>
           <div className="scrim" onClick={() => setOpen(null)} />
-          <aside className="drawer" role="dialog" aria-label="Source document">
+          <aside className="drawer" data-lenis-prevent role="dialog" aria-label="Source document">
             <div className="between" style={{ marginBottom: 20 }}>
               <span className="label muted">/ Source document</span>
               <button className="pill" onClick={() => setOpen(null)}>Close</button>

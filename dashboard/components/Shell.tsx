@@ -40,13 +40,11 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/ask", label: "Ask about Keyway", icon: Spark },
   ];
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
-  // The aura theme is in review on the overview only; the other pages keep the current look.
-  const aura = path === "/overview";
 
   return (
     <DocProvider>
-      <div className={aura ? "shell theme-aura" : "shell"}>
-        <aside className="side">
+      <div className="shell theme-aura">
+        <aside className="side" data-lenis-prevent>
           <Link href="/" className="brand" aria-label="AccountableAI home">
             <Mark className="brand-mark" />
             <span className="brand-word">AccountableAI</span>
@@ -84,7 +82,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <main className="main">
-          {aura && <Aura />}
+          <Aura />
           <div className="wrap">{children}</div>
         </main>
         <ResponsesPanel />
