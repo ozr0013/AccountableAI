@@ -24,10 +24,11 @@ const EMAILS = [
   { sender: "keyway", subject: "Re: Payment reminder KW-0402", body: "Hi, Sparkline Electric was paid for KW-0402 last week. Thanks, Keyway AP" },
   { sender: "v-riogrande", subject: "Payment received - KW-0301", body: "Hi Keyway team, we received your payment of $1,240.00 for KW-0301 today. Thank you." },
 ];
+// the same figures, by the same rules, as Overview's boxes (session.py books, lib/balances.ts)
 const FIGS: { k: keyof Books; label: string; money: boolean }[] = [
-  { k: "unexplained", label: "Unexplained", money: true },
-  { k: "keyway", label: "Keyway still owes", money: true },
-  { k: "open", label: "Open vendor balance", money: true },
+  { k: "paid", label: "Paid to vendors", money: true },
+  { k: "left", label: "Left to pay", money: true },
+  { k: "late", label: "Past due", money: true },
   { k: "attention", label: "Review queue", money: false },
 ];
 const BUDGET = 9000;                     // an action plays in about nine seconds at most

@@ -44,17 +44,28 @@ def test_reminders_are_recorded_not_emailed(frames):
 
 
 def _figures_agree(state):
-    """The dashboard shows these as one breakdown (dashboard/lib/balances.ts): they must add up."""
+    """Every page's money figures come from one set of rules (dashboard/lib/balances.ts, mirrored in
+    session.py): each bill splits into paid + left to pay + not yet funded, and the totals are the books'."""
+    from session import books, left_to_pay, late_to_pay, not_funded
     r, items = state["recon"], state["items"]
-    open_ = round(sum(i["owed"] for i in items if i["owed"] > 0), 2)
-    parts = round(r["owed"] + r["unfunded"] + r["held"] + r["duplicate_funded"], 2)
-    unexplained = round(sum(i["owed"] for i in items if i["cause"] == "unexplained" and i["owed"] > 0), 2)
-    funded = round(r["paid"] + r["held"] + r["duplicate_funded"] + r["owed"], 2)  # the Overview strip
-    return (open_ == parts and state["headline"]["unexplained"] == unexplained and funded == r["funded"],
-            (open_, parts, unexplained, funded, r["funded"]))
+    bad = [i["id"] for i in items
+           if abs(i["amount"] - (i["paid"] + left_to_pay(i) + not_funded(i))) > 0.005]
+    b = books(state)
+    checks = {
+        "each bill splits exactly": not bad,
+        "paid by Oakline = paid to vendors + left to pay": abs(b["funded"] - (b["paid"] + b["left"])) < 0.005,
+        "funded and paid are the books'": abs(b["funded"] - r["funded"]) < 0.005 and abs(b["paid"] - r["paid"]) < 0.005,
+        "left to pay = owed + retained + billed twice": abs(b["left"] - (r["owed"] + r["held"] + r["duplicate_funded"])) < 0.005,
+        "not yet funded is the books'": abs(b["not_funded"] - r["unfunded"]) < 0.005,
+        "past due is part of left to pay": b["late"] <= b["left"] + 0.005,
+        "unexplained is past due": abs(state["headline"]["unexplained"] - round(sum(
+            left_to_pay(i) for i in items if late_to_pay(i) and i["cause"] == "unexplained"), 2)) < 0.005,
+    }
+    failed = [k for k, ok in checks.items() if not ok]
+    return not failed, (failed, bad, b)
 
 
-def test_open_balance_reconciles_at_the_start_and_after_every_step(frames):
+def test_every_figure_adds_up_at_the_start_and_after_every_step(frames):
     ok, got = _figures_agree(DemoSession().snapshot())
     assert ok, got
     for f in frames:

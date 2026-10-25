@@ -116,11 +116,10 @@ def test_a_document_reports_the_books_before_and_after():
     bank = demo.add_file(samples / 'Keyway_Bank_Export_Apr22.csv')
     b, a = bank['books']['before'], bank['books']['after']
     assert [c['id'] for c in bank['diff']['changed']] == ['INV-KW-0901']
-    assert (b['unexplained'] - a['unexplained'], b['keyway'] - a['keyway'], b['open'] - a['open']) == (1000, 1000, 1000)
+    # $1,000 proven paid: it moves from "left to pay" (and past due) to "paid to vendors", nothing else
+    assert (a['paid'] - b['paid'], b['left'] - a['left'], b['late'] - a['late']) == (1000, 1000, 1000)
+    assert (a['funded'], a['not_funded'], b['unexplained'] - a['unexplained']) == (b['funded'], b['not_funded'], 1000)
     assert b['attention'] - a['attention'] == 1
-    assert a == {'unexplained': bank['state']['headline']['unexplained'], 'keyway': bank['state']['recon']['owed'],
-                 'open': round(sum(i['owed'] for i in bank['state']['items'] if i['owed'] > 0), 2),
-                 'attention': sum(1 for i in bank['state']['items'] if i['attention'])}
 
 
 @pytest.fixture(scope='module')

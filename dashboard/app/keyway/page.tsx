@@ -33,7 +33,7 @@ export default function Keyway() {
     <>
       <PageTop title={state.meta.manager} sub="Every dollar from funded to paid." />
 
-      <MoneyStrip state={state} />
+      <MoneyStrip items={state.items} />
       <Disclosure title="Where the money went" hint="Reconciliation and payment breakdown">
       <div className="card">
         <div className="bar" style={{ height: 36 }}>

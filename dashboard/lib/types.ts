@@ -91,7 +91,7 @@ export type State = {
 export type Response = { agent: string; what: string; type: string; invoice_id: string | null };
 
 /** The figures every tab shows, before and after one action (session.py `books`). */
-export type Books = { unexplained: number; keyway: number; open: number; attention: number };
+export type Books = { funded: number; paid: number; left: number; late: number; not_funded: number; unexplained: number; attention: number };
 
 /** One beat of an action's run, in order (dashboard/feed/session.py `_act` timeline). */
 export type Signal =

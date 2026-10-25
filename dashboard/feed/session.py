@@ -897,11 +897,29 @@ def _audit(events: list[Event]) -> list[dict]:
     return out[::-1]
 
 
+def left_to_pay(i: dict) -> float:
+    """Oakline's money still with Keyway on one bill (dashboard/lib/balances.ts leftToPay)."""
+    return max(i["funded"] - i["paid"], 0.0)
+
+
+def not_funded(i: dict) -> float:
+    """Billed but not yet sent to Keyway by Oakline (balances.ts notFunded)."""
+    return max(i["amount"] - max(i["funded"], i["paid"]), 0.0)
+
+
+def late_to_pay(i: dict) -> bool:
+    """Left to pay and past due; not retained under the agreement, not a bill sent twice (balances.ts lateToPay)."""
+    return (left_to_pay(i) > 0 and i["days_late"] > 0 and not i["duplicate_of"]
+            and i["cause"] != "authorized_hold")
+
+
 def books(snap: dict) -> dict:
-    """The figures every tab shows, from one snapshot (the same as dashboard/lib/balances.ts)."""
+    """The figures every tab shows, from one snapshot, by the same rules as dashboard/lib/balances.ts."""
     items = snap["items"]
-    return {"unexplained": snap["headline"]["unexplained"], "keyway": snap["recon"]["owed"],
-            "open": round(sum(i["owed"] for i in items if i["owed"] > 0), 2),
+    c = lambda xs: round(sum(xs), 2)
+    return {"funded": c(i["funded"] for i in items), "paid": c(i["paid"] for i in items),
+            "left": c(left_to_pay(i) for i in items), "late": c(left_to_pay(i) for i in items if late_to_pay(i)),
+            "not_funded": c(not_funded(i) for i in items), "unexplained": snap["headline"]["unexplained"],
             "attention": sum(1 for i in items if i["attention"])}
 
 
