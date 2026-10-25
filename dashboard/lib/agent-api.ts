@@ -17,6 +17,14 @@ export type WorkflowDelivery = {enabled: boolean; configured: boolean; delivered
 export type WorkflowCases = { cases: WorkflowCase[]; worker: {enabled: boolean; last_error: string | null; last_run: string | null; delivery?: WorkflowDelivery | null} };
 export type EvidenceInput = { kind: 'vendor_invoice' | 'manager_bank' | 'manager_statement'; invoice_id: string; vendor_id?: string; amount: number; on: string; payee?: string; account?: string; routing?: string; bank?: string; reference?: string; invoice_date?: string; replaces?: string };
 
+/** Agent pipeline: SpacetimeDB task queue shared by the chaser and anomaly agents. */
+export type AgentStep = { tool: string; input: Record<string, unknown>; result: unknown; refused: boolean; terminal: boolean };
+export type AgentTrace = { agent: 'chaser' | 'anomaly'; model: string; thinking: string[]; steps: AgentStep[]; decision: {tool: string; input: Record<string, unknown>; result: unknown} | null; text: string; usage: Record<string, number>; error: string | null };
+export type TaskOutcome = { decision: string | null; rationale?: string | null; verdict?: 'clean' | 'awaiting_statement' | 'needs_review' | null; summary?: string | null; finding_codes?: string[] | null; result?: unknown; error: string | null };
+export type AgentTask = { task_id: string; agent: 'chaser' | 'anomaly'; invoice_id: string; status: 'pending' | 'running' | 'done' | 'failed'; created_by: string; reason: string; payload: Record<string, unknown>; outcome: TaskOutcome; as_of: string; trace?: AgentTrace };
+export type PipelineFlow = { invoice: unknown; vendor: string; agreement: Record<string, unknown>[]; rules: Rule[]; tasks: AgentTask[]; chaser_actions: Action[]; case: WorkflowCase | null };
+export type Processed = { task_id: string; agent: string; invoice_id: string } & TaskOutcome;
+
 type Options = { fetch?: typeof fetch; timeoutMs?: number };
 export function createAgentApi(options: Options = {}) {
   const fetcher = options.fetch ?? globalThis.fetch;
@@ -64,6 +72,12 @@ export function createAgentApi(options: Options = {}) {
     tick: () => request<WorkflowCases>('chaser', '/workflow/tick', {}),
     evidence: (body: EvidenceInput) => request<{document_id: string; cases: WorkflowCase[]}>('chaser', '/workflow/evidence', body),
     acknowledgeOutbox: (outbox: string, reference: string) => request<{status: 'delivered'}>('chaser', `/workflow/outbox/${id(outbox)}/ack`, {reference}),
+    pipelineDispatch: (vendor = '') => request<{as_of: string; queued: string[]}>('chaser', `/pipeline/dispatch${vendor ? query({vendor}) : ''}`, {}),
+    pipelineRun: (limit = 10) => request<{as_of: string; processed: Processed[]}>('chaser', `/pipeline/run${query({limit: String(limit)})}`, {}),
+    pipelineRunInvoice: (invoice: string) => request<{processed: Processed[]; flow: PipelineFlow}>('chaser', `/pipeline/invoices/${id(invoice)}/run`, {}),
+    pipelineTasks: (filters: {invoice_id?: string; agent?: string; status?: string} = {}) => request<AgentTask[]>('chaser', `/pipeline/tasks${Object.keys(filters).length ? query(filters as Record<string,string>) : ''}`),
+    pipelineTask: (task: string) => request<AgentTask>('chaser', `/pipeline/tasks/${id(task)}`),
+    pipelineFlow: (invoice: string) => request<PipelineFlow>('chaser', `/pipeline/flow/${id(invoice)}`),
     resolveCase: (invoice: string, note: string) => request<WorkflowCase>('chaser', `/workflow/cases/${id(invoice)}/resolve`, {note}),
   };
 }

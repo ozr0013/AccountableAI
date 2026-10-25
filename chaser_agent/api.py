@@ -145,6 +145,8 @@ def delivery_history(rails, rows):
                 item['status'] = 'superseded'
             elif receipt and receipt['status'] == 'delivered':
                 item['as_of'] = receipt.get('delivered_on', receipt['created_on'])
+                item['delivery'] = 'delivered'
+                item['delivery_reference'] = receipt.get('reference')
             elif item['status'] in ('queued', 'approved'):
                 item['status'] = 'awaiting_delivery'
         projected.append(item)
@@ -408,9 +410,11 @@ if __name__ == '__main__':
     import sys
     sys.modules['chaser_agent.api'] = sys.modules[__name__]
 
-from .workflow_api import router as workflow_router
+from .pipeline_api import router as pipeline_router  # noqa: E402
+from .workflow_api import router as workflow_router  # noqa: E402
 
 app.include_router(workflow_router)
+app.include_router(pipeline_router)
 
 
 if __name__ == "__main__":

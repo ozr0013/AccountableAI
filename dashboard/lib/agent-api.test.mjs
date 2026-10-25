@@ -133,3 +133,17 @@ test('delivery errors explain known recovery conditions without exposing arbitra
  assert.match(fallback,/receipt/i);
  assert.doesNotMatch(fallback,/password|secret/);
 });
+
+test('pipeline queue, run and flow requests use the pipeline endpoints', async () => {
+ const {api,calls}=capture({queued:[],processed:[]});
+ await api.pipelineDispatch('Rio Grande'); await api.pipelineRun(5); await api.pipelineRunInvoice('INV-KW-0301');
+ await api.pipelineTasks({invoice_id:'INV-KW-0301',agent:'anomaly'}); await api.pipelineTask('chaser:INV-KW-0301:2026-04-22');
+ await api.pipelineFlow('INV-KW-0301');
+ assert.deepEqual(calls.map(c=>[c.method,c.url]),[
+  ['POST','/chaser-agent-api/pipeline/dispatch?vendor=Rio+Grande'],
+  ['POST','/chaser-agent-api/pipeline/run?limit=5'],
+  ['POST','/chaser-agent-api/pipeline/invoices/INV-KW-0301/run'],
+  ['GET','/chaser-agent-api/pipeline/tasks?invoice_id=INV-KW-0301&agent=anomaly'],
+  ['GET','/chaser-agent-api/pipeline/tasks/chaser%3AINV-KW-0301%3A2026-04-22'],
+  ['GET','/chaser-agent-api/pipeline/flow/INV-KW-0301']]);
+});

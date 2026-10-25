@@ -128,13 +128,21 @@ def save(r: Review, rules: list[dict], status: str, confirmed_by: str | None = N
 
 
 def wake_workflow() -> dict:
-    """Wake the consumer after saving; its polling scan repairs a missed wake after restart."""
+    """Wake the consumer after saving; its polling scan repairs a missed wake after restart.
+    Then hand off to the chaser agent: queue a chaser task for every invoice now covered by an
+    agreement (queueing only - the agents run on /pipeline/run or the worker)."""
+    base = 'http://127.0.0.1:' + os.getenv('CHASER_API_PORT', '8773')
     request = urllib.request.Request(
-        'http://127.0.0.1:' + os.getenv('CHASER_API_PORT', '8773') + '/workflow/tick',
+        base + '/workflow/tick',
         data=b'{}', headers={'Content-Type': 'application/json'}, method='POST')
     try:
         with urllib.request.urlopen(request, timeout=10):
-            return {'triggered': True}
+            pass
+        with urllib.request.urlopen(urllib.request.Request(
+                base + '/pipeline/dispatch', data=b'{}', method='POST',
+                headers={'Content-Type': 'application/json'}), timeout=10) as resp:
+            queued = json.loads(resp.read() or b'{}').get('queued', [])
+        return {'triggered': True, 'chaser_tasks_queued': len(queued)}
     except (OSError, urllib.error.URLError) as exc:
         log.warning('Workflow wake deferred: %s', type(exc).__name__)
         return {'triggered': False, 'error': 'Saved; coordinator will retry on its next polling tick.'}

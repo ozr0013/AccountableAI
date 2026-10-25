@@ -31,10 +31,10 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
 
 [tool.setuptools.packages.find]
-include = ["contracts*", "rails*", "world*", "workflow*", "agents*", "evals*", "agreement_agent*", "chaser_agent*"]
+include = ["contracts*", "rails*", "world*", "workflow*", "agents*", "evals*", "agreement_agent*", "chaser_agent*", "anomaly_agent*"]
 
 [tool.pytest.ini_options]
-testpaths = ["contracts", "evals", "rails", "world", "workflow", "agents", "dashboard/feed/tests", "agreement_agent/tests", "chaser_agent/tests"]
+testpaths = ["contracts", "evals", "rails", "world", "workflow", "agents", "dashboard/feed/tests", "agreement_agent/tests", "chaser_agent/tests", "anomaly_agent/tests"]
 
 [tool.ruff]
 line-length = 100

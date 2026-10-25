@@ -1,0 +1,282 @@
+
+------------------------------------------------------------------------------------------------
+2026-04-22 - CHASER AGENT
+------------------------------------------------------------------------------------------------
+{
+  "task": "chaser:INV-KW-0301:2026-04-22",
+  "created_by": "daily_schedule",
+  "status": "done",
+  "reasoning": [
+    "The agreement's 30-day deadline from March 3 actually runs to April 2, so the ledger date of March 13 is wrong\u2014the agreement terms take precedence. Since no bank payment has come through yet, I should send a polite reminder.\n\n"
+  ],
+  "tool_calls": [
+    {
+      "tool": "get_invoice_context",
+      "input": {},
+      "refused": false
+    },
+    {
+      "tool": "send_reminder",
+      "input": {
+        "rationale": "Under rule 9b5f2667dfdc3458:pay_within_days (30 calendar days from the 2026-03-03 receipt), the $1,240.00 was due 2026-04-02. The ledger shows 2026-03-13, but the agreement date applies. The invoice is 20 days overdue with no bank payment on record, no earlier reminders and no manager replies, so the polite reminder is the next step on the schedule. The vendor has a clean history: 0 of 4 past payments were late."
+      },
+      "refused": false
+    }
+  ],
+  "decision": {
+    "decision": "send_reminder",
+    "rationale": "Under rule 9b5f2667dfdc3458:pay_within_days (30 calendar days from the 2026-03-03 receipt), the $1,240.00 was due 2026-04-02. The ledger shows 2026-03-13, but the agreement date applies. The invoice is 20 days overdue with no bank payment on record, no earlier reminders and no manager replies, so the polite reminder is the next step on the schedule. The vendor has a clean history: 0 of 4 past payments were late.",
+    "result": {
+      "recorded": "INV-KW-0301:reminder:polite:0",
+      "level": "polite",
+      "status": "queued",
+      "message": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?"
+    },
+    "error": null
+  },
+  "usage": {
+    "input_tokens": 6,
+    "output_tokens": 306,
+    "cache_read_input_tokens": 2310
+  },
+  "model": "claude-opus-5-5"
+}
+
+------------------------------------------------------------------------------------------------
+2026-04-22 - OUTBOX
+------------------------------------------------------------------------------------------------
+polite reminder delivered (receipt smtp-0422)
+
+------------------------------------------------------------------------------------------------
+2026-04-27 - CHASER AGENT
+------------------------------------------------------------------------------------------------
+{
+  "task": "chaser:INV-KW-0301:2026-04-27",
+  "created_by": "daily_schedule",
+  "status": "done",
+  "reasoning": [],
+  "tool_calls": [
+    {
+      "tool": "get_invoice_context",
+      "input": {},
+      "refused": false
+    },
+    {
+      "tool": "send_reminder",
+      "input": {
+        "rationale": "Under rule 9b5f2667dfdc3458:pay_within_days (30 calendar days from receipt on 2026-03-03), the $1,240.00 was due 2026-04-02; the ledger shows 2026-03-13, but the agreement date applies. It is now 25 days overdue with no bank payment on record and no manager reply, and the polite reminder of 2026-04-22 was delivered (smtp-0422). The next step on the schedule is the firm reminder, which goes to the controller for approval; the vendor's history is clean (0 of 4 past payments late)."
+      },
+      "refused": false
+    }
+  ],
+  "decision": {
+    "decision": "send_reminder",
+    "rationale": "Under rule 9b5f2667dfdc3458:pay_within_days (30 calendar days from receipt on 2026-03-03), the $1,240.00 was due 2026-04-02; the ledger shows 2026-03-13, but the agreement date applies. It is now 25 days overdue with no bank payment on record and no manager reply, and the polite reminder of 2026-04-22 was delivered (smtp-0422). The next step on the schedule is the firm reminder, which goes to the controller for approval; the vendor's history is clean (0 of 4 past payments late).",
+    "result": {
+      "recorded": "INV-KW-0301:reminder:firm:0",
+      "level": "firm",
+      "status": "needs_approval",
+      "message": "Hello Keyway Property Management, following up on our earlier note about $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301). We still have no bank record or vendor confirmation of payment. Please send one, or tell us what is holding it up."
+    },
+    "error": null
+  },
+  "usage": {
+    "input_tokens": 6,
+    "output_tokens": 266,
+    "cache_read_input_tokens": 2310
+  },
+  "model": "claude-opus-5-5"
+}
+
+------------------------------------------------------------------------------------------------
+2026-04-29 - NEW EVIDENCE
+------------------------------------------------------------------------------------------------
+bank: $1,240 to Rio Grande Plumbing LLC, First Mesa Bank
+
+------------------------------------------------------------------------------------------------
+2026-04-30 - CHASER AGENT
+------------------------------------------------------------------------------------------------
+{
+  "task": "chaser:INV-KW-0301:2026-04-30",
+  "created_by": "daily_schedule",
+  "status": "done",
+  "reasoning": [],
+  "tool_calls": [
+    {
+      "tool": "get_invoice_context",
+      "input": {},
+      "refused": false
+    },
+    {
+      "tool": "handoff_to_anomaly",
+      "input": {
+        "rationale": "Under rule 9b5f2667dfdc3458:pay_within_days (30 calendar days from receipt on 2026-03-03), the $1,240.00 was due 2026-04-02. The ledger shows 2026-03-13, but the agreement date applies. A bank payment of $1,240.00 was recorded on 2026-04-29, 27 days after the deadline, following a polite reminder delivered 2026-04-22 (smtp-0422); the firm draft of 2026-04-27 is superseded. Handing off so the anomaly agent can check the amount, payee (rule 9b5f2667dfdc3458:payee), account (rule 9b5f2667dfdc3458:pay_to_account) and the late timing; vendor history shows 1 of 5 past payments late."
+      },
+      "refused": false
+    }
+  ],
+  "decision": {
+    "decision": "handoff_to_anomaly",
+    "rationale": "Under rule 9b5f2667dfdc3458:pay_within_days (30 calendar days from receipt on 2026-03-03), the $1,240.00 was due 2026-04-02. The ledger shows 2026-03-13, but the agreement date applies. A bank payment of $1,240.00 was recorded on 2026-04-29, 27 days after the deadline, following a polite reminder delivered 2026-04-22 (smtp-0422); the firm draft of 2026-04-27 is superseded. Handing off so the anomaly agent can check the amount, payee (rule 9b5f2667dfdc3458:payee), account (rule 9b5f2667dfdc3458:pay_to_account) and the late timing; vendor history shows 1 of 5 past payments late.",
+    "result": {
+      "recorded": "INV-KW-0301:handoff_anomaly:handoff_anomaly:0",
+      "anomaly_task": "anomaly:INV-KW-0301:2026-04-30"
+    },
+    "error": null
+  },
+  "usage": {
+    "input_tokens": 6,
+    "output_tokens": 340,
+    "cache_read_input_tokens": 2310
+  },
+  "model": "claude-opus-5-5"
+}
+
+------------------------------------------------------------------------------------------------
+2026-04-30 - ANOMALY AGENT
+------------------------------------------------------------------------------------------------
+{
+  "task": "anomaly:INV-KW-0301:2026-04-30",
+  "created_by": "chaser_agent",
+  "status": "done",
+  "reasoning": [
+    "This looks like a late payment flagged for review \u2014 the note claims paid 2026-03-10 but the bank shows 2026-04-29, so the statement predates and misstates the actual payment date. The vendor's only late invoice is this one, with prior history on time, and funds were held about 55 days after funding on 2026-03-05, which I'll treat as neutral.\n\n"
+  ],
+  "tool_calls": [
+    {
+      "tool": "get_payment_case",
+      "input": {},
+      "refused": false
+    },
+    {
+      "tool": "get_agreement_rules",
+      "input": {},
+      "refused": false
+    },
+    {
+      "tool": "vendor_history",
+      "input": {},
+      "refused": false
+    },
+    {
+      "tool": "record_verdict",
+      "input": {
+        "verdict": "needs_review",
+        "summary": "Invoice INV-KW-0301 ($1,240.00, received 2026-03-03) was paid $1,240.00 on 2026-04-29 (pipeline-bank-0301) to Rio Grande Plumbing LLC at First Mesa Bank, routing 102000021, account 4471029. The payee, account and amount match rules 9b5f2667dfdc3458:payee, :pay_to_account and the ledger. The payment came 27 days after the 2026-04-02 deadline under rule :pay_within_days (late_payment), even though Oakline funded $1,240.00 on 2026-03-05. Keyway's statement doc-stmt-kw-2026-03 (dated 2026-03-31) shows this invoice as paid on 2026-03-10 (line L14), which predates the bank payment and conflicts with it (statement_predates_payment). The controller should decide whether to ask Keyway why the funds were held from 2026-03-05 to 2026-04-29 and why the statement reports an earlier payment, and should get a statement dated after 2026-04-29.",
+        "finding_codes": [
+          "late_payment",
+          "statement_predates_payment"
+        ]
+      },
+      "refused": false
+    }
+  ],
+  "decision": {
+    "decision": "record_verdict",
+    "verdict": "needs_review",
+    "summary": "Invoice INV-KW-0301 ($1,240.00, received 2026-03-03) was paid $1,240.00 on 2026-04-29 (pipeline-bank-0301) to Rio Grande Plumbing LLC at First Mesa Bank, routing 102000021, account 4471029. The payee, account and amount match rules 9b5f2667dfdc3458:payee, :pay_to_account and the ledger. The payment came 27 days after the 2026-04-02 deadline under rule :pay_within_days (late_payment), even though Oakline funded $1,240.00 on 2026-03-05. Keyway's statement doc-stmt-kw-2026-03 (dated 2026-03-31) shows this invoice as paid on 2026-03-10 (line L14), which predates the bank payment and conflicts with it (statement_predates_payment). The controller should decide whether to ask Keyway why the funds were held from 2026-03-05 to 2026-04-29 and why the statement reports an earlier payment, and should get a statement dated after 2026-04-29.",
+    "finding_codes": [
+      "late_payment",
+      "statement_predates_payment"
+    ],
+    "result": {
+      "verdict": "needs_review",
+      "handoff": "reviewed",
+      "next": "controller review is open"
+    },
+    "error": null
+  },
+  "usage": {
+    "input_tokens": 6,
+    "output_tokens": 679,
+    "cache_read_input_tokens": 1921
+  },
+  "model": "claude-opus-5-5"
+}
+
+------------------------------------------------------------------------------------------------
+FLOW: the chain for this invoice
+------------------------------------------------------------------------------------------------
+{
+  "agreement_rules": [
+    "Payments must go to bank First Mesa Bank, routing 102000021, account 4471029; any change needs controller approval and identity checks.",
+    "Invoices are billed at $95.00 per hour; flag any other rate.",
+    "Pay within 30 calendar days of invoice receipt; chase after that.",
+    "Every bank payment for this agreement must name Rio Grande Plumbing LLC."
+  ],
+  "tasks": [
+    [
+      "chaser:INV-KW-0301:2026-04-22",
+      "daily_schedule",
+      "done",
+      "send_reminder",
+      null
+    ],
+    [
+      "chaser:INV-KW-0301:2026-04-27",
+      "daily_schedule",
+      "done",
+      "send_reminder",
+      null
+    ],
+    [
+      "chaser:INV-KW-0301:2026-04-30",
+      "daily_schedule",
+      "done",
+      "handoff_to_anomaly",
+      null
+    ],
+    [
+      "anomaly:INV-KW-0301:2026-04-30",
+      "chaser_agent",
+      "done",
+      "record_verdict",
+      "needs_review"
+    ]
+  ],
+  "chaser_actions": [
+    [
+      "2026-04-30",
+      "handoff_anomaly",
+      null,
+      "reviewed"
+    ],
+    [
+      "2026-04-27",
+      "reminder",
+      "firm",
+      "needs_approval"
+    ],
+    [
+      "2026-04-22",
+      "reminder",
+      "polite",
+      "queued"
+    ]
+  ],
+  "case": {
+    "state": "needs_controller",
+    "findings": [
+      {
+        "code": "late_payment",
+        "message": "Payment was made after the agreement deadline 2026-04-02."
+      },
+      {
+        "code": "statement_predates_payment",
+        "message": "A statement dated after the payment is required."
+      }
+    ]
+  }
+}
+
+------------------------------------------------------------------------------------------------
+TOTAL TOKENS
+------------------------------------------------------------------------------------------------
+{
+  "input_tokens": 24,
+  "output_tokens": 1591
+}
+
+------------------------------------------------------------------------------------------------
+Cleaned up: scratch schema dropped, queue and chaser rows cleared.
+------------------------------------------------------------------------------------------------
