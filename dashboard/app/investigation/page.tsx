@@ -9,7 +9,7 @@ import { PageTop } from "@/components/ui";
  *  outside-paperwork run through the engine (components/LiveRun) below. */
 export default function Investigation() {
   return <>
-    <PageTop title="Live investigation" />
+    <PageTop title="Live investigation" meta={false} />
     <LivePipeline />
     <Disclosure title="Run outside paperwork through the engine"><LiveRun /></Disclosure>
   </>;

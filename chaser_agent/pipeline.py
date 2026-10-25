@@ -183,4 +183,24 @@ def flow(rails, mirror, invoice_id: str) -> dict:
         "tasks": tasks(mirror, invoice_id=invoice_id),
         "chaser_actions": [h for h in service.history(mirror) if h["invoice_id"] == invoice_id],
         "case": case,
+        "deadline": _deadline(line, rules),
+        "statements": _statement_claims(rails, invoice_id),
     }
+
+
+def _deadline(line, rules: list[dict]) -> str | None:
+    """The agreement's payment deadline for this invoice: receipt + pay_within_days."""
+    term = next((r for r in rules if r["rule_type"] == "pay_within_days" and r["status"] == "active"), None)
+    if term is None or line.invoice_received is None:
+        return None
+    params = json.loads(term["params"]) if isinstance(term["params"], str) else term["params"]
+    return str(daily.add_days(line.invoice_received, int(params["days"]), params.get("basis", "calendar")))
+
+
+def _statement_claims(rails, invoice_id: str) -> list[dict]:
+    """What the middleman's statements say about this invoice (a claim, not proof), oldest first."""
+    out = [{"statement": d.id, "dated": str(d.dated), "says": row.get("status"),
+            "amount": row.get("amount"), "paid_on": row.get("on")}
+           for d in rails.documents(MANAGER) if d.kind.value == "manager_statement"
+           for row in d.data.get("lines", []) if row.get("invoice_id") == invoice_id]
+    return sorted(out, key=lambda c: c["dated"])
