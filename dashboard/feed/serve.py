@@ -1,6 +1,7 @@
 """Live feed for the dashboard (NEXT_PUBLIC_FEED=live): the demo session over HTTP.
 
     python dashboard/feed/serve.py            # http://127.0.0.1:8765, rules-mode agents, free
+    FEED_MESSY=1 python dashboard/feed/serve.py   # the same, on paperwork parsed from raw files
 
 The Next.js app proxies /api/* here. One in-memory session; POST /api/reset rebuilds it.
 Rules-mode agents by default (free). POST /api/live {"on": true} sends the next events to Claude
@@ -23,9 +24,9 @@ from typing import Literal
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(Path(__file__).parent)]
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 from session import DemoSession
 
@@ -168,6 +169,57 @@ async def stream(request: Request):
 
     return StreamingResponse(events(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+SAMPLES = Path(__file__).parent / "samples"
+_MEDIA = {".pdf": "application/pdf", ".eml": "text/plain; charset=utf-8", ".csv": "text/plain; charset=utf-8"}
+
+
+def _sample(name: str) -> Path:
+    """Only the files listed in samples/manifest.json (written by samples.py)."""
+    listed = {s["file"] for s in json.loads((SAMPLES / "manifest.json").read_text())}
+    if name not in listed:
+        raise HTTPException(404, f"no sample called {name!r}")
+    return SAMPLES / name
+
+
+@app.get("/api/samples")
+def samples():
+    """Sample paperwork to drop into the demo: file, label, which flow it starts, what to expect."""
+    return json.loads((SAMPLES / "manifest.json").read_text())
+
+
+@app.get("/api/samples/{name}")
+def sample_file(name: str):
+    path = _sample(name)
+    return FileResponse(path, media_type=_MEDIA.get(path.suffix, "application/octet-stream"),
+                        headers={"Content-Disposition": f'inline; filename="{name}"'})
+
+
+@app.post("/api/samples/{name}/add")
+def add_sample(name: str):
+    """The file arrives: parsed by agents/extract, then run through the workflow."""
+    with _lock:
+        return session().add_file(_sample(name))
+
+
+@app.get("/api/simulation")
+def simulation():
+    """The 15-day script (simulation.py): day, label, what kind of step."""
+    from simulation import SCRIPT
+    return [{"index": i, "day": st["day"], "label": st["label"], "source": st["kind"]} for i, st in enumerate(SCRIPT)]
+
+
+@app.post("/api/simulation/{index}")
+def simulation_step(index: int):
+    """Run one step of the script on the session: what ran, what was written, what changed."""
+    from simulation import SCRIPT, run
+    if not 0 <= index < len(SCRIPT):
+        raise HTTPException(404, f"the script has {len(SCRIPT)} steps")
+    with _lock:
+        if index == 0:
+            session().reset()
+        return run(session(), index)
 
 
 @app.post("/api/reset")

@@ -1,17 +1,55 @@
 "use client";
+
 import Link from "next/link";
-import { useFeed } from "@/components/Feed";
-import { PageTop, Loading } from "@/components/ui";
+import { Spotlight } from "@/components/Spotlight";
 import { Disclosure } from "@/components/Disclosure";
-import { PaymentSummary, PaymentAnalytics } from "@/components/PaymentSummary";
-import { money, ALERT } from "@/lib/format";
-export default function Overview(){
- const {state}=useFeed();
- if(!state)return <><PageTop title="Vendor payments"/><Loading/></>;
- const alerts=state.alerts.filter(a=>a.open && a.kind!=="recurring_pattern");
- const pending=state.cases.filter(c=>c.status==="pending");
- return <><div className="ledger-breadcrumb">Portfolio <span>›</span> {state.meta.parent}</div><PageTop title="Vendor payments" sub={`Payment oversight · ${state.meta.manager}`}/>
- <section className="ledger-panel review-panel"><div className="between"><h2><span className="ledger-alert">△</span> {alerts.length} alerts need review</h2><Link className="pill" href="/items">All invoices ↗</Link></div>{alerts.slice(0,2).map(a=><div className="ledger-review-row" key={a.id}><div><strong>{state.items.find(i=>i.id===a.invoice_ids[0])?.vendor || state.meta.manager}</strong><p>{ALERT[a.kind] || a.kind}</p></div><b>{money(a.amount,false)}</b><Link className="btn sm" href={`/items/${a.invoice_ids[0]}`}>Review</Link></div>)}{!alerts.length&&<p className="body muted">No alerts awaiting review.</p>}</section>
- <PaymentSummary state={state}/><PaymentAnalytics state={state}/>
- <Disclosure title="Controller decisions" hint="Funding holds and bank-detail reviews" meta={`${pending.length} pending`}><div className="between"><p className="body">Recommended funding hold: <strong>{money(state.headline.proposed_hold,false)}</strong>. Agents recommend; a controller decides.</p><Link className="btn" href="/cases">Open review queue</Link></div></Disclosure></>;
+import { useFeed } from "@/components/Feed";
+import { MoneyStrip } from "@/components/MoneyStrip";
+import { Badge, Loading, PageTop } from "@/components/ui";
+import { ALERT, money } from "@/lib/format";
+
+export default function Overview() {
+  const { state } = useFeed();
+  if (!state) return <><PageTop title="Overview" /><Loading /></>;
+  const h = state.headline;
+  const pending = state.cases.filter(c => c.status === "pending");
+  const flagged = state.alerts.filter(a => a.open);
+  const priorities = [...flagged].sort((a,b) => Number(b.kind === "unexplained_unpaid") - Number(a.kind === "unexplained_unpaid")).slice(0,3);
+  const instruction = (state.decisions ?? []).filter(d => d.type === "funding_instruction").at(-1);
+  const fundingPending = pending.some(c => c.kind === "funding");
+
+  return (
+    <>
+      <PageTop title="Your money, accounted for." sub="A clear view of Keyway. Start with what needs you." />
+      <Spotlight className="overview-hero">
+        <div>
+          <span className="label">/ {fundingPending ? "Your next decision" : instruction ? "Decision recorded" : "Your funding overview"}</span>
+          <div className="moment-amount num" style={{ marginTop: 20 }}>{money(instruction && !fundingPending ? instruction.hold : h.proposed_hold, false)}<small>{instruction && !fundingPending ? "hold recorded" : "recommended hold"}</small></div>
+          <p>{h.unexplained_items.length} invoices still need payment proof.</p>
+        </div>
+        <div className="moment-actions">
+          <Link href="/investigation" className="btn on-wine">Run live investigation <span aria-hidden="true">↗</span></Link>
+          <span className="micro" style={{ color: "#ddd", lineHeight: "16px" }}>{pending.length ? `${pending.length} case${pending.length === 1 ? "" : "s"} waiting after review` : "You decide. No money moves here."}</span>
+        </div>
+      </Spotlight>
+
+      <MoneyStrip state={state} />
+
+      <section className="focus-panel">
+        <div className="focus-heading"><div><span className="label muted">/ Start here</span><h2>Needs a <em>closer look.</em></h2></div><Link href="/cases" className="pill">Review queue ↗</Link></div>
+        <div className="focus-list">
+          {priorities.length === 0 && <p className="body muted">No open alerts. You’re caught up.</p>}
+          {priorities.map(a => {
+            const item = state.items.find(i => i.id === a.invoice_ids[0]);
+            return <Link key={a.id} href={a.kind === "recurring_pattern" ? "/keyway" : `/items/${a.invoice_ids[0]}`} className="focus-row"><Badge kind={a.kind === "unexplained_unpaid" ? "flag" : "idle"} /><span><strong>{item?.vendor ?? "Keyway"}</strong><small>{ALERT[a.kind] ?? a.kind}</small></span><b>{money(a.amount, false)}</b><span aria-hidden="true">↗</span></Link>;
+          })}
+        </div>
+        {flagged.length > priorities.length && <p className="body muted" style={{ margin: "18px 0 0" }}>{flagged.length - priorities.length} more alerts available in open items.</p>}
+      </section>
+      <Disclosure title="What happened behind the scenes" hint="Agent activity and source coverage" meta={`${state.meta.documents} records`}>
+        <div className="rows">{state.agents.map(a => <div className="arow" key={a.agent}><Badge kind={a.flagged ? "flag" : "done"} /><div className="arow-main"><span className="arow-title">{a.agent}</span><span className="body muted">{a.done}{a.flagged ? ` · ${a.flagged}` : ""}</span></div></div>)}</div>
+        <Link href="/agents" className="link" style={{ display: "inline-block", marginTop: 20 }}>Explore the team ↗</Link>
+      </Disclosure>
+    </>
+  );
 }

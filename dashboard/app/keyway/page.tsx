@@ -2,6 +2,7 @@
 
 import { Disclosure } from "@/components/Disclosure";
 import { useFeed } from "@/components/Feed";
+import { MoneyStrip } from "@/components/MoneyStrip";
 import { ReplyBox } from "@/components/ReplyBox";
 import { Cites, Loading, PageTop, SectionTitle } from "@/components/ui";
 import { day, money, month, named } from "@/lib/format";
@@ -32,11 +33,7 @@ export default function Keyway() {
     <>
       <PageTop title={state.meta.manager} sub="The middleman Oakline funds. Every dollar from 'funded' to 'vendor confirmed paid'." />
 
-      <div className="quiet-metrics">
-        <div><span>Funded</span><strong>{money(r.funded, false)}</strong></div>
-        <div><span>Paid to vendors</span><strong>{money(r.paid, false)}</strong></div>
-        <div><span>Still owed</span><strong>{money(r.owed, false)}</strong></div>
-      </div>
+      <MoneyStrip state={state} />
       <Disclosure title="Where the money went" hint="Reconciliation and payment breakdown">
       <div className="card">
         <div className="bar" style={{ height: 36 }}>

@@ -1,13 +1,15 @@
 "use client";
-import { useState } from "react";
+
 import { useFeed } from "@/components/Feed";
-import { ItemsTable } from "@/components/ItemsTable";
-import { PageTop,Loading } from "@/components/ui";
-import { PaymentSummary } from "@/components/PaymentSummary";
-export default function Items(){
- const {state}=useFeed();const [query,setQuery]=useState("");const [status,setStatus]=useState("all");const [vendor,setVendor]=useState("all");const [page,setPage]=useState(0);
- if(!state)return <><PageTop title="Accounts payable"/><Loading/></>;
- const rows=state.items.filter(i=>(vendor==="all"||i.vendor===vendor)&&`${i.vendor} ${i.id}`.toLowerCase().includes(query.toLowerCase())&&(status==="all"||status==="paid"&&i.owed<=0||status==="past"&&i.owed>0&&i.days_late>0||status==="open"&&i.owed>0||status==="review"&&i.alerts.length>0));
- const pages=Math.max(1,Math.ceil(rows.length/10));const current=Math.min(page,pages-1);
- return <><div className="ledger-breadcrumb">Invoices <span>›</span> {state.meta.parent}</div><PageTop title="Accounts payable" sub="Invoices, payment evidence, and exceptions in one place."/><PaymentSummary state={state}/><section className="ledger-panel"><div className="between"><h2>Invoice ledger <span className="tag neutral">{rows.length} records</span></h2></div><div className="ledger-filters"><input className="input" aria-label="Filter invoices" placeholder="Search vendor or invoice…" value={query} onChange={e=>{setQuery(e.target.value);setPage(0)}}/><select className="input" aria-label="Vendor" value={vendor} onChange={e=>{setVendor(e.target.value);setPage(0)}}><option value="all">All vendors</option>{[...new Set(state.items.map(i=>i.vendor))].sort().map(v=><option key={v}>{v}</option>)}</select><select className="input" aria-label="Invoice status" value={status} onChange={e=>{setStatus(e.target.value);setPage(0)}}><option value="all">All statuses</option><option value="open">Outstanding</option><option value="past">Past due</option><option value="review">With alerts</option><option value="paid">Paid</option></select></div>{rows.length ? <ItemsTable state={state} items={rows.slice(current*10,current*10+10)}/> : <p className="empty">No invoices match these filters.</p>}<div className="ledger-pagination"><span>{rows.length ? current*10+1 : 0}–{Math.min((current+1)*10,rows.length)} of {rows.length} invoices</span><button className="pill" disabled={!current} onClick={()=>setPage(current-1)}>Previous</button><span>{current+1} / {pages}</span><button className="pill" disabled={current+1>=pages} onClick={()=>setPage(current+1)}>Next</button></div></section></>;
+import { NeedsAttention } from "@/components/NeedsAttention";
+import { Loading, PageTop } from "@/components/ui";
+
+/** Needs attention on its own (the same section sits at the top of the Review queue). */
+export default function Items() {
+  const { state } = useFeed();
+  if (!state) return <><PageTop title="Needs attention" /><Loading /></>;
+  return <>
+    <PageTop title="Needs attention" sub="The few items that need a closer look." />
+    <NeedsAttention state={state} />
+  </>;
 }
