@@ -93,10 +93,21 @@ export type Response = { agent: string; what: string; type: string; invoice_id: 
 /** The figures every tab shows, before and after one action (session.py `books`). */
 export type Books = { unexplained: number; keyway: number; open: number; attention: number };
 
+/** One beat of an action's run, in order (dashboard/feed/session.py `_act` timeline). */
+export type Signal =
+  | { type: "reader"; file: string; kind: string[]; flags: string[]; invoices: string[] }
+  | { type: "step"; step: string }
+  | { type: "agent_started"; agent: string; invoice_id: string | null; question: string | null }
+  | { type: "decision"; agent: string; invoice_id: string | null; question: string;
+      steps: { kind: string; text: string; cites: { source: string; locator: string | null; quote: string | null }[] }[];
+      answer: Record<string, unknown>; mode: string; ms: number | null }
+  | { type: "policy"; action: string; actor: string; ok: boolean; why: string };
+
 export type ActionResult =
   | { ok: true; kind: string; summary: string; affected: string[]; trace: string[]; diff: Diff; responses: Response[]; cost: number; live: boolean; state: State; events: unknown[]; parsed?: Parsed;
       // what ran and what was written (dashboard/feed/session.py _act)
       books?: { before: Books; after: Books };
+      timeline?: Signal[]; ran_ms?: number; emails?: unknown[];
       steps?: string[]; agents?: Record<string, number>; writes?: { total: number; notes: { type: string; text: string; invoice_id: string | null }[] } }
   | { ok: false; error: string; suggestions?: string[]; state?: State };
 

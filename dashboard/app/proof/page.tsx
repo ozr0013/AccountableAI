@@ -54,7 +54,7 @@ export default function Proof() {
       <section className="proof-hero">
         <div><span className="label">/ Latest · {pack.ran_on} · outside paperwork</span><h1>20 PDFs we didn’t generate.</h1>
           <p>An agreement, a bank export, a statement, invoices and emails from a separate company, including a spoofed vendor and hidden instructions. Read by Sonnet, run through the engine for 15 days, scored against an answer key written from the documents.</p></div>
-        <Link className="btn on-wine" href="/investigation">See the run ↗</Link>
+        <Link className="btn on-wine" href="/console">See the run ↗</Link>
       </section>
       <div className="proof-metrics">
         <article><strong>{pack.score.passed} / {pack.score.total}</strong><span>answer-key checks</span><small>world/pack/answer_key.json</small></article>

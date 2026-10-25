@@ -29,8 +29,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
-    { href: "/investigation", label: "Live investigation", icon: Spark },
-    { href: "/simulation", label: "Simulated flow", icon: Spark },
+    { href: "/console", label: "Judge Console", icon: Gavel },
     // the number is what still needs someone; it goes when everything is cleared
     { href: "/cases", label: "Review queue", icon: Inbox, count: open, hot: true },
     { href: "/invoices", label: "Invoices", icon: ListIcon },
@@ -59,7 +58,6 @@ export function Shell({ children }: { children: ReactNode }) {
               <Link href="/proof"><Spark /> Proof & evals</Link>
               <Link href="/guardrails"><Shield /> Guardrails</Link>
             </Disclosure>
-            <Link href="/console" aria-current={active("/console") ? "page" : undefined}><Gavel /> Judge Console</Link>
           </nav>
           <DemoBar />
           <div className="side-foot">

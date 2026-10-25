@@ -203,6 +203,39 @@ def add_sample(name: str):
         return session().add_file(_sample(name))
 
 
+class Written(BaseModel):
+    sender: str                                  # "keyway" or a vendor id
+    subject: str = ""
+    body: str
+
+
+class Upload(BaseModel):
+    name: str
+    data: str                                    # base64
+
+
+@app.post("/api/write")
+def write(body: Written):
+    """An email the judge writes as Keyway or a vendor, read like any other inbox file."""
+    with _lock:
+        return session().write_email(body.sender, body.subject, body.body)
+
+
+@app.post("/api/upload")
+def upload(body: Upload):
+    """A file the judge brings (PDF, .eml, bank CSV, up to 2 MB), read like any other inbox file."""
+    import base64
+    import binascii
+    if len(body.data) > 2_800_000:
+        raise HTTPException(413, "Files up to 2 MB")
+    try:
+        data = base64.b64decode(body.data, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, "not base64") from None
+    with _lock:
+        return session().upload(body.name, data)
+
+
 @app.get("/api/simulation")
 def simulation():
     """The 15-day script (simulation.py): day, label, what kind of step."""
