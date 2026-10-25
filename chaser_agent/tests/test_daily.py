@@ -12,7 +12,7 @@ RULES = [DEADLINE]
 
 def _line(paid=0.0):
     return LedgerLine(invoice_id="INV-KW-0301", manager_id="keyway", vendor_id="v-riogrande",
-                      amount=1240.0, invoice_received=date(2026, 3, 3), paid_amount=paid,
+                      amount=1240.0, funded_amount=1240.0, invoice_received=date(2026, 3, 3), paid_amount=paid,
                       paid_on=date(2026, 3, 20) if paid else None)
 
 
@@ -76,7 +76,7 @@ def test_escalation_notifies_both_proposes_a_hold_and_needs_the_controller():
 def test_any_payment_hands_off_to_the_anomaly_agent():
     assert _decide(date(2026, 4, 22), paid=1240.0).action == "handoff_anomaly"
     partial = _decide(date(2026, 4, 22), paid=1000.0)
-    assert partial.action == "handoff_anomaly" and "$240.00 short" in partial.reason
+    assert partial.action == "handoff_anomaly" and "$240.00 still owed" in partial.reason
 
 
 def test_agreement_waiting_for_controller_is_held_not_chased():
@@ -91,3 +91,69 @@ def test_no_agreement_is_skipped():
 def test_business_days_skip_weekends_and_names_match_without_suffixes():
     assert add_days(date(2026, 4, 24), 2, "business") == date(2026, 4, 28)
     assert norm_name("Rio Grande Plumbing LLC") == norm_name("Rio Grande Plumbing")
+
+
+def test_vendor_without_agreement_uses_the_management_agreement_deadline_only():
+    from chaser_agent.daily import _rules_by_vendor, rules_for
+    rows = [{**DEADLINE, "vendor_name": "Keyway Property Management", "params": {"days": 10}},
+            {"rule_id": "m:payee", "rule_type": "payee", "status": "active", "params": {},
+             "check": "name Keyway", "vendor_name": "Keyway Property Management"},
+            {**DEADLINE, "vendor_name": "Rio Grande Plumbing LLC"}]
+    by_vendor = _rules_by_vendor(rows)
+    assert rules_for(by_vendor, "Rio Grande Plumbing", "Keyway Property Management")[0]["params"]["days"] == 30
+    fallback = rules_for(by_vendor, "Topline Roofing", "Keyway Property Management")
+    assert [r["rule_type"] for r in fallback] == ["pay_within_days"]
+    assert fallback[0]["params"]["days"] == 10
+
+
+def test_unfunded_invoice_is_not_chased():
+    line = LedgerLine(invoice_id="INV-KW-0601", manager_id="keyway", vendor_id="v-x", amount=8400.0,
+                      invoice_received=date(2026, 3, 3))
+    d = decide(line, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22))
+    assert d.action == "skip" and "not funded" in d.reason
+
+
+def test_all_levels_and_the_escalation_notice_go_out_without_approval(monkeypatch):
+    from chaser_agent import daily
+    monkeypatch.setattr(daily, "AUTO_LEVELS", {"polite", "firm", "escalation"})
+    monkeypatch.setattr(daily, "AUTO_ESCALATE", True)
+    firm = _decide(date(2026, 4, 27), [_row("polite", "2026-04-22", "queued")])
+    assert (firm.level, firm.status) == ("firm", "queued")
+    sent = [_row("polite", "2026-04-22", "queued"), _row("firm", "2026-04-27", "queued"),
+            _row("escalation", "2026-05-02", "queued")]
+    raised = _decide(date(2026, 5, 7), sent)
+    assert raised.action == "escalate" and raised.status == "queued"
+
+
+def test_after_the_hand_off_a_balance_still_owed_is_chased():
+    handed = [_row(None, "2026-04-22", "reviewed", action="handoff_anomaly")]
+    d = _decide(date(2026, 4, 22), handed, paid=1000.0)
+    assert d.action == "reminder" and d.amount_owed == 240.0
+    assert _decide(date(2026, 4, 22), handed, paid=1240.0).action == "skip"
+
+
+def test_a_payment_to_another_vendor_is_handed_off_then_chased_as_unpaid():
+    from chaser_agent.daily import verified_line
+    line, source = verified_line(_line(paid=1240.0), [{"vendor_id": "v-other", "amount": 1240.0, "on": "2026-03-20"}])
+    assert (line.paid_amount, source) == (0.0, "bank")
+    first = decide(line, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22), payment_seen=True)
+    assert first.action == "handoff_anomaly" and "different vendor" in first.reason
+    handed = [_row(None, "2026-04-22", "reviewed", action="handoff_anomaly")]
+    later = decide(line, "Rio Grande Plumbing", "Keyway", RULES, handed, date(2026, 4, 23), payment_seen=True)
+    assert later.action == "reminder" and later.amount_owed == 1240.0
+
+
+def test_a_vendor_confirmation_is_named_as_the_source():
+    d = decide(_line(paid=1240.0), "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22),
+               paid_source="vendor confirmation")
+    assert d.reason.startswith("vendor confirmation shows")
+
+
+def test_a_late_wire_from_oakline_moves_the_deadline():
+    from chaser_agent.daily import FUNDING_GRACE_DAYS
+    line = _line().model_copy(update={"funded_on": date(2026, 4, 10)})   # agreement date: Apr 2
+    d = decide(line, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 11))
+    assert d.action == "not_due" and d.due_date == str(date(2026, 4, 10).replace(day=10 + FUNDING_GRACE_DAYS))
+    assert "after the agreement date" in d.reason
+    on_time = _line().model_copy(update={"funded_on": date(2026, 3, 5)})
+    assert decide(on_time, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 11)).due_date == "2026-04-02"

@@ -22,7 +22,7 @@ export function Badge({ kind }: { kind: "done" | "flag" | "idle" | "no" }) {
   return <span className="badge idle" />;
 }
 
-export function PageTop({ title, sub, children }: { title: string; sub?: ReactNode; children?: ReactNode }) {
+export function PageTop({ title, sub, children, meta = true }: { title: string; sub?: ReactNode; children?: ReactNode; meta?: boolean }) {
   const { state, mode } = useFeed();
   return (
     <div className="top">
@@ -32,10 +32,10 @@ export function PageTop({ title, sub, children }: { title: string; sub?: ReactNo
       </div>
       <div className="top-meta">
         {children}
-        {state && <span className="chip">As of {day(state.meta.as_of, true)}</span>}
-        <span className={`chip ${mode}`} title={mode === "live" ? "dashboard/feed/serve.py" : "public/feed/*.json"}>
+        {meta && state && <span className="chip">As of {day(state.meta.as_of, true)}</span>}
+        {meta && <span className={`chip ${mode}`} title={mode === "live" ? "dashboard/feed/serve.py" : "public/feed/*.json"}>
           {mode === "live" ? "Live feed" : "Replay feed"}
-        </span>
+        </span>}
       </div>
     </div>
   );

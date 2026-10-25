@@ -1,0 +1,939 @@
+[
+  {
+    "event": "No agreement: preview has no actionable decisions",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-05-08",
+      "decisions": []
+    }
+  },
+  {
+    "event": "Claude reviews incomplete GreenEdge agreement",
+    "http_status": 200,
+    "output": {
+      "review": {
+        "doc_id": "c164e9e4f71007ea",
+        "filename": "greenedge_landscaping_agreement.pdf",
+        "source": "upload",
+        "sender": null,
+        "subject": null,
+        "kind": "agreement",
+        "kind_reason": "agreement wording: agreement, contract, services, (\"owner\"), (\"contractor\")",
+        "relevant": true,
+        "fields": [
+          {
+            "name": "owner_name",
+            "label": "Owner company name",
+            "status": "found",
+            "value": "Oakline Homes LLC",
+            "quote": "This Agreement is entered into by Oakline Homes LLC (\"Owner\")",
+            "location": "p.1",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "vendor_name",
+            "label": "Vendor company name",
+            "status": "found",
+            "value": "GreenEdge Landscaping LLC",
+            "quote": "GreenEdge Landscaping LLC",
+            "location": "p.1",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "payment_due",
+            "label": "Payment due date or terms",
+            "status": "missing",
+            "value": null,
+            "quote": null,
+            "location": null,
+            "note": "Searched sections and for 'days'; no due date or terms. Only monthly invoicing is stated.",
+            "by": "model"
+          },
+          {
+            "name": "payment_amount",
+            "label": "Payment amount or rate",
+            "status": "found",
+            "value": "$1,250 per month",
+            "quote": "Owner will pay Contractor a monthly fee of $1,250 for the services.",
+            "location": "\u00a72",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "payment_info",
+            "label": "Payment information",
+            "status": "unclear",
+            "value": null,
+            "quote": null,
+            "location": null,
+            "note": "Section 4 says \"Payment details to be provided separately.\" No bank, check or remit-to details.",
+            "by": "model"
+          },
+          {
+            "name": "effective_date",
+            "label": "Effective date",
+            "status": "missing",
+            "value": null,
+            "quote": null,
+            "location": null,
+            "note": "No date appears in the document.",
+            "by": "model"
+          },
+          {
+            "name": "reminder_terms",
+            "label": "Reminder or grace terms",
+            "status": "missing",
+            "value": null,
+            "quote": null,
+            "location": null,
+            "note": "No grace period, reminder or late fee terms found.",
+            "by": "model"
+          },
+          {
+            "name": "signatures",
+            "label": "Signatures",
+            "status": "missing",
+            "value": null,
+            "quote": null,
+            "location": null,
+            "note": "No signature block, 'By:' or signature lines found.",
+            "by": "model"
+          }
+        ],
+        "complete": false,
+        "escalation": {
+          "id": "esc-eb9266311e",
+          "doc_id": "c164e9e4f71007ea",
+          "to": "owner",
+          "subject": "Action needed: greenedge_landscaping_agreement.pdf is missing payment due date or terms, payment information",
+          "body": "Agreement \u201cgreenedge_landscaping_agreement.pdf\u201d from GreenEdge Landscaping LLC can't be relied on yet. Missing or unclear: payment due date or terms, payment information.\n\n- Payment due date or terms: missing. Searched sections and for 'days'; no due date or terms. Only monthly invoicing is stated.\n- Payment information: unclear. Section 4 says \"Payment details to be provided separately.\" No bank, check or remit-to details.\n\nFound:\n- Owner company name: Oakline Homes LLC (p.1)\n- Vendor company name: GreenEdge Landscaping LLC (p.1)\n- Payment amount or rate: $1,250 per month (\u00a72)\n\nSuggested next step: ask GreenEdge Landscaping LLC for a corrected copy that states payment due date or terms, payment information. No payment should be scheduled from this document until then.\n\n(Drafted by the agreement agent. Not sent.)",
+          "items": [
+            {
+              "name": "payment_due",
+              "label": "Payment due date or terms",
+              "status": "missing",
+              "value": null,
+              "quote": null,
+              "location": null,
+              "note": "Searched sections and for 'days'; no due date or terms. Only monthly invoicing is stated.",
+              "by": "model"
+            },
+            {
+              "name": "payment_info",
+              "label": "Payment information",
+              "status": "unclear",
+              "value": null,
+              "quote": null,
+              "location": null,
+              "note": "Section 4 says \"Payment details to be provided separately.\" No bank, check or remit-to details.",
+              "by": "model"
+            }
+          ],
+          "severity": "high",
+          "status": "drafted",
+          "created_at": "2026-10-25T01:00:57.945461Z"
+        },
+        "steps": [
+          "parsed greenedge_landscaping_agreement.pdf: 1 page(s), 6 sections, kind agreement (agreement wording: agreement, contract, services, (\"owner\"), (\"contractor\"))",
+          "model turn 1: read_header, list_sections",
+          "read the header (top of the document)",
+          "listed 6 sections",
+          "model turn 2: search, search, search",
+          "searched for 'days': 1 hit(s)",
+          "searched for 'signature': 0 hit(s)",
+          "searched for 'date': 0 hit(s)",
+          "model turn 3: record_field, record_field, record_field, mark_missing, mark_unclear, mark_missing, mark_missing, mark_missing",
+          "recorded Owner company name: Oakline Homes LLC",
+          "recorded Vendor company name: GreenEdge Landscaping LLC",
+          "recorded Payment amount or rate: $1,250 per month",
+          "marked Payment due date or terms missing: Searched sections and for 'days'; no due date or terms. Only monthly invoicing is stated.",
+          "marked Payment information unclear: Section 4 says \"Payment details to be provided separately.\" No bank, check or remit-to details.",
+          "marked Effective date missing: No date appears in the document.",
+          "marked Reminder or grace terms missing: No grace period, reminder or late fee terms found.",
+          "marked Signatures missing: No signature block, 'By:' or signature lines found.",
+          "model turn 4: done",
+          "checked 8 fields: 2 required field(s) need the owner",
+          "escalated to the owner (high): payment due date or terms, payment information"
+        ],
+        "mode": "model",
+        "cost_usd": 0.0316
+      },
+      "status": "needs_controller",
+      "rules": [
+        {
+          "rule_id": "c164e9e4f71007ea:payee",
+          "rule_type": "payee",
+          "params": {
+            "vendor": "GreenEdge Landscaping LLC"
+          },
+          "check": "Every bank payment for this agreement must name GreenEdge Landscaping LLC.",
+          "status": "pending_controller",
+          "source_quote": "GreenEdge Landscaping LLC",
+          "location": "p.1"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:amount",
+          "rule_type": "amount",
+          "params": {
+            "amount": 1250.0,
+            "per": "month",
+            "extras_allowed": false
+          },
+          "check": "Invoices are billed at $1,250.00 per month; flag any other rate.",
+          "status": "pending_controller",
+          "source_quote": "Owner will pay Contractor a monthly fee of $1,250 for the services.",
+          "location": "\u00a72"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:hold_payment:payment_due",
+          "rule_type": "hold_payment",
+          "params": {
+            "term": "payment_due"
+          },
+          "check": "Payment due date or terms is missing: hold payment until the controller confirms it.",
+          "status": "blocking",
+          "source_quote": null,
+          "location": null
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:hold_payment:payment_info",
+          "rule_type": "hold_payment",
+          "params": {
+            "term": "payment_info"
+          },
+          "check": "Payment information is unclear: hold payment until the controller confirms it.",
+          "status": "blocking",
+          "source_quote": null,
+          "location": null
+        }
+      ],
+      "saved_to_spacetime": true,
+      "save_error": null
+    }
+  },
+  {
+    "event": "Controller fills GreenEdge missing terms",
+    "http_status": 200,
+    "output": {
+      "doc_id": "c164e9e4f71007ea",
+      "filename": "greenedge_landscaping_agreement.pdf",
+      "kind": "agreement",
+      "status": "confirmed",
+      "vendor_name": "GreenEdge Landscaping LLC",
+      "payment_due": "within 15 days of invoice receipt",
+      "payment_amount": "$1,250 per month",
+      "payment_info": "ACH to Desert Bank, routing 123456789, account 99887766",
+      "complete": true,
+      "missing": [
+        "effective_date",
+        "reminder_terms",
+        "signatures"
+      ],
+      "escalation_subject": null,
+      "confirmed_by": "trace-controller",
+      "controller_note": "Isolated scenario input",
+      "rules": [
+        {
+          "rule_id": "c164e9e4f71007ea:payee",
+          "rule_type": "payee",
+          "params": {
+            "vendor": "GreenEdge Landscaping LLC"
+          },
+          "check": "Every bank payment for this agreement must name GreenEdge Landscaping LLC.",
+          "status": "active",
+          "source_quote": "GreenEdge Landscaping LLC",
+          "location": "p.1"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:pay_within_days",
+          "rule_type": "pay_within_days",
+          "params": {
+            "basis": "calendar",
+            "days": 15,
+            "from": "invoice receipt",
+            "undisputed_only": false
+          },
+          "check": "Pay within 15 calendar days of invoice receipt; chase after that.",
+          "status": "active",
+          "source_quote": "within 15 days of invoice receipt",
+          "location": "controller:trace-controller"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:amount",
+          "rule_type": "amount",
+          "params": {
+            "amount": 1250.0,
+            "extras_allowed": false,
+            "per": "month"
+          },
+          "check": "Invoices are billed at $1,250.00 per month; flag any other rate.",
+          "status": "active",
+          "source_quote": "Owner will pay Contractor a monthly fee of $1,250 for the services.",
+          "location": "\u00a72"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:pay_to_account",
+          "rule_type": "pay_to_account",
+          "params": {
+            "account": "99887766",
+            "bank": "Desert Bank",
+            "routing": "123456789"
+          },
+          "check": "Payments must go to bank Desert Bank, routing 123456789, account 99887766; any change needs controller approval and identity checks.",
+          "status": "active",
+          "source_quote": "ACH to Desert Bank, routing 123456789, account 99887766",
+          "location": "controller:trace-controller"
+        }
+      ]
+    }
+  },
+  {
+    "event": "Controller rejects GreenEdge agreement",
+    "http_status": 200,
+    "output": {
+      "doc_id": "c164e9e4f71007ea",
+      "filename": "greenedge_landscaping_agreement.pdf",
+      "kind": "agreement",
+      "status": "rejected",
+      "vendor_name": "GreenEdge Landscaping LLC",
+      "payment_due": "within 15 days of invoice receipt",
+      "payment_amount": "$1,250 per month",
+      "payment_info": "ACH to Desert Bank, routing 123456789, account 99887766",
+      "complete": true,
+      "missing": [
+        "effective_date",
+        "reminder_terms",
+        "signatures"
+      ],
+      "escalation_subject": null,
+      "confirmed_by": "trace-controller",
+      "controller_note": "Demonstrate rejection branch in isolated fixture",
+      "rules": [
+        {
+          "rule_id": "c164e9e4f71007ea:payee",
+          "rule_type": "payee",
+          "params": {
+            "vendor": "GreenEdge Landscaping LLC"
+          },
+          "check": "Every bank payment for this agreement must name GreenEdge Landscaping LLC.",
+          "status": "rejected",
+          "source_quote": "GreenEdge Landscaping LLC",
+          "location": "p.1"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:pay_within_days",
+          "rule_type": "pay_within_days",
+          "params": {
+            "basis": "calendar",
+            "days": 15,
+            "from": "invoice receipt",
+            "undisputed_only": false
+          },
+          "check": "Pay within 15 calendar days of invoice receipt; chase after that.",
+          "status": "rejected",
+          "source_quote": "within 15 days of invoice receipt",
+          "location": "controller:trace-controller"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:amount",
+          "rule_type": "amount",
+          "params": {
+            "amount": 1250.0,
+            "extras_allowed": false,
+            "per": "month"
+          },
+          "check": "Invoices are billed at $1,250.00 per month; flag any other rate.",
+          "status": "rejected",
+          "source_quote": "Owner will pay Contractor a monthly fee of $1,250 for the services.",
+          "location": "\u00a72"
+        },
+        {
+          "rule_id": "c164e9e4f71007ea:pay_to_account",
+          "rule_type": "pay_to_account",
+          "params": {
+            "account": "99887766",
+            "bank": "Desert Bank",
+            "routing": "123456789"
+          },
+          "check": "Payments must go to bank Desert Bank, routing 123456789, account 99887766; any change needs controller approval and identity checks.",
+          "status": "rejected",
+          "source_quote": "ACH to Desert Bank, routing 123456789, account 99887766",
+          "location": "controller:trace-controller"
+        }
+      ]
+    }
+  },
+  {
+    "event": "Claude reviews complete Rio Grande agreement",
+    "http_status": 200,
+    "output": {
+      "review": {
+        "doc_id": "9b5f2667dfdc3458",
+        "filename": "rio_grande_services_agreement.pdf",
+        "source": "upload",
+        "sender": null,
+        "subject": null,
+        "kind": "agreement",
+        "kind_reason": "agreement wording: agreement, between, shall, services, terms, fees, (\"owner\"), (\"vendor\")",
+        "relevant": true,
+        "fields": [
+          {
+            "name": "owner_name",
+            "label": "Owner company name",
+            "status": "found",
+            "value": "Oakline Homes LLC",
+            "quote": "Oakline Homes LLC (\"Owner\")",
+            "location": "p.1",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "vendor_name",
+            "label": "Vendor company name",
+            "status": "found",
+            "value": "Rio Grande Plumbing LLC",
+            "quote": "Rio Grande Plumbing LLC (\"Vendor\")",
+            "location": "p.1",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "payment_due",
+            "label": "Payment due date or terms",
+            "status": "found",
+            "value": "Within 30 days of receipt of each undisputed invoice",
+            "quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+            "location": "\u00a73",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "payment_amount",
+            "label": "Payment amount or rate",
+            "status": "found",
+            "value": "$95 per hour plus approved materials",
+            "quote": "at the rate of $95 per hour plus approved materials",
+            "location": "\u00a72",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "payment_info",
+            "label": "Payment information",
+            "status": "found",
+            "value": "ACH to First Mesa Bank, routing 102000021, account 4471029, in the name of Rio Grande Plumbing LLC",
+            "quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,",
+            "location": "\u00a74",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "effective_date",
+            "label": "Effective date",
+            "status": "found",
+            "value": "March 1, 2026",
+            "quote": "This Services Agreement is made as of March 1, 2026",
+            "location": "p.1",
+            "note": "",
+            "by": "model"
+          },
+          {
+            "name": "reminder_terms",
+            "label": "Reminder or grace terms",
+            "status": "missing",
+            "value": null,
+            "quote": null,
+            "location": null,
+            "note": "Read all sections and searched \"late\"; no grace period, reminder, or late fee terms are stated.",
+            "by": "model"
+          },
+          {
+            "name": "signatures",
+            "label": "Signatures",
+            "status": "found",
+            "value": "Signed by both parties: Dana Ortiz (Controller, Oakline Homes LLC) and Luis Ortega (Owner, Rio Grande Plumbing LLC), both dated March 1, 2026",
+            "quote": "By: Luis Ortega, Owner, Rio Grande Plumbing LLC Date: March 1, 2026",
+            "location": "p.1",
+            "note": "",
+            "by": "model"
+          }
+        ],
+        "complete": true,
+        "escalation": null,
+        "steps": [
+          "parsed rio_grande_services_agreement.pdf: 1 page(s), 8 sections, kind agreement (agreement wording: agreement, between, shall, services, terms, fees, (\"owner\"), (\"vendor\"))",
+          "model turn 1: read_header, list_sections",
+          "read the header (top of the document)",
+          "listed 8 sections",
+          "model turn 2: read_section, read_section, read_section, search",
+          "read section 4",
+          "read section 5",
+          "read section Signatures",
+          "searched for 'late': 0 hit(s)",
+          "model turn 3: record_field, record_field, record_field, record_field, record_field, record_field, record_field, mark_missing",
+          "recorded Owner company name: Oakline Homes LLC",
+          "recorded Vendor company name: Rio Grande Plumbing LLC",
+          "recorded Payment due date or terms: Within 30 days of receipt of each undisputed invoice",
+          "recorded Payment amount or rate: $95 per hour plus approved materials",
+          "recorded Payment information: ACH to First Mesa Bank, routing 102000021, account 4471029, in the name of Rio Grande Plumbing LLC",
+          "recorded Effective date: March 1, 2026",
+          "recorded Signatures: Signed by both parties: Dana Ortiz (Controller, Oakline Homes LLC) and Luis Ortega (Owner, Rio Grande Plumbing LLC), both dated March 1, 2026",
+          "marked Reminder or grace terms missing: Read all sections and searched \"late\"; no grace period, reminder, or late fee terms are stated.",
+          "model turn 4: done",
+          "checked 8 fields: complete"
+        ],
+        "mode": "model",
+        "cost_usd": 0.03548
+      },
+      "status": "active",
+      "rules": [
+        {
+          "rule_id": "9b5f2667dfdc3458:payee",
+          "rule_type": "payee",
+          "params": {
+            "vendor": "Rio Grande Plumbing LLC"
+          },
+          "check": "Every bank payment for this agreement must name Rio Grande Plumbing LLC.",
+          "status": "active",
+          "source_quote": "Rio Grande Plumbing LLC (\"Vendor\")",
+          "location": "p.1"
+        },
+        {
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_type": "pay_within_days",
+          "params": {
+            "days": 30,
+            "basis": "calendar",
+            "from": "invoice receipt",
+            "undisputed_only": true
+          },
+          "check": "Pay within 30 calendar days of invoice receipt; chase after that.",
+          "status": "active",
+          "source_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "location": "\u00a73"
+        },
+        {
+          "rule_id": "9b5f2667dfdc3458:amount",
+          "rule_type": "amount",
+          "params": {
+            "amount": 95.0,
+            "per": "hour",
+            "extras_allowed": true
+          },
+          "check": "Invoices are billed at $95.00 per hour; flag any other rate.",
+          "status": "active",
+          "source_quote": "at the rate of $95 per hour plus approved materials",
+          "location": "\u00a72"
+        },
+        {
+          "rule_id": "9b5f2667dfdc3458:pay_to_account",
+          "rule_type": "pay_to_account",
+          "params": {
+            "bank": "First Mesa Bank",
+            "routing": "102000021",
+            "account": "4471029"
+          },
+          "check": "Payments must go to bank First Mesa Bank, routing 102000021, account 4471029; any change needs controller approval and identity checks.",
+          "status": "active",
+          "source_quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,",
+          "location": "\u00a74"
+        }
+      ],
+      "saved_to_spacetime": true,
+      "save_error": null
+    }
+  },
+  {
+    "event": "March 30: invoice not due",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-03-30",
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "not_due",
+          "reason": "due 2026-04-02 (3 days left) under 'Pay within 30 calendar days of invoice receipt; chase after that.'",
+          "level": null,
+          "due_date": "2026-04-02",
+          "days_overdue": 0,
+          "amount_owed": 1240.0,
+          "message": null,
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "recorded",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:not_due:not_due:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "April 22: overdue -> polite queued",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-04-22",
+      "counts": {
+        "reminder": 1
+      },
+      "saved": 1,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "reminder",
+          "reason": "20 days past the 2026-04-02 deadline; polite reminder queued automatically; history: no payment history",
+          "level": "polite",
+          "due_date": "2026-04-02",
+          "days_overdue": 20,
+          "amount_owed": 1240.0,
+          "message": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "queued",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:reminder:polite:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "April 23: cadence -> wait",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-04-23",
+      "counts": {
+        "wait": 1
+      },
+      "saved": 0,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "wait",
+          "reason": "last reminder 1 days ago; next after 5 (approved default of 5 days); history: no payment history",
+          "level": null,
+          "due_date": "2026-04-02",
+          "days_overdue": 21,
+          "amount_owed": 1240.0,
+          "message": null,
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "recorded",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:wait:wait:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "April 27: firm draft requires approval",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-04-27",
+      "counts": {
+        "reminder": 1
+      },
+      "saved": 1,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "reminder",
+          "reason": "25 days past the 2026-04-02 deadline; firm reminder drafted for controller approval; history: no payment history",
+          "level": "firm",
+          "due_date": "2026-04-02",
+          "days_overdue": 25,
+          "amount_owed": 1240.0,
+          "message": "Hello Keyway Property Management, following up on our earlier note about $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301). We still have no bank record or vendor confirmation of payment. Please send one, or tell us what is holding it up.",
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "needs_approval",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:reminder:firm:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "April 28: pending approval -> wait",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-04-28",
+      "counts": {
+        "wait": 1
+      },
+      "saved": 0,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "wait",
+          "reason": "reminder draft awaiting controller approval; history: no payment history",
+          "level": null,
+          "due_date": "2026-04-02",
+          "days_overdue": 26,
+          "amount_owed": 1240.0,
+          "message": null,
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "recorded",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:wait:wait:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "Controller approves firm reminder",
+    "http_status": 200,
+    "output": {
+      "action_id": "INV-KW-0301:reminder:firm:0",
+      "invoice_id": "INV-KW-0301",
+      "vendor_name": "Rio Grande Plumbing",
+      "action": "reminder",
+      "level": "firm",
+      "due_date": "2026-04-02",
+      "days_overdue": 25,
+      "amount_owed": 1240.0,
+      "message": "Hello Keyway Property Management, following up on our earlier note about $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301). We still have no bank record or vendor confirmation of payment. Please send one, or tell us what is holding it up.",
+      "reason": "25 days past the 2026-04-02 deadline; firm reminder drafted for controller approval; history: no payment history",
+      "rule_id": "9b5f2667dfdc3458:pay_within_days",
+      "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+      "status": "approved",
+      "as_of": "2026-04-27",
+      "decided_by": "trace-controller",
+      "decision_note": null
+    }
+  },
+  {
+    "event": "May 2: escalation reminder requires approval",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-05-02",
+      "counts": {
+        "reminder": 1
+      },
+      "saved": 1,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "reminder",
+          "reason": "30 days past the 2026-04-02 deadline; escalation reminder drafted for controller approval; history: no payment history",
+          "level": "escalation",
+          "due_date": "2026-04-02",
+          "days_overdue": 30,
+          "amount_owed": 1240.0,
+          "message": "Hello Keyway Property Management, this item is still unexplained: $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301) with no bank record or vendor confirmation. Oakline's controller has been notified and may hold further funding until it is resolved. Please reply with payment proof.",
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "needs_approval",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:reminder:escalation:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "Controller approves escalation reminder",
+    "http_status": 200,
+    "output": {
+      "action_id": "INV-KW-0301:reminder:escalation:0",
+      "invoice_id": "INV-KW-0301",
+      "vendor_name": "Rio Grande Plumbing",
+      "action": "reminder",
+      "level": "escalation",
+      "due_date": "2026-04-02",
+      "days_overdue": 30,
+      "amount_owed": 1240.0,
+      "message": "Hello Keyway Property Management, this item is still unexplained: $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301) with no bank record or vendor confirmation. Oakline's controller has been notified and may hold further funding until it is resolved. Please reply with payment proof.",
+      "reason": "30 days past the 2026-04-02 deadline; escalation reminder drafted for controller approval; history: no payment history",
+      "rule_id": "9b5f2667dfdc3458:pay_within_days",
+      "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+      "status": "approved",
+      "as_of": "2026-05-02",
+      "decided_by": "trace-controller",
+      "decision_note": null
+    }
+  },
+  {
+    "event": "May 7: owner-management escalation and proposed funding hold",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-05-07",
+      "counts": {
+        "escalate": 1
+      },
+      "saved": 1,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "escalate",
+          "reason": "escalated to owner and management; hold proposed for the controller; history: no payment history",
+          "level": null,
+          "due_date": "2026-04-02",
+          "days_overdue": 35,
+          "amount_owed": 1240.0,
+          "message": "INV-KW-0301 (Rio Grande Plumbing): $1,240.00 is 35 days past the 2026-04-02 deadline after all three reminders. Notified: Oakline (owner) and Keyway Property Management (management). Proposed: hold $1,240.00 from the next funding to Keyway Property Management until it is paid. Controller decision required.",
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "needs_controller",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:escalate:escalate:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "May 8: $1000 bank payment -> partial-payment anomaly handoff",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-05-08",
+      "counts": {
+        "handoff_anomaly": 1
+      },
+      "saved": 1,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "handoff_anomaly",
+          "reason": "bank shows $1,000.00 paid of $1,240.00 ($240.00 short) on 2026-05-08; anomaly agent checks amount, recipient and timing",
+          "level": null,
+          "due_date": "2026-04-02",
+          "days_overdue": 0,
+          "amount_owed": 240.0,
+          "message": null,
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "recorded",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:handoff_anomaly:handoff_anomaly:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "Repeated check does not save duplicate handoff",
+    "http_status": 200,
+    "output": {
+      "as_of": "2026-05-08",
+      "counts": {
+        "handoff_anomaly": 1
+      },
+      "saved": 0,
+      "decisions": [
+        {
+          "invoice_id": "INV-KW-0301",
+          "vendor_name": "Rio Grande Plumbing",
+          "action": "handoff_anomaly",
+          "reason": "bank shows $1,000.00 paid of $1,240.00 ($240.00 short) on 2026-05-08; anomaly agent checks amount, recipient and timing",
+          "level": null,
+          "due_date": "2026-04-02",
+          "days_overdue": 0,
+          "amount_owed": 240.0,
+          "message": null,
+          "rule_id": "9b5f2667dfdc3458:pay_within_days",
+          "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+          "status": "recorded",
+          "attempt": 0,
+          "action_id": "INV-KW-0301:handoff_anomaly:handoff_anomaly:0"
+        }
+      ]
+    }
+  },
+  {
+    "event": "Final action history",
+    "http_status": 200,
+    "output": [
+      {
+        "action_id": "INV-KW-0301:reminder:polite:0",
+        "invoice_id": "INV-KW-0301",
+        "vendor_name": "Rio Grande Plumbing",
+        "action": "reminder",
+        "level": "polite",
+        "due_date": "2026-04-02",
+        "days_overdue": 20,
+        "amount_owed": 1240.0,
+        "message": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+        "reason": "20 days past the 2026-04-02 deadline; polite reminder queued automatically; history: no payment history",
+        "rule_id": "9b5f2667dfdc3458:pay_within_days",
+        "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+        "status": "queued",
+        "as_of": "2026-04-22"
+      },
+      {
+        "action_id": "INV-KW-0301:reminder:firm:0",
+        "invoice_id": "INV-KW-0301",
+        "vendor_name": "Rio Grande Plumbing",
+        "action": "reminder",
+        "level": "firm",
+        "due_date": "2026-04-02",
+        "days_overdue": 25,
+        "amount_owed": 1240.0,
+        "message": "Hello Keyway Property Management, following up on our earlier note about $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301). We still have no bank record or vendor confirmation of payment. Please send one, or tell us what is holding it up.",
+        "reason": "25 days past the 2026-04-02 deadline; firm reminder drafted for controller approval; history: no payment history",
+        "rule_id": "9b5f2667dfdc3458:pay_within_days",
+        "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+        "status": "approved",
+        "as_of": "2026-04-27",
+        "decided_by": "trace-controller",
+        "decision_note": null
+      },
+      {
+        "action_id": "INV-KW-0301:reminder:escalation:0",
+        "invoice_id": "INV-KW-0301",
+        "vendor_name": "Rio Grande Plumbing",
+        "action": "reminder",
+        "level": "escalation",
+        "due_date": "2026-04-02",
+        "days_overdue": 30,
+        "amount_owed": 1240.0,
+        "message": "Hello Keyway Property Management, this item is still unexplained: $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301) with no bank record or vendor confirmation. Oakline's controller has been notified and may hold further funding until it is resolved. Please reply with payment proof.",
+        "reason": "30 days past the 2026-04-02 deadline; escalation reminder drafted for controller approval; history: no payment history",
+        "rule_id": "9b5f2667dfdc3458:pay_within_days",
+        "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+        "status": "approved",
+        "as_of": "2026-05-02",
+        "decided_by": "trace-controller",
+        "decision_note": null
+      },
+      {
+        "action_id": "INV-KW-0301:escalate:escalate:0",
+        "invoice_id": "INV-KW-0301",
+        "vendor_name": "Rio Grande Plumbing",
+        "action": "escalate",
+        "level": null,
+        "due_date": "2026-04-02",
+        "days_overdue": 35,
+        "amount_owed": 1240.0,
+        "message": "INV-KW-0301 (Rio Grande Plumbing): $1,240.00 is 35 days past the 2026-04-02 deadline after all three reminders. Notified: Oakline (owner) and Keyway Property Management (management). Proposed: hold $1,240.00 from the next funding to Keyway Property Management until it is paid. Controller decision required.",
+        "reason": "escalated to owner and management; hold proposed for the controller; history: no payment history",
+        "rule_id": "9b5f2667dfdc3458:pay_within_days",
+        "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+        "status": "needs_controller",
+        "as_of": "2026-05-07"
+      },
+      {
+        "action_id": "INV-KW-0301:handoff_anomaly:handoff_anomaly:0",
+        "invoice_id": "INV-KW-0301",
+        "vendor_name": "Rio Grande Plumbing",
+        "action": "handoff_anomaly",
+        "level": null,
+        "due_date": "2026-04-02",
+        "days_overdue": 0,
+        "amount_owed": 240.0,
+        "message": null,
+        "reason": "bank shows $1,000.00 paid of $1,240.00 ($240.00 short) on 2026-05-08; anomaly agent checks amount, recipient and timing",
+        "rule_id": "9b5f2667dfdc3458:pay_within_days",
+        "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+        "status": "recorded",
+        "as_of": "2026-05-08"
+      }
+    ]
+  }
+]
