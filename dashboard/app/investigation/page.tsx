@@ -1,14 +1,14 @@
 "use client";
 
-import { FlowLive } from "@/components/FlowLive";
+import { Simulation } from "@/components/Simulation";
 import { useFeed } from "@/components/Feed";
 import { Loading, PageTop } from "@/components/ui";
 
-/** Live investigation: one file in, and the path it takes through the workflow, top to bottom. */
+/** Live investigation: 15 days through the real workflow, step by step (components/Simulation). */
 export default function Investigation() {
   const { state } = useFeed();
   return <>
     <PageTop title="Live investigation" />
-    {state ? <FlowLive /> : <Loading />}
+    {state ? <Simulation /> : <Loading />}
   </>;
 }

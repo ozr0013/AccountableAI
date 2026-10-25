@@ -230,3 +230,15 @@
   .home-footer { flex-wrap: wrap; padding: 24px 0; }
   .home-footer > span { order: 3; width: 100%; }
 }
+
+/* geometry everywhere: square corners, dashed box lines, a touch darker */
+.home-page { --box-line: #a9b4c8; }
+.home-page :is(.home-button, .button-orb, .ledger-row, .ledger-track, .ledger-track i, .proof-demo, .sample-label, .invoice-corrected,
+  .invoice-corrected > b, .line-tags span, .rule-icon, .proof-toggle, .stage-canvas, .stage-node, .stage-statement, .stage-bubble,
+  .stage-hold, .stage-choice i, .stage-node.ping::before, .stage-node.ping::after) { border-radius: 0; }
+.home-page :is(.ledger-row, .proof-demo, .line-tags span, .rule-icon, .stage-canvas, .stage-node:not(.you), .stage-statement,
+  .stage-bubble, .stage-hold:not(.decide), .stage-choice i:not(:first-child), .invoice-corrected > b) { border: 1px dashed var(--box-line); }
+.home-page .home-button:not(.home-button-dark):not(.proof-toggle) { border: 1px dashed var(--box-line); }
+.home-page .proof-demo::before { display: none; }
+.home-page .proof-invoice { border-top-style: dashed; border-top-color: var(--box-line); }
+.home-page .stage-node.ping::before, .home-page .stage-node.ping::after { border-radius: 0; }

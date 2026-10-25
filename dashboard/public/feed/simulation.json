@@ -1,0 +1,531 @@
+{
+ "start": 3140.0,
+ "frames": [
+  {
+   "index": 0,
+   "day": 1,
+   "label": "Keyway's April statement arrives",
+   "source": "file",
+   "kind": "document",
+   "summary": "Keyway_Owner_Statement_Apr2026.pdf arrived: read as manager statement",
+   "steps": [
+    "route",
+    "detect_anomalies",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish"
+   ],
+   "agents": {
+    "anomaly": 1,
+    "trail": 8,
+    "cause": 8,
+    "verifier": 3,
+    "chaser": 2
+   },
+   "writes": {
+    "total": 31,
+    "notes": [
+     {
+      "type": "document_ingested",
+      "text": "Stored Keyway_Owner_Statement_Apr2026.pdf (manager statement)",
+      "invoice_id": null
+     },
+     {
+      "type": "alert_raised",
+      "text": "Owner alerted: INV-KW-0301: statement says $640.00, approved $1,240.00",
+      "invoice_id": "INV-KW-0301"
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 3140.0,
+   "as_of": "2026-04-22",
+   "diff": {
+    "unexplained": [
+     3140.0,
+     3140.0
+    ]
+   }
+  },
+  {
+   "index": 1,
+   "day": 1,
+   "label": "Keyway replies: \u201cBrightside was paid\u201d",
+   "source": "file",
+   "kind": "reply",
+   "summary": "Keyway replied on INV-KW-0901, no attachment: \u201cHi,\n\nBrightside Cleaning was paid last week for KW-0901. Let us know if you need anything else.\n\nThanks,\nKeyway AP\u201d",
+   "steps": [
+    "route",
+    "read_reply",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish"
+   ],
+   "agents": {
+    "chaser": 3,
+    "trail": 7,
+    "cause": 7,
+    "verifier": 1
+   },
+   "writes": {
+    "total": 26,
+    "notes": [
+     {
+      "type": "chase_reply",
+      "text": "Stored Keyway's reply",
+      "invoice_id": "INV-KW-0901"
+     },
+     {
+      "type": "reply_read",
+      "text": "Reply read: holding position: reply claims payment with no vendor or bank proof",
+      "invoice_id": "INV-KW-0901"
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 3140.0,
+   "as_of": "2026-04-22",
+   "diff": {
+    "unexplained": [
+     3140.0,
+     3140.0
+    ]
+   }
+  },
+  {
+   "index": 2,
+   "day": 2,
+   "label": "A day passes",
+   "source": "clock",
+   "kind": "clock",
+   "summary": "Demo clock moved 1 day to Apr 23.",
+   "steps": [
+    "route",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish"
+   ],
+   "agents": {
+    "trail": 6,
+    "cause": 6,
+    "chaser": 2
+   },
+   "writes": {
+    "total": 19,
+    "notes": [
+     {
+      "type": "world_meta",
+      "text": "Clock moved to 2026-04-23",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 3140.0,
+   "as_of": "2026-04-23",
+   "diff": {
+    "unexplained": [
+     3140.0,
+     3140.0
+    ]
+   }
+  },
+  {
+   "index": 3,
+   "day": 2,
+   "label": "Fact: the electrician's invoice arrived Apr 15",
+   "source": "fact",
+   "kind": "fact",
+   "summary": "INV-KW-0402 ($900.00) was received Apr 15, not Mar 28; due Apr 25 under the 10-day window.",
+   "steps": [
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "funding_review",
+    "finish"
+   ],
+   "agents": {
+    "trail": 5,
+    "cause": 5,
+    "verifier": 1,
+    "chaser": 1,
+    "case": 1
+   },
+   "writes": {
+    "total": 26,
+    "notes": [
+     {
+      "type": "fact_corrected",
+      "text": "Stored a corrected fact",
+      "invoice_id": "INV-KW-0402"
+     },
+     {
+      "type": "alert_withdrawn",
+      "text": "Alert withdrawn: not due yet under the current facts (due 2026-04-25)",
+      "invoice_id": "INV-KW-0402"
+     },
+     {
+      "type": "case_proposed",
+      "text": "Hold proposed: $2,240.00 of $18,400.00",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 2240.0,
+   "as_of": "2026-04-23",
+   "diff": {
+    "unexplained": [
+     3140.0,
+     2240.0
+    ]
+   }
+  },
+  {
+   "index": 4,
+   "day": 4,
+   "label": "Two days pass",
+   "source": "clock",
+   "kind": "clock",
+   "summary": "Demo clock moved 2 days to Apr 25.",
+   "steps": [
+    "route",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish"
+   ],
+   "agents": {
+    "trail": 6,
+    "cause": 6,
+    "verifier": 1,
+    "chaser": 1
+   },
+   "writes": {
+    "total": 20,
+    "notes": [
+     {
+      "type": "world_meta",
+      "text": "Clock moved to 2026-04-25",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 2240.0,
+   "as_of": "2026-04-25",
+   "diff": {
+    "unexplained": [
+     2240.0,
+     2240.0
+    ]
+   }
+  },
+  {
+   "index": 5,
+   "day": 4,
+   "label": "Rio Grande confirms it was paid",
+   "source": "file",
+   "kind": "document",
+   "summary": "RioGrande_Payment_Received.eml arrived: read as vendor confirmation",
+   "steps": [
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "funding_review",
+    "finish"
+   ],
+   "agents": {
+    "trail": 6,
+    "cause": 6,
+    "verifier": 1,
+    "chaser": 1,
+    "case": 1
+   },
+   "writes": {
+    "total": 28,
+    "notes": [
+     {
+      "type": "document_ingested",
+      "text": "Stored RioGrande_Payment_Received.eml (vendor confirmation)",
+      "invoice_id": "INV-KW-0301"
+     },
+     {
+      "type": "alert_withdrawn",
+      "text": "Alert withdrawn: now unexplained: Oakline funded $1,240.00; $0.00 is still unpaid (due 2026-03-13, 10 days from receipt under clause 7.2). Vendor confirmed it was paid. No matching bank payment was found; payment may have gone another way. No authorized hold, paperwork issue or owner-side reason is on file.",
+      "invoice_id": "INV-KW-0301"
+     },
+     {
+      "type": "case_proposed",
+      "text": "Hold proposed: $1,000.00 of $18,400.00",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 1000.0,
+   "as_of": "2026-04-25",
+   "diff": {
+    "unexplained": [
+     2240.0,
+     1000.0
+    ]
+   }
+  },
+  {
+   "index": 6,
+   "day": 7,
+   "label": "Three days pass",
+   "source": "clock",
+   "kind": "clock",
+   "summary": "Demo clock moved 3 days to Apr 28.",
+   "steps": [
+    "route",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "funding_review",
+    "finish"
+   ],
+   "agents": {
+    "trail": 6,
+    "cause": 6,
+    "verifier": 2,
+    "chaser": 2,
+    "case": 1
+   },
+   "writes": {
+    "total": 31,
+    "notes": [
+     {
+      "type": "world_meta",
+      "text": "Clock moved to 2026-04-28",
+      "invoice_id": null
+     },
+     {
+      "type": "alert_raised",
+      "text": "Owner alerted: INV-KW-0402 (v-sparkline): $900.00 unpaid, 3 days past due (unexplained)",
+      "invoice_id": "INV-KW-0402"
+     },
+     {
+      "type": "chase_sent",
+      "text": "Reminder to Keyway, escalation (INV-KW-0402) \u00b7 recorded, not emailed",
+      "invoice_id": null
+     },
+     {
+      "type": "chase_sent",
+      "text": "Reminder to Keyway, escalation (INV-KW-0901) \u00b7 recorded, not emailed",
+      "invoice_id": null
+     },
+     {
+      "type": "case_proposed",
+      "text": "Hold proposed: $1,900.00 of $18,400.00",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 1900.0,
+   "as_of": "2026-04-28",
+   "diff": {
+    "unexplained": [
+     1000.0,
+     1900.0
+    ]
+   }
+  },
+  {
+   "index": 7,
+   "day": 7,
+   "label": "Keyway's bank export arrives",
+   "source": "file",
+   "kind": "document",
+   "summary": "Keyway_Bank_Export_Apr22.csv arrived: read as manager bank",
+   "steps": [
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish",
+    "route",
+    "funding_review",
+    "finish"
+   ],
+   "agents": {
+    "trail": 10,
+    "cause": 10,
+    "verifier": 4,
+    "chaser": 1,
+    "case": 1
+   },
+   "writes": {
+    "total": 42,
+    "notes": [
+     {
+      "type": "document_ingested",
+      "text": "Stored Keyway_Bank_Export_Apr22.csv (manager bank)",
+      "invoice_id": null
+     },
+     {
+      "type": "alert_withdrawn",
+      "text": "Alert withdrawn: payment is now proven by bank or vendor records on 2026-04-22; it was paid 34 days after the due date, which the lateness pattern tracks",
+      "invoice_id": "INV-KW-0901"
+     },
+     {
+      "type": "case_proposed",
+      "text": "Hold proposed: $900.00 of $18,400.00",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 900.0,
+   "as_of": "2026-04-28",
+   "diff": {
+    "unexplained": [
+     1900.0,
+     900.0
+    ]
+   }
+  },
+  {
+   "index": 8,
+   "day": 12,
+   "label": "Five days pass",
+   "source": "clock",
+   "kind": "clock",
+   "summary": "Demo clock moved 5 days to May 3.",
+   "steps": [
+    "route",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish"
+   ],
+   "agents": {
+    "trail": 5,
+    "cause": 5,
+    "chaser": 1
+   },
+   "writes": {
+    "total": 16,
+    "notes": [
+     {
+      "type": "world_meta",
+      "text": "Clock moved to 2026-05-03",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 900.0,
+   "as_of": "2026-05-03",
+   "diff": {
+    "unexplained": [
+     900.0,
+     900.0
+    ]
+   }
+  },
+  {
+   "index": 9,
+   "day": 15,
+   "label": "Three days pass",
+   "source": "clock",
+   "kind": "clock",
+   "summary": "Demo clock moved 3 days to May 6.",
+   "steps": [
+    "route",
+    "finish",
+    "route",
+    "assess",
+    "draft_alerts",
+    "verify",
+    "chase",
+    "finish"
+   ],
+   "agents": {
+    "trail": 5,
+    "cause": 5,
+    "chaser": 1
+   },
+   "writes": {
+    "total": 16,
+    "notes": [
+     {
+      "type": "world_meta",
+      "text": "Clock moved to 2026-05-06",
+      "invoice_id": null
+     }
+    ]
+   },
+   "ok": true,
+   "unexplained": 900.0,
+   "as_of": "2026-05-06",
+   "diff": {
+    "unexplained": [
+     900.0,
+     900.0
+    ]
+   }
+  }
+ ]
+}

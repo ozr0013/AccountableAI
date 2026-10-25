@@ -189,6 +189,25 @@ def add_sample(name: str):
         return session().add_file(_sample(name))
 
 
+@app.get("/api/simulation")
+def simulation():
+    """The 15-day script (simulation.py): day, label, what kind of step."""
+    from simulation import SCRIPT
+    return [{"index": i, "day": st["day"], "label": st["label"], "source": st["kind"]} for i, st in enumerate(SCRIPT)]
+
+
+@app.post("/api/simulation/{index}")
+def simulation_step(index: int):
+    """Run one step of the script on the session: what ran, what was written, what changed."""
+    from simulation import SCRIPT, run
+    if not 0 <= index < len(SCRIPT):
+        raise HTTPException(404, f"the script has {len(SCRIPT)} steps")
+    with _lock:
+        if index == 0:
+            session().reset()
+        return run(session(), index)
+
+
 @app.post("/api/reset")
 def reset():
     with _lock:
