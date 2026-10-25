@@ -22,13 +22,13 @@ DIR = HERE / "samples"
 
 # What each file is, which of the three flows it starts, and what should happen.
 SAMPLES = [
-    {"file": "Keyway_Owner_Statement_Apr2026.pdf", "label": "Keyway statement (PDF)",
+    {"file": "Keyway_Owner_Statement_Apr2026.pdf", "label": "Keyway Management statement (PDF)",
      "flow": "statement", "expect": "One line says $640.00 for Rio Grande's $1,240.00 invoice: a mismatch alert."},
     {"file": "RioGrande_Payment_Received.eml", "label": "Rio Grande: “we received your payment”",
      "flow": "evidence", "expect": "The vendor confirms it was paid: that $1,240.00 alert is withdrawn."},
-    {"file": "Keyway_Reply_KW-0901.eml", "label": "Keyway reply: “Brightside was paid”",
+    {"file": "Keyway_Reply_KW-0901.eml", "label": "Keyway Management reply: “Brightside was paid”",
      "flow": "reply", "expect": "A reply with no receipt is not proof: the $1,000.00 alert stays open."},
-    {"file": "Keyway_Bank_Export_Apr22.csv", "label": "Keyway bank export (CSV)",
+    {"file": "Keyway_Bank_Export_Apr22.csv", "label": "Keyway Management bank export (CSV)",
      "flow": "evidence", "expect": "The bank shows the $1,000.00 Brightside payment: that alert is withdrawn."},
 ]
 

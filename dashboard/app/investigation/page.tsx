@@ -1,12 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { LiveRun } from "@/components/LiveRun";
-import { PageTop } from "@/components/ui";
-
-/** Live investigation: outside paperwork run through the engine (components/LiveRun). */
-export default function Investigation() {
-  return <>
-    <PageTop title="Live investigation" />
-    <LiveRun />
-  </>;
+/** Folded into the Judge Console. */
+export default function Moved() {
+  redirect("/console");
 }

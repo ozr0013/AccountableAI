@@ -36,7 +36,7 @@ export default function AccountPage() {
   };
 
   return <>
-    <PageTop title="Your account" sub="Connect Google to show your name and photo in AccountableAI." />
+    <PageTop title="Your account" sub="Connect Google to show your name and photo." />
     {error && <div className="notice err">{error}</div>}
     <section className="section">
       <div className="card block-shadow dots-panel" style={{ padding: 28 }}>

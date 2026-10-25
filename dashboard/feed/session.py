@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import logging
 import os
+import re
+import tempfile
 from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
@@ -68,7 +70,7 @@ def _claims_paid(text: str) -> bool:
 AGENT_NAME = {"verifier": "Verifier", "recheck": "Recheck", "chaser": "Chaser agent",
               "case_agent": "Case agent", "agreement_agent": "Agreement agent",
               "workflow": "Workflow", "controller": "Controller", "judge": "Judge",
-              "keyway": "Keyway", "trail": "Payment-trail agent", "cause": "Delay-cause agent",
+              "keyway": "Keyway Management", "trail": "Payment-trail agent", "cause": "Delay-cause agent",
               "policy": "Policy gate", "pattern": "Pattern check", "anomaly": "Anomaly detector"}
 
 
@@ -132,13 +134,30 @@ def _properties(homes: dict, items: list[dict]) -> list[dict]:
     return sorted(out, key=lambda p: (-p["attention"], -p["owed"], p["id"]))
 
 
+def _signal(m: dict) -> dict:
+    """A workflow step or an agent starting, as Live investigation's timeline shows it."""
+    if m["type"] == "step":
+        return {"type": "step", "step": m["step"]}
+    return {"type": "agent_started", "agent": m.get("agent"), "invoice_id": m.get("invoice_id"),
+            "question": m.get("question")}
+
+
+def _decision(r) -> dict:
+    """One agent's finished decision: its reasoning steps with the records they cite."""
+    cite = lambda c: {"source": c.source_id, "locator": c.locator, "quote": c.quote}
+    return {"type": "decision", "agent": r.agent, "invoice_id": r.invoice_id, "question": r.question,
+            "steps": [{"kind": st.kind, "text": st.text, "cites": [cite(c) for c in st.citations]}
+                      for st in r.steps],
+            "answer": r.answer, "mode": r.mode, "ms": getattr(r, "ms", None)}
+
+
 def _write_note(e: Event, open_before: set[str]) -> dict | None:
     """One event-log write in plain words, or None for internal bookkeeping."""
     p = e.payload or {}
     if e.type == "document_ingested":
         text = f"Stored {str(p.get('id', '')).removeprefix('raw:inbox/')} ({str(p.get('kind', '')).replace('_', ' ')})"
     elif e.type == "chase_reply":
-        text = "Stored Keyway's reply"
+        text = "Stored Keyway Management's reply"
     elif e.type == "fact_corrected":
         text = "Stored a corrected fact"
     elif e.type == "world_meta":
@@ -152,7 +171,7 @@ def _write_note(e: Event, open_before: set[str]) -> dict | None:
         text = f"Alert withdrawn: {p.get('reason', '')}"
     elif e.type == "chase_sent":
         c = p.get("chase", {})
-        text = f"Reminder to Keyway, {c.get('level', '')} ({', '.join(c.get('invoice_ids', []))}) · recorded, not emailed"
+        text = f"Reminder to Keyway Management, {c.get('level', '')} ({', '.join(c.get('invoice_ids', []))}) · recorded, not emailed"
     elif e.type == "reply_read":
         text = f"Reply read: {p.get('verdict', '')}"
     elif e.type == "case_proposed":
@@ -184,6 +203,7 @@ class DemoSession:
         # emails and bank CSVs (world/mess -> agents/extract), not the generator's clean records.
         self.messy = os.getenv("FEED_MESSY", "").lower() in ("1", "true", "yes")
         self.paperwork: dict | None = None
+        self.inbox = Path(tempfile.mkdtemp(prefix="accountableai-inbox-"))   # files judges write or bring
         self.build()
 
     # -- setup ----------------------------------------------------------------------------
@@ -267,17 +287,31 @@ class DemoSession:
 
     # -- the loop: every action runs the workflow, then the follow-ups ----------------------
     def _act(self, kind: str, summary: str, events: list[Event], affected: list[str],
-             before: dict, appended: bool = False) -> dict:
+             before: dict, appended: bool = False, reader: dict | None = None) -> dict:
         """Handle the action's events, then let the other agents respond: a scan (chaser
         follows up on schedule, pattern and causes refresh) and, when what Keyway owes changed,
         a fresh case-agent review of the pending funding. Returns what each agent did."""
+        import time
+
         from workflow.book import WorkflowBook
         from workflow.run import funding_event
+        t0 = time.monotonic()
         seq0 = before["meta"]["events"]
         spent0 = self.meter.spent
         open_before = set(WorkflowBook.load(self.rails).open_ids)
         signals: list[dict] = []                # every step and agent start, in order
         stop = self.wf.subscribe_live(lambda m: signals.append(m) if m.get("type") in ("step", "agent_started") else None)
+        # the same run as one ordered timeline, for Live investigation to play back
+        timeline: list[dict] = [{"type": "reader", **reader}] if reader else []
+        stop_live = self.wf.subscribe_live(lambda m: timeline.append(_signal(m)) if m.get("type") in ("step", "agent_started") else None)
+        stop_dec = self.wf.subscribe(lambda r: timeline.append(_decision(r)))
+        gate = self.rails.policy_check
+
+        def checked(action: str, actor: str, payload: dict) -> tuple[bool, str]:
+            ok, why = gate(action, actor, payload)
+            timeline.append({"type": "policy", "action": action, "actor": actor, "ok": ok, "why": why})
+            return ok, why
+        self.rails.policy_check = checked
         self.hub.publish({"type": "action", "status": "started", "kind": kind, "summary": summary,
                           "as_of": self.rails.now().isoformat(), "live": self.live})
         try:
@@ -294,13 +328,15 @@ class DemoSession:
                     "id": f"{ev.id}-recheck-{n}", "valid_from": t, "learned_at": t + _sec(2)})])
             emails = self._deliver(seq0)
         finally:
-            stop()
+            stop(); stop_live(); stop_dec()
+            del self.rails.policy_check          # back to the class's own check
         after = self.snapshot()
         written = self.rails.events()[seq0:]
         trace = [line for r in runs for line in r.trace]
         out = {"ok": True, "kind": kind, "summary": summary, "affected": affected,
                "events": [e.model_dump(mode="json") for e in events], "trace": trace,
                "diff": (d := diff(before, after, affected)),
+               "books": {"before": books(before), "after": books(after)},
                "responses": _responses(self.rails.events()[seq0:], trace, after["meta"]["names"],
                                        set(affected) | {c["id"] for c in d["changed"]}),
                "cost": round(self.meter.spent - spent0, 4), "live": self.live,
@@ -309,7 +345,7 @@ class DemoSession:
                "agents": dict(Counter(m.get("agent") for m in signals if m["type"] == "agent_started")),
                "writes": {"total": len(written),
                           "notes": [w for e in written if (w := _write_note(e, open_before))]},
-               "emails": emails, "state": after}
+               "timeline": timeline, "ran_ms": round((time.monotonic() - t0) * 1000), "emails": emails, "state": after}
         self.history.append({k: out[k] for k in ("kind", "summary", "affected", "diff", "responses", "cost")})
         self.hub.publish({"type": "action", "status": "finished", "kind": kind, "summary": summary,
                           "as_of": self.rails.now().isoformat(), "cost": out["cost"],
@@ -398,11 +434,14 @@ class DemoSession:
         read = [p for p in records if p.kind is not None and p.dated]
         if not read:
             return {"ok": False, "error": f"Nothing usable in {path.name}", "flags": flags}
+        reader = {"file": path.name, "kind": sorted({p.kind.value for p in read}), "flags": flags,
+                  "invoices": sorted({i for p in read for i in ([p.data.get("invoice_id")]
+                                      + [ln.get("invoice_id") for ln in p.data.get("lines", [])]) if i})}
         reply = next((p for p in read if p.kind == SourceKind.manager_reply), None)
         if reply:
             if not reply.data.get("invoice_id"):
                 return {"ok": False, "error": "The reply doesn't say which invoice", "flags": flags}
-            out = self.reply(reply.data["invoice_id"], reply.text or "")
+            out = self.reply(reply.data["invoice_id"], reply.text or "", reader=reader)
             out["parsed"] = {"file": path.name, "kind": "manager_reply", "flags": flags}
             return out
         at = self._clock(15, 10 + self.actions % 40)
@@ -411,11 +450,11 @@ class DemoSession:
         kinds = sorted({p.kind.value for p in read})
         affected = sorted({i for p in read for i in ([p.data.get("invoice_id")] + [ln.get("invoice_id") for ln in p.data.get("lines", [])]) if i})
         out = self._act("document", f"{path.name} arrived: read as {', '.join(k.replace('_', ' ') for k in kinds)}",
-                        events, affected, before)
+                        events, affected, before, reader=reader)
         out["parsed"] = {"file": path.name, "kind": kinds, "flags": flags}
         return out
 
-    def reply(self, invoice_id: str, text: str, proof: str = "none") -> dict:
+    def reply(self, invoice_id: str, text: str, proof: str = "none", reader: dict | None = None) -> dict:
         """The judge plays Keyway and answers a reminder. Proof, if attached, is the record it
         would actually send: a bank payment line or the vendor's confirmation."""
         import hashlib
@@ -427,7 +466,7 @@ class DemoSession:
         if proof not in ("none", "bank", "vendor"):
             return {"ok": False, "error": "proof must be none, bank, or vendor"}
         if not text:
-            return {"ok": False, "error": "write Keyway's reply first"}
+            return {"ok": False, "error": "write Keyway Management's reply first"}
         try:
             jc.invoice(invoice_id)
         except ConsoleError as e:
@@ -448,8 +487,46 @@ class DemoSession:
         self.rails.append_event(ev)
         events.append(ev)
         attached = {"bank": " with a bank record attached", "vendor": " with the vendor's confirmation attached"}
-        return self._act("reply", f"Keyway replied on {invoice_id}{attached.get(proof, ', no attachment')}: “{text}”",
-                         events, [invoice_id], before, appended=True)
+        return self._act("reply", f"Keyway Management replied on {invoice_id}{attached.get(proof, ', no attachment')}: “{text}”",
+                         events, [invoice_id], before, appended=True, reader=reader)
+
+    def write_email(self, sender: str, subject: str, body: str) -> dict:
+        """An email the judge writes, as Keyway or as a vendor: built as a real .eml and read by
+        the same parser as any other inbox file (add_file)."""
+        from datetime import UTC, time
+        from email.utils import formataddr
+
+        from world.mess.render import _eml
+        try:
+            from world.mess.noise import VENDOR_DOMAINS
+        except ImportError:
+            VENDOR_DOMAINS = {}
+        body = (body or "").strip()
+        if not body:
+            return {"ok": False, "error": "Write the email first"}
+        if sender == "keyway":
+            frm, to, cc = formataddr(("Keyway AP", "ap@keywaypm.com")), "controller@oaklinehomes.com", None
+        elif (v := next((v for v in self.world.vendors if v.id == sender), None)):
+            name = v.name
+            domain = VENDOR_DOMAINS.get(sender, re.sub(r"[^a-z0-9]", "", name.lower()) + ".com")
+            frm, to, cc = formataddr((name, f"billing@{domain}")), "ap@keywaypm.com", "controller@oaklinehomes.com"
+        else:
+            return {"ok": False, "error": f"unknown sender {sender!r}"}
+        when = datetime.combine(self.rails.now(), time(15, 10), tzinfo=UTC)
+        path = self.inbox / f"written-{self.actions + 1}.eml"
+        path.write_bytes(_eml(frm, to, (subject or "").strip() or "(no subject)", body, when, cc=cc))
+        return self.add_file(path)
+
+    def upload(self, name: str, data: bytes) -> dict:
+        """A file the judge brings: saved under this session's inbox and read like any other."""
+        safe = re.sub(r"[^A-Za-z0-9._-]", "_", Path(name).name)[:80] or "upload"
+        if Path(safe).suffix.lower() not in (".pdf", ".eml", ".csv"):
+            return {"ok": False, "error": "The reader takes PDF, email (.eml) or bank CSV files"}
+        if len(data) > 2_000_000:
+            return {"ok": False, "error": "Files up to 2 MB"}
+        path = self.inbox / f"upload-{self.actions + 1}-{safe}"
+        path.write_bytes(data)
+        return self.add_file(path)
 
     def advance(self, days: int) -> dict:
         """Move the demo clock forward: due dates pass, the chaser's schedule moves on."""
@@ -489,7 +566,7 @@ class DemoSession:
         if case["kind"] == "funding":
             hold = case["proposed_hold"] if approve else 0.0
             release = round((case["funding_amount"] or FUNDING) - hold, 2)
-            summary = (f"Funding instruction recorded: send ${release:,.2f} to Keyway now"
+            summary = (f"Funding instruction recorded: send ${release:,.2f} to Keyway Management now"
                        + (f", hold ${hold:,.2f} until payment proof." if hold else " (hold declined)."))
             payload = {"approval_id": approval_id, "release": release, "hold": hold,
                        "approved": approve, "by": by, "note": "a recorded instruction for a person; no money moved"}
@@ -691,7 +768,7 @@ class DemoSession:
         """Live calls to the rails policy gate: what an agent is not allowed to do."""
         body = (chases[-1]["body"] if chases else "Please pay the vendor today.")
         tries = [
-            ("Chaser sends a free-form email to Keyway", "send_outbound", "chaser",
+            ("Chaser sends a free-form email to Keyway Management", "send_outbound", "chaser",
              {"to": "ap@keyway.example", "body": body.replace("friendly reminder", "final notice"),
               "proposed_by": "chaser"}),
             ("Case agent pays Rio Grande Plumbing", "pay_vendor", "case_agent", {}),
@@ -806,7 +883,7 @@ def _audit(events: list[Event]) -> list[dict]:
         elif e.type == "reply_read":
             what = p.get("verdict") or "reply read"
         elif e.type == "funding_instruction":
-            what = (f"funding instruction: send ${p['release']:,.2f} to Keyway"
+            what = (f"funding instruction: send ${p['release']:,.2f} to Keyway Management"
                     + (f", hold ${p['hold']:,.2f}" if p["hold"] else "") + " (no money moved)")
         elif e.type == "bank_change_decided":
             what = ("bank-detail change approved" if p["allowed"] else f"bank-detail change still held: {p['reason']}")
@@ -818,6 +895,32 @@ def _audit(events: list[Event]) -> list[dict]:
                     "actor": AGENT_OF_STEP[e.type], "what": what,
                     "invoice_id": e.invoice_id})
     return out[::-1]
+
+
+def left_to_pay(i: dict) -> float:
+    """Oakline's money still with Keyway on one bill (dashboard/lib/balances.ts leftToPay)."""
+    return max(i["funded"] - i["paid"], 0.0)
+
+
+def not_funded(i: dict) -> float:
+    """Billed but not yet sent to Keyway by Oakline (balances.ts notFunded)."""
+    return max(i["amount"] - max(i["funded"], i["paid"]), 0.0)
+
+
+def late_to_pay(i: dict) -> bool:
+    """Left to pay and past due; not retained under the agreement, not a bill sent twice (balances.ts lateToPay)."""
+    return (left_to_pay(i) > 0 and i["days_late"] > 0 and not i["duplicate_of"]
+            and i["cause"] != "authorized_hold")
+
+
+def books(snap: dict) -> dict:
+    """The figures every tab shows, from one snapshot, by the same rules as dashboard/lib/balances.ts."""
+    items = snap["items"]
+    c = lambda xs: round(sum(xs), 2)
+    return {"funded": c(i["funded"] for i in items), "paid": c(i["paid"] for i in items),
+            "left": c(left_to_pay(i) for i in items), "late": c(left_to_pay(i) for i in items if late_to_pay(i)),
+            "not_funded": c(not_funded(i) for i in items), "unexplained": snap["headline"]["unexplained"],
+            "attention": sum(1 for i in items if i["attention"])}
 
 
 def diff(before: dict, after: dict, rechecked: list[str]) -> dict:

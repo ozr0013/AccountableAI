@@ -8,7 +8,7 @@
 #
 # Rules agents by default: free, and the same 9/9 as the evals. The sidebar's Claude switch uses
 # ANTHROPIC_API_KEY from .env (metered). The backend runs on the clean demo world; the 20 outside
-# PDFs are shown from their recorded run on Live investigation (world/pack/).
+# PDFs are shown from their recorded run on the Judge Console (world/pack/).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -40,9 +40,7 @@ start() {
   reset
   echo
   echo "  Open $WEB            landing page"
-  echo "       $WEB/console    Judge Console: the moment (\$3,140 -> \$2,240)"
-  echo "       $WEB/simulation Simulated flow: 15 days, on its own"
-  echo "       $WEB/investigation Live investigation: 20 outside PDFs, end to end"
+  echo "       $WEB/console    Judge Console: paperwork, an email, a fact or time in; every agent it wakes, in order"
 }
 
 reset() {
@@ -51,7 +49,7 @@ reset() {
 
 check() {
   local bad=0
-  for p in / /overview /console /simulation /investigation /cases /items /keyway /guardrails /proof; do
+  for p in / /overview /console /cases /invoices /properties /keyway /guardrails /proof; do
     code=$(curl -s -o /dev/null -w "%{http_code}" "$WEB$p")
     printf "  %-16s %s\n" "$p" "$code"; [ "$code" = 200 ] || bad=1
   done

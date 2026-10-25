@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
 import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
@@ -29,8 +28,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
-    { href: "/investigation", label: "Live investigation", icon: Spark },
-    { href: "/simulation", label: "Simulated flow", icon: Spark },
+    { href: "/console", label: "Judge Console", icon: Gavel },
     // the number is what still needs someone; it goes when everything is cleared
     { href: "/cases", label: "Review queue", icon: Inbox, count: open, hot: true },
     { href: "/invoices", label: "Invoices", icon: ListIcon },
@@ -59,7 +57,6 @@ export function Shell({ children }: { children: ReactNode }) {
               <Link href="/proof"><Spark /> Proof & evals</Link>
               <Link href="/guardrails"><Shield /> Guardrails</Link>
             </Disclosure>
-            <Link href="/console" aria-current={active("/console") ? "page" : undefined}><Gavel /> Judge Console</Link>
           </nav>
           <DemoBar />
           <div className="side-foot">
@@ -70,11 +67,10 @@ export function Shell({ children }: { children: ReactNode }) {
                 <small>{state?.meta.parent ?? "Oakline Homes"}</small>
               </span>
             </Link>
-            <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway</Link>
+            <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway Management</Link>
           </div>
         </aside>
         <main className="main">
-          <Aura />
           <div className="wrap">{children}</div>
         </main>
         <ResponsesPanel />

@@ -7,7 +7,7 @@ import { Badge, Loading, PageTop, SectionTitle } from "@/components/ui";
 const RULES = [
   ["Never move money", "There is no payment function anywhere. pay, wire, transfer and release exist only to be refused."],
   ["Agents recommend, people hold", "The case agent proposes a hold; only the controller places it, and never the proposer."],
-  ["Approved templates only", "Reminders to Keyway use controller-approved templates on an approved schedule. Anything else needs approval of that exact draft."],
+  ["Approved templates only", "Reminders to Keyway Management use controller-approved templates on an approved schedule. Anything else needs approval of that exact draft."],
   ["Never alert without a cited record", "Every claim cites the funding record, the vendor's evidence and the agreement clause. The verifier blocks uncited claims."],
   ["Never accuse", "Wording tops out at “unexplained”. Accusatory terms are blocked in alerts and outbound mail."],
   ["Bank-detail changes are held", "Vendor bank changes wait for identity verification and a controller who didn't request them."],
@@ -19,7 +19,7 @@ export default function Guardrails() {
   if (!state) return <><PageTop title="Guardrails" /><Loading /></>;
   return (
     <>
-      <PageTop title="Guardrails" sub="Your boundaries, enforced in code. Open a rule to learn more." />
+      <PageTop title="Guardrails" sub="Rules the system can't break, enforced in code." />
       <Disclosure title="Policy check results" hint="Inspect actions, actors, and reasons" meta={`${state.guardrails.filter((g) => !g.allowed).length} refused`}>
       <div className="card" style={{ padding: "16px 8px 4px" }}>
         <table className="table">

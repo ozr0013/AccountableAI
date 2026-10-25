@@ -8,7 +8,7 @@ import { money } from "@/lib/format";
 import type { ActionResult, Response } from "@/lib/types";
 
 const TONE: Record<string, "done" | "flag" | "idle" | "no"> = {
-  Keyway: "idle", Judge: "idle", Controller: "done",
+  "Keyway Management": "idle", Judge: "idle", Controller: "done",
 };
 
 function kindOf(r: Response): "done" | "flag" | "idle" | "no" {
@@ -44,7 +44,7 @@ export function ResultHead({ res }: { res: Extract<ActionResult, { ok: true }> }
   const [a, b] = res.diff.unexplained;
   return (
     <div className="stack" style={{ gap: 8 }}>
-      <span className="label muted">/ {({ fact: "Judge fact", reply: "Keyway replied", decision: "Controller decision", clock: "Clock" } as Record<string, string>)[res.kind] ?? res.kind}</span>
+      <span className="label muted">/ {({ fact: "Judge fact", reply: "Keyway Management replied", decision: "Controller decision", clock: "Clock" } as Record<string, string>)[res.kind] ?? res.kind}</span>
       <p className="body" style={{ margin: 0, color: "var(--ink)", fontSize: 15, lineHeight: "22px" }}>{res.summary}</p>
       <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
         <span className="tag neutral">{res.diff.rechecked.length} rechecked</span>
