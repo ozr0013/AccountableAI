@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
 import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
@@ -72,7 +71,6 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <main className="main">
-          <Aura />
           <div className="wrap">{children}</div>
         </main>
         <ResponsesPanel />
