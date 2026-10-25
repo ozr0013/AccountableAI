@@ -89,7 +89,10 @@ def run_day(demo, mirror, client=None) -> dict:
     today = demo.now()
     queued = pipeline.dispatch(demo, mirror, today, since=START)
     processed = pipeline.process(demo, mirror, today, client=client, limit=30)
-    connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
+    cases = connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
+    # Paid and handed off: any reminder draft still waiting for the controller is moot.
+    from .api import mark_handoffs_reviewed
+    mark_handoffs_reviewed(mirror, cases)
     delivered = _deliver(demo, mirror, today)
     return {**state(demo), "queued": queued, "processed": processed, "delivered": delivered}
 
