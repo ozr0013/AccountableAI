@@ -17,6 +17,8 @@ import threading
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from hashlib import sha256
 from pathlib import Path
 
 MODEL = os.getenv("PIPELINE_MODEL", "claude-opus-5-5")
@@ -28,7 +30,7 @@ SKILLS = Path(__file__).resolve().parent / "skills"
 # -- live events: every subscriber (the dashboard's SSE stream) gets each event as it happens ----
 _SUBSCRIBERS: set[queue.Queue] = set()
 _SUB_LOCK = threading.Lock()
-CONTEXT: ContextVar[dict] = ContextVar("pipeline_context", default={})
+CONTEXT: ContextVar[dict | None] = ContextVar("pipeline_context", default=None)
 
 
 def subscribe() -> queue.Queue:
@@ -51,7 +53,7 @@ def emit(event: dict) -> None:
     """Publish one event, tagged with the current task (agent, invoice, day)."""
     if not _SUBSCRIBERS:
         return
-    payload = {**CONTEXT.get(), **event}
+    payload = {**(CONTEXT.get() or {}), 'at': datetime.now(UTC).isoformat(), **event}
     with _SUB_LOCK:
         for q in list(_SUBSCRIBERS):
             try:
@@ -68,7 +70,7 @@ def _call(client, **kw):
     with stream_fn(**kw) as stream:
         for ev in stream:
             if ev.type == "content_block_start" and ev.content_block.type == "tool_use":
-                emit({"type": "tool_call", "tool": ev.content_block.name})
+                emit({"type": "tool_call", "tool": ev.content_block.name, "call_id": ev.content_block.id})
             elif ev.type == "content_block_delta":
                 d = ev.delta
                 if d.type == "thinking_delta" and d.thinking:
@@ -79,7 +81,9 @@ def _call(client, **kw):
 
 
 def load_skill(name: str) -> str:
-    return (SKILLS / name / "SKILL.md").read_text()
+    content = (SKILLS / name / "SKILL.md").read_text()
+    emit({'type': 'skill_loaded', 'name': name, 'version': sha256(content.encode()).hexdigest()[:12]})
+    return content
 
 
 @dataclass
@@ -126,7 +130,8 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
     messages = [{"role": "user", "content": task}]
     trace = Trace(agent=agent)
     emit({"type": "agent_started"})
-    for _ in range(max_turns):
+    for turn in range(max_turns):
+        emit({'type': 'model_turn', 'turn': turn + 1, 'model': MODEL})
         resp = _call(
             client, model=MODEL, max_tokens=16000, system=system_blocks,
             tools=[t.spec() for t in tools], messages=messages,
@@ -154,6 +159,7 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
             return trace
         results, decided = [], False
         for block in uses:
+            emit({'type': 'tool_started', 'tool': block.name, 'call_id': block.id, 'input': block.input})
             tool = by_name.get(block.name)
             try:
                 out = tool.fn(**block.input) if tool else {"error": f"unknown tool {block.name}"}
@@ -164,7 +170,7 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
             if len(text) > RESULT_LIMIT:
                 text = text[:RESULT_LIMIT] + ' ... "[truncated]"'
             emit({"type": "tool_result", "tool": block.name, "input": block.input, "refused": refused,
-                  "terminal": bool(tool and tool.terminal), "preview": text[:600]})
+                  "terminal": bool(tool and tool.terminal), "preview": text[:600], "call_id": block.id})
             trace.steps.append({"tool": block.name, "input": block.input,
                                 "result": json.loads(text) if len(text) < 2000 else text[:2000],
                                 "refused": refused, "terminal": bool(tool and tool.terminal)})
@@ -179,3 +185,32 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
             return trace
     trace.error = f"no decision within {max_turns} turns"
     return trace
+
+
+def event_response():
+    """Expose this process's existing execution bus to the frontend without proxy buffering."""
+    import asyncio
+
+    from fastapi.responses import StreamingResponse
+    q = subscribe()
+
+    async def events():
+        try:
+            yield 'event: ready\ndata: {}\n\n'
+            idle = 0
+            while True:
+                try:
+                    event = q.get_nowait()
+                except queue.Empty:
+                    await asyncio.sleep(0.05)
+                    idle += 1
+                    if idle >= 300:
+                        idle = 0
+                        yield ': keep-alive\n\n'
+                    continue
+                idle = 0
+                yield f"event: {event['type']}\ndata: {json.dumps(event, default=str)}\n\n"
+        finally:
+            unsubscribe(q)
+    return StreamingResponse(events(), media_type='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})

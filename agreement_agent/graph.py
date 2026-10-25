@@ -19,8 +19,11 @@ import logging
 import os
 from datetime import UTC, datetime
 from typing import Any, TypedDict
+from uuid import uuid4
 
 from langgraph.graph import END, START, StateGraph
+
+from chaser_agent import runtime
 
 from . import fields as F
 from .models import Escalation, FieldResult, Parsed, Review, SourceDoc, norm
@@ -221,7 +224,8 @@ def node_rules_agent(state: State) -> State:
 
 def _llm():
     from langchain_anthropic import ChatAnthropic
-    return ChatAnthropic(model=MODEL, max_tokens=4000, max_retries=2, timeout=120)
+    options = {'thinking': {'type': 'adaptive', 'display': 'summarized'}} if runtime.listening() else {}
+    return ChatAnthropic(model=MODEL, max_tokens=4000, max_retries=2, timeout=120, **options)
 
 
 def node_agent(state: State) -> State:
@@ -236,7 +240,28 @@ def node_agent(state: State) -> State:
         HumanMessage(f"Document: {state['doc'].filename} ({p.kind}: {p.kind_reason}). "
                      f"{len(p.pages)} page(s). Begin."),
     ]
-    resp = state["_model"].invoke(msgs)
+    runtime.emit({'type': 'model_turn', 'turn': state.get('turns', 0) + 1, 'model': MODEL})
+    model = state['_model']
+    if runtime.listening() and callable(getattr(model, 'stream', None)):
+        resp = None
+        for chunk in model.stream(msgs):
+            content = chunk.content
+            if isinstance(content, str):
+                if content:
+                    runtime.emit({'type': 'text', 'text': content})
+            else:
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get('type') == 'thinking' and block.get('thinking'):
+                        runtime.emit({'type': 'thinking', 'text': block['thinking']})
+                    elif block.get('type') == 'text' and block.get('text'):
+                        runtime.emit({'type': 'text', 'text': block['text']})
+            resp = chunk if resp is None else resp + chunk
+        if resp is None:
+            raise RuntimeError('Agreement model returned an empty stream.')
+    else:
+        resp = model.invoke(msgs)
     u = getattr(resp, "usage_metadata", None) or {}
     pin, pout = PRICE.get(MODEL, (2.0, 10.0))
     cost = (u.get("input_tokens", 0) * pin + u.get("output_tokens", 0) * pout) / 1e6
@@ -263,11 +288,15 @@ def node_tools(state: State) -> State:
     out = []
     n0 = len(tools.steps)
     for call in state["messages"][-1].tool_calls:
+        runtime.emit({'type': 'tool_started', 'tool': call['name'], 'call_id': call['id'], 'input': call['args']})
         fn = by_name.get(call["name"])
         try:
             result = fn.invoke(call["args"]) if fn else f"error: no tool {call['name']}"
         except Exception as e:                               # noqa: BLE001 - tell the model
             result = f"error: {e}"
+        runtime.emit({'type': 'tool_result', 'tool': call['name'], 'call_id': call['id'],
+                      'input': call['args'], 'preview': json.dumps(result, default=str)[:600],
+                      'refused': isinstance(result, str) and result.startswith('error:')})
         out.append(ToolMessage(content=json.dumps(result, default=str)[:6000], tool_call_id=call["id"]))
     return {"messages": state["messages"] + out, "results": dict(tools.results),
             "steps": state["steps"] + tools.steps[n0:]}
@@ -347,7 +376,7 @@ def build_graph():
 _GRAPH = None
 
 
-def review(doc: SourceDoc, use_model: bool = False, model=None) -> Review:
+def _review(doc: SourceDoc, use_model: bool = False, model=None) -> Review:
     """Run the agreement agent on one document. `model`: a chat model with tools bound (tests
     pass a scripted one); by default Claude is used when use_model is set."""
     global _GRAPH
@@ -369,3 +398,22 @@ def review(doc: SourceDoc, use_model: bool = False, model=None) -> Review:
                   fields=[res[n] for n in order if n in res],
                   complete=out.get("escalation") is None, escalation=out.get("escalation"),
                   steps=out["steps"], mode=mode, cost_usd=round(out.get("cost", 0.0), 5))
+
+
+def review(doc: SourceDoc, use_model: bool = False, model=None) -> Review:
+    """Existing review with observable execution; no change to routing or persistence."""
+    token = runtime.CONTEXT.set({'task_id': f'agreement:{doc.id}:{uuid4().hex[:12]}',
+                                 'agent': 'agreement', 'document_id': doc.id})
+    runtime.emit({'type': 'task_started', 'reason': f'Review {doc.filename}',
+                  'mode': 'model' if use_model else 'rules'})
+    try:
+        result = _review(doc, use_model, model)
+        runtime.emit({'type': 'task_done', 'status': 'done',
+                      'outcome': {'complete': result.complete, 'mode': result.mode,
+                                  'summary': f'{len(result.fields)} fields reviewed'}})
+        return result
+    except Exception as exc:
+        runtime.emit({'type': 'task_done', 'status': 'failed', 'error': type(exc).__name__})
+        raise
+    finally:
+        runtime.CONTEXT.reset(token)
