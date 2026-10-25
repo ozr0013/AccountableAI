@@ -40,6 +40,7 @@ export const ALERT: Record<string, string> = {
   bank_detail_change: "Bank-detail change",
   owner_pending_approval: "Oakline approval pending",
   paperwork_request: "Paperwork request",
+  statement_mismatch: "Statement mismatch",
 };
 
 export const SOURCE: Record<string, string> = {
