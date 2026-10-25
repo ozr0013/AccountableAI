@@ -29,6 +29,8 @@ log = logging.getLogger(__name__)
 
 
 def enabled() -> bool:
+    if "PYTEST_CURRENT_TEST" in os.environ:       # never from a test run
+        return False
     return os.getenv("FEED_SEND_EMAIL", "1") != "0" and TOKEN.exists()
 
 

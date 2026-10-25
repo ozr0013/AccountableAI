@@ -27,12 +27,12 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agents.anomaly.rules import compare  # noqa: E402
-from agents.extract.fields import VendorIndex  # noqa: E402
-from agents.extract.parse import parse_pdf_file  # noqa: E402
-from agreement_agent.connectors import LocalFolder  # noqa: E402
-from agreement_agent.graph import review  # noqa: E402
-from contracts.models import Document, LedgerLine, SourceKind, Vendor  # noqa: E402
+from agents.anomaly.rules import compare
+from agents.extract.fields import VendorIndex
+from agents.extract.parse import parse_pdf_file
+from agreement_agent.connectors import LocalFolder
+from agreement_agent.graph import review
+from contracts.models import Document, LedgerLine, SourceKind, Vendor
 
 logging.getLogger("pypdf").setLevel(logging.ERROR)
 logging.getLogger("pdfminer").setLevel(logging.ERROR)
@@ -41,6 +41,12 @@ logging.getLogger("pdfminer").setLevel(logging.ERROR)
 WANT_KIND = {
     "agreement": {"agreement"}, "invoice": {"vendor_invoice", "invoice"},
     "manager_statement": {"manager_statement"}, "bank_export": {"manager_bank"},
+    "email_vendor_past_due": {"vendor_notice"}, "email_vendor_confirmation": {"vendor_confirmation"},
+    "email_manager_reply": {"manager_reply"}, "email_approval_request": {"manager_reply"},
+    "email_paperwork_request": {"manager_reply"}, "email_vendor_reply": {"vendor_notice"},
+    "email_bank_detail_change": {"vendor_notice"},
+    # an adversarial email may be ignored, or read as an (unproven) manager reply; never as proof
+    "email_adversarial": {None, "manager_reply"},
 }
 
 
@@ -58,17 +64,21 @@ def _money_eq(a, b) -> bool:
 def registry(truth: dict):
     """What the pack lets the system know up front. No truth labels."""
     vendors, aliases, domains = [], {}, {}
+    generic = {"gmail.com", "yahoo.com", "outlook.com", "hotmail.com", "icloud.com"}
     for vid, v in truth["vendors"].items():
-        # one canonical name per vendor: the extractor has no alias support, and duplicate entries
-        # for one vendor would trip its "two candidates too close" refusal
         vendors.append(Vendor(id=vid, name=v["name"], trade=v["trade"]))
-        aliases[vid] = v["name"]
-        if v.get("email"):
-            domains[v["email"].split("@", 1)[1]] = vid
-    ledger = [LedgerLine(invoice_id=iid, manager_id="keyway", vendor_id=inv["vendor"],
-                         amount=inv["amount"], funded_amount=0.0)
-              for iid, inv in truth["invoices"].items()]
-    return VendorIndex(vendors, domains), ledger, aliases
+        for a in v.get("aliases", []):
+            aliases[a] = vid
+        dom = v.get("email", "").split("@", 1)[-1]
+        if dom and dom not in generic:          # a gmail address can't identify a vendor
+            domains[vid] = dom                  # VendorIndex takes {vendor id: domain}
+    # approved amounts; a payment the registry already records (G-0291 in February) counts as paid
+    ledger = []
+    for iid, inv in truth["invoices"].items():
+        before = sum(a for d, a, _ in inv.get("payments", []) if d < "2026-03-01")
+        ledger.append(LedgerLine(invoice_id=iid, manager_id="keyway", vendor_id=inv["vendor"],
+                                 amount=inv["amount"], paid_amount=before))
+    return VendorIndex(vendors, domains, aliases), ledger, aliases
 
 
 def stage_documents(pack: Path, truth: dict, vindex: VendorIndex) -> tuple[list[dict], dict]:
@@ -115,7 +125,7 @@ def stage_documents(pack: Path, truth: dict, vindex: VendorIndex) -> tuple[list[
 def _vendor_hit(value: str, inv: dict, truth: dict) -> bool:
     v = truth["vendors"][inv["vendor"]]
     names = [v["name"], *v.get("aliases", [])]
-    squash = lambda s: re.sub(r"[^a-z]", "", s.lower())  # noqa: E731
+    squash = lambda s: re.sub(r"[^a-z]", "", s.lower())
     return any(squash(n)[:8] and squash(n)[:8] in squash(value) for n in names)
 
 
@@ -140,15 +150,29 @@ def stage_statement(pack: Path, truth: dict, parsed_by_file: dict, ledger: list[
                       "amount": ln.get("amount")})
     stmt = Document(id=f"raw:{sdoc['file']}", kind=SourceKind.manager_statement, manager_id="keyway",
                     text=p.text or "", data={"lines": lines})
-    report = compare(stmt, lines, ledger, "data")
+    # bank lines from the bank export, and job refs the extractor read off the invoices
+    bdoc = next(d for d in truth["documents"] if d["type"] == "bank_export")
+    bp = parsed_by_file[bdoc["file"]][0]
+    bank = (bp.data or {}).get("payments", []) if bp.kind == SourceKind.manager_bank else None
+    refs = {}
+    for d in truth["documents"]:
+        if d["type"] == "invoice":
+            ip = parsed_by_file[d["file"]][0]
+            iid = by_num.get(_digits(ip.data.get("vendor_ref")))
+            if iid and ip.data.get("job_ref"):
+                refs[iid] = [ip.data["job_ref"]]
+    for ln, raw in zip(lines, read):
+        ln.update({k: raw[k] for k in ("status", "retained", "_vendor_id", "_vendor_ref") if k in raw})
+    report = compare(stmt, lines, ledger, "data", bank, refs)
     # what the truth says each flagged line really is
     truth_flag = {e["invoice_id"]: e["truth_flag"] for e in exp_lines}
     judged = [{"invoice": a.invoice_id, "line": a.line, "stated": a.statement_amount,
-               "approved": a.expected_amount, "reason": a.reason,
+               "approved": a.expected_amount, "reason": a.reason, "bank": a.bank_amount,
                "truth_flag": truth_flag.get(a.invoice_id),
                "truth_cause": truth["invoices"].get(a.invoice_id or "", {}).get("truth_cause")}
               for a in report.anomalies]
     return {"expected_lines": len(exp_lines), "read_lines": len(read), "anomalies": judged,
+            "bank_lines": len(bank or []),
             "matched": report.matched,
             "truth_problems": [{"invoice": e["invoice_id"], "flag": e["truth_flag"]}
                                for e in exp_lines if e["truth_flag"] != "ok"]}
@@ -172,8 +196,8 @@ def stage_adversarial(rows: list[dict]) -> list[dict]:
 def render(res: dict) -> str:
     rows = res["documents"]
     L = ["# Held-out pack: " + res["pack"], "",
-         "Rules mode, $0. Registry given: canonical vendor names, email domains; invoice ids, vendors, "
-         "approved amounts. Truth labels used for scoring only.", "", "## 1. Documents", "",
+         ("Rules mode, $0. Registry given: vendor names and aliases, email domains; invoice ids, vendors, "
+          "approved amounts. Truth labels used for scoring only."), "", "## 1. Documents", "",
          "| # | Type | Agreement agent reads it as | Extractor reads it as |", "|---|---|---|---|"]
     for r in rows:
         aa, ex = r["agreement_agent"], r["extractor"]
@@ -188,12 +212,15 @@ def render(res: dict) -> str:
         L.append(f"| {sysname.replace('_', ' ')} | {c['vendor']}/6 | {c['number']}/6 | {c['amount']}/6 |")
     st = res["statement"]
     L += ["", "## 2. Statement and the anomaly detector", "",
-          f"Statement lines read: **{st['read_lines']} of {st['expected_lines']}**.", ""]
+          (f"Statement lines read: **{st['read_lines']} of {st['expected_lines']}**. "
+           f"Bank payment lines read: **{st['bank_lines']}**."), ""]
     if st["anomalies"]:
-        L += ["| Line | Invoice | Statement | Approved | Detector says | Truth |", "|---|---|---|---|---|---|"]
+        L += ["| Line | Invoice | Statement | Approved | Bank | Detector says | Truth |",
+              "|---|---|---|---|---|---|---|"]
         for a in st["anomalies"]:
-            L.append(f"| {a['line']} | {a['invoice']} | ${a['stated']:,.2f} | ${a['approved']:,.2f} | {a['reason']} | "
-                     f"{a['truth_flag']} ({a['truth_cause']}) |")
+            bank = f"${a['bank']:,.2f}" if a["bank"] is not None else ""
+            L.append(f"| {a['line']} | {a['invoice']} | ${a['stated']:,.2f} | ${a['approved']:,.2f} | {bank} | "
+                     f"{a['reason']} | {a['truth_flag']} ({a['truth_cause']}) |")
     L += ["", "Problems the truth plants in this statement: " +
           ", ".join(f"{p['invoice']} {p['flag']}" for p in st["truth_problems"])]
     L += ["", "## 3. Adversarial files", ""]

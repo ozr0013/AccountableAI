@@ -124,10 +124,12 @@ def _iso(x) -> str | None:
 
 
 class DemoSession:
-    def __init__(self, seed: int = 13, n_clean: int = 100, budget: float = 1.0):
+    def __init__(self, seed: int = 13, n_clean: int = 100, budget: float = 1.0,
+                 send_email: bool = False):
         from live import Meter
         from stream import Hub
         self.seed, self.n_clean = seed, n_clean
+        self.send_email = send_email           # real emails only when the server turns this on
         self.meter = Meter(budget)
         self.live = False
         self.hub = Hub()                       # live decisions for /api/stream
@@ -253,7 +255,7 @@ class DemoSession:
         import mailer
 
         from rails.guards.templates import STATEMENT_NOTICE_TEMPLATE
-        if not mailer.enabled():
+        if not self.send_email or not mailer.enabled():
             return []
         out = []
         for e in self.rails.events()[seq0:]:

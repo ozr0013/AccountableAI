@@ -38,7 +38,7 @@ _session: DemoSession | None = None
 def session() -> DemoSession:
     global _session
     if _session is None:
-        _session = DemoSession(budget=float(os.getenv("FEED_BUDGET", "1.0")))
+        _session = DemoSession(budget=float(os.getenv("FEED_BUDGET", "1.0")), send_email=True)
     return _session
 
 

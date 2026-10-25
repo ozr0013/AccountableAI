@@ -514,7 +514,8 @@ def parse_mail(mail: Mail, source: str, vendors: VendorIndex,
             return out
     if _JUNK.search(mail.subject + "\n" + mail.body):
         return [Parsed(source, None, method="email", warnings=["ignored: auto-reply / newsletter"])]
-    if "statement" in mail.subject.lower() and not mail.attachments:
+    if not mail.attachments and re.search(r"statement\b.{0,30}\battach|\battach\w*\b.{0,30}\bstatement",
+                                          mail.subject + "\n" + mail.own_text, re.IGNORECASE | re.DOTALL):
         p = Parsed(source, None, method="email")
         p.flag("Keyway says a statement is attached, but nothing was attached")
         return [p]
