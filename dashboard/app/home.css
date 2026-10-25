@@ -150,7 +150,7 @@
     linear-gradient(#f0f3f9 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(90deg, #f0f3f9 1px, transparent 1px) 0 0 / 40px 40px, #fff; }
 .stage-canvas > * { translate: 20px 20px; }
 .stage-lines { position: absolute; left: 0; top: 0; width: 560px; height: 500px; overflow: visible; }
-.ln { fill: none; stroke: #d5dced; stroke-width: 2; stroke-linecap: round; stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset 1s ease, stroke .4s ease; }
+.ln { fill: none; stroke: #d5dced; stroke-width: 2; stroke-linecap: square; stroke-linejoin: miter; stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset 1s ease, stroke .4s ease; }
 .ln.in { stroke-dashoffset: 0; stroke: var(--blue); }
 .ln.pay.in { stroke: #7aa2ff; }
 .ln.broken { stroke: #f2711c; stroke-dasharray: 4 7; stroke-dashoffset: 0; }

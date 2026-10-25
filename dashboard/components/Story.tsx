@@ -64,9 +64,9 @@ export function Story() {
           <div className="stage-canvas" data-step={step}>
             <svg className="stage-lines" viewBox="0 0 560 500">
               <path className={`ln fund${at(0)}`} d="M 120 250 H 210" />
-              <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 C 390 250 390 126 430 126" />
+              <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 H 390 V 126 H 430" />
               <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 H 430" />
-              <path className={`ln pay${at(1)}${step >= 5 ? " clear" : step >= 3 ? " broken" : ""}`} d="M 350 250 C 390 250 390 374 430 374" />
+              <path className={`ln pay${at(1)}${step >= 5 ? " clear" : step >= 3 ? " broken" : ""}`} d="M 350 250 H 390 V 374 H 430" />
             </svg>
             <span className={`pkt${step === 0 || step === 6 ? " in" : ""}`} />
             <div className="stage-node you in"><b>You</b><small>Oakline Homes</small></div>

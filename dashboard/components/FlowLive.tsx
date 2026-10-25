@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import manifest from "@/feed/samples/manifest.json";
 import { useFeed } from "./Feed";
 import { money } from "@/lib/format";
-import type { ActionResult } from "@/lib/types";
+import type { ActionResult, Diff } from "@/lib/types";
 
 const FEED_URL = process.env.NEXT_PUBLIC_FEED_URL || "http://127.0.0.1:8765";
 const PACE = 420;
@@ -19,28 +19,31 @@ type Sample = { file: string; label: string; flow: "statement" | "evidence" | "r
 const SAMPLES = manifest as Sample[];
 
 type NodeId = "in" | "detect" | "reply" | "assess" | "verify" | "owner" | "chase" | "middleman";
-const NODES: { id: NodeId; x: number; y: number; title: string; step: string; tone: string }[] = [
-  { id: "in", x: 80, y: 150, title: "Paperwork in", step: "route", tone: "src" },
-  { id: "detect", x: 270, y: 60, title: "Anomaly detector", step: "detect_anomalies", tone: "model" },
-  { id: "reply", x: 270, y: 240, title: "Chaser reads reply", step: "read_reply", tone: "model" },
-  { id: "assess", x: 460, y: 150, title: "Trail + Cause", step: "assess", tone: "code" },
-  { id: "verify", x: 650, y: 150, title: "Verifier", step: "verify", tone: "ver" },
-  { id: "owner", x: 840, y: 60, title: "Owner", step: "alert_raised", tone: "human" },
-  { id: "chase", x: 840, y: 240, title: "Chaser reminds", step: "chase", tone: "code" },
-  { id: "middleman", x: 650, y: 296, title: "Middleman", step: "chase_sent", tone: "out" },
+// Top to bottom: paperwork (or the middleman's reply) in, the reader that fits it, the checks,
+// then the outcome. Straight segments and right angles only.
+const L = 120, C = 320, R = 520;
+const NODES: { id: NodeId; x: number; y: number; title: string; tone: string }[] = [
+  { id: "in", x: C, y: 36, title: "Paperwork in", tone: "src" },
+  { id: "middleman", x: R, y: 36, title: "Middleman", tone: "out" },
+  { id: "detect", x: L, y: 136, title: "Anomaly detector", tone: "model" },
+  { id: "reply", x: R, y: 136, title: "Chaser reads reply", tone: "model" },
+  { id: "assess", x: C, y: 236, title: "Trail + Cause", tone: "code" },
+  { id: "verify", x: C, y: 336, title: "Verifier", tone: "ver" },
+  { id: "owner", x: L, y: 436, title: "Owner", tone: "human" },
+  { id: "chase", x: R, y: 436, title: "Chaser reminds", tone: "code" },
 ];
 const EDGES: Record<string, string> = {
-  "in>detect": "M 150 150 C 175 150, 175 60, 200 60",
-  "in>reply": "M 150 150 C 175 150, 175 240, 200 240",
-  "in>assess": "M 150 150 L 390 150",
-  "detect>assess": "M 340 60 C 365 60, 365 150, 390 150",
-  "reply>assess": "M 340 240 C 365 240, 365 150, 390 150",
-  "assess>verify": "M 530 150 L 580 150",
-  "verify>owner": "M 720 150 C 745 150, 745 60, 770 60",
-  "verify>chase": "M 720 150 C 745 150, 745 240, 770 240",
-  "chase>middleman": "M 840 266 C 840 296, 760 296, 720 296",
-  "middleman>reply": "M 580 296 C 440 296, 380 296, 340 250",
+  "in>detect": `M ${C} 58 V 86 H ${L} V 114`,
+  "in>assess": `M ${C} 58 V 214`,
+  "middleman>reply": `M ${R} 58 V 114`,
+  "detect>assess": `M ${L} 158 V 186 H ${C - 40} V 214`,
+  "reply>assess": `M ${R} 158 V 186 H ${C + 40} V 214`,
+  "assess>verify": `M ${C} 258 V 314`,
+  "verify>owner": `M ${C} 358 V 386 H ${L} V 414`,
+  "verify>chase": `M ${C} 358 V 386 H ${R} V 414`,
+  "chase>middleman": `M ${R + 80} 436 H ${R + 104} V 36 H ${R + 80}`,
 };
+const JOINTS: [number, number][] = [[C, 86], [C, 386]];          // where a line branches
 const NODE_OF: Record<string, NodeId> = {
   route: "in", detect_anomalies: "detect", read_reply: "reply", assess: "assess",
   draft_alerts: "verify", verify: "verify", chase: "chase", funding_review: "owner",
@@ -55,10 +58,17 @@ const EXPECTED: Record<Sample["flow"], { step: string; notes?: string[] }[]> = {
     { step: "verify", notes: ["still holds"] }, { step: "chase" }, { step: "finish" }],
 };
 
+/** The change in a few words: alerts raised and withdrawn. */
+function outcome(d: Diff): string {
+  const n = (k: number, what: string) => `${k} alert${k === 1 ? "" : "s"} ${what}`;
+  const parts = [d.raised.length ? n(d.raised.length, "raised") : "", d.withdrawn.length ? n(d.withdrawn.length, "withdrawn") : ""].filter(Boolean);
+  return parts.length ? parts.join(", ") : "no change";
+}
+
 type Beat = { kind: "start"; from: NodeId; caption: string } | { kind: "step"; step: string; notes: string[] };
 
 export function FlowLive() {
-  const { state, mode, busy, addFile } = useFeed();
+  const { mode, busy, addFile, setPanel } = useFeed();
   const live = mode === "live";
   const [pick, setPick] = useState(SAMPLES[0].file);
   const [lit, setLit] = useState<Set<string>>(new Set());          // nodes and edges visited this run
@@ -135,75 +145,42 @@ export function FlowLive() {
         ...EXPECTED[sample.flow].map((b) => ({ kind: "step" as const, step: b.step, notes: b.notes ?? [] })));
       return;
     }
-    setResult(await addFile(sample.file));
+    const r = await addFile(sample.file);
+    setPanel(false);                        // the map is the answer here; no side panel
+    setResult(r);
   };
 
   const cls = (id: string) => (id === active ? " active" : lit.has(id) ? " lit" : "");
-  const paper = state?.meta.paperwork;
   const ok = result && result.ok ? result : null;
 
   return (
-    <section className="flow-live" aria-label="Live flow of the investigation">
-      <div className="flow-head">
-        <div>
-          <span className="label">/ live flow</span>
-          <h2>Drop in paperwork. <em className="serif">Watch it travel.</em></h2>
-        </div>
-        <span className={`chip ${live && connected ? "live" : "replay"}`}>
-          {live ? (connected ? "Live · following the workflow" : "Live feed · connecting") : "Replay · feed not running"}
-        </span>
+    <section className="flow-live" aria-label="Live flow">
+      <div className="flow-bar">
+        <select aria-label="File" value={pick} onChange={(e) => setPick(e.target.value)}>
+          {SAMPLES.map((s) => <option key={s.file} value={s.file}>{s.label}</option>)}
+        </select>
+        <button className="btn" onClick={add} disabled={busy}>{busy ? "Reading…" : live ? "Add" : "Play"}</button>
+        {live && <a className="pill" href={`/api/samples/${encodeURIComponent(sample.file)}`} target="_blank" rel="noreferrer">Open ↗</a>}
+        <span className={`chip ${live && connected ? "live" : "replay"}`}>{live && connected ? "Live" : "Replay"}</span>
       </div>
 
-      <div className="flow-body">
-        <div className="flow-controls">
-          <label className="flow-field">
-            <span className="micro muted">File</span>
-            <select value={pick} onChange={(e) => setPick(e.target.value)}>
-              {SAMPLES.map((s) => <option key={s.file} value={s.file}>{s.label}</option>)}
-            </select>
-          </label>
-          <p className="flow-expect">{sample.expect}</p>
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
-            <button className="btn" onClick={add} disabled={busy}>{busy ? "Reading…" : live ? "Add to inbox" : "Play the expected path"}</button>
-            {live
-              ? <a className="pill" href={`/api/samples/${encodeURIComponent(sample.file)}`} target="_blank" rel="noreferrer">Open file ↗</a>
-              : <span className="pill" aria-disabled="true" title="Needs the live feed">Open file ↗</span>}
-          </div>
-          <p className="flow-paper micro">
-            {paper ? `Running on raw files: ${paper.records} records read, ${paper.documents} documents, ${paper.flagged} flagged for a person.`
-              : live ? "Running on clean records. Start the feed with FEED_MESSY=1 to read raw PDFs, scans and emails."
-                : "Start python dashboard/feed/serve.py to run the real workflow."}
-          </p>
-        </div>
+      <svg className="flow-map" viewBox="0 0 640 470" role="img" aria-label={caption}>
+        {Object.entries(EDGES).map(([k, d]) => <path key={k} d={d} className={`fl-edge${lit.has(k) ? " lit" : ""}`} />)}
+        {JOINTS.map(([x, y]) => <rect key={`${x}-${y}`} x={x - 3} y={y - 3} width="6" height="6" className="fl-joint" />)}
+        {comet && <path key={comet.n} d={EDGES[comet.edge]} pathLength={100} className="fl-comet" />}
+        {NODES.map((nd) => (
+          <g key={nd.id} className={`fl-node t-${nd.tone}${cls(nd.id)}`} transform={`translate(${nd.x - 80} ${nd.y - 22})`}>
+            <rect width="160" height="44" />
+            <text x="80" y="27" textAnchor="middle">{nd.title}</text>
+          </g>
+        ))}
+      </svg>
 
-        <div className="flow-map">
-          <svg viewBox="0 0 1000 330" role="img" aria-label={`Flow map. ${caption}`}>
-            {Object.entries(EDGES).map(([k, d]) => <path key={k} d={d} className={`fl-edge${lit.has(k) ? " lit" : ""}`} />)}
-            {comet && <path key={comet.n} d={EDGES[comet.edge]} pathLength={100} className="fl-comet" />}
-            {NODES.map((nd) => (
-              <g key={nd.id} className={`fl-node t-${nd.tone}${cls(nd.id)}`} transform={`translate(${nd.x - 70} ${nd.y - 26})`}>
-                <rect width="140" height="52" rx="12" />
-                <text x="14" y="23" className="fl-title">{nd.title}</text>
-                <text x="14" y="39" className="fl-step">{nd.id === "in" ? "paperwork" : nd.step}</text>
-              </g>
-            ))}
-          </svg>
-          <p className="flow-caption" aria-live="polite">{caption}</p>
-        </div>
-      </div>
-
-      {result && (
-        <div className="flow-result">
-          {ok ? <>
-            <div><span className="micro muted">Read as</span><strong>{[ok.parsed?.kind].flat().join(", ").replace(/_/g, " ") || ok.kind}</strong></div>
-            <div><span className="micro muted">Unexplained</span><strong>{money(ok.diff.unexplained[0], false)} → {money(ok.diff.unexplained[1], false)}</strong></div>
-            <div className="flow-result-wide"><span className="micro muted">What happened</span>
-              {ok.responses.slice(0, 3).map((r, i) => <p key={i}><b>{r.agent}</b> {r.what}</p>)}
-              {ok.parsed?.flags.map((f, i) => <p key={`f${i}`} className="warn-ink">Flagged: {f}</p>)}
-            </div>
-          </> : <p className="warn-ink">{result.ok ? "" : result.error}</p>}
-        </div>
-      )}
+      <p className="flow-result" aria-live="polite">
+        {ok ? <>Unexplained <b>{money(ok.diff.unexplained[0], false)} → {money(ok.diff.unexplained[1], false)}</b>
+          <span> · {outcome(ok.diff)}{ok.parsed?.flags[0] ? ` · flagged: ${ok.parsed.flags[0]}` : ""}</span></>
+          : result && !result.ok ? <span className="warn-ink">{result.error}</span> : null}
+      </p>
     </section>
   );
 }
