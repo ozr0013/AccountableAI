@@ -6,11 +6,13 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
-import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
+import { Arrow, Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
 import { DemoBar } from "./DemoBar";
 import { Disclosure } from "./Disclosure";
 import { ResponsesPanel } from "./Responses";
 import { DocProvider } from "./ui";
+import { LogoutDialog, TopBar, WorkspaceLayer } from "./workspace/parts";
+import { useWs } from "./workspace/Workspace";
 
 export function Shell({ children }: { children: ReactNode }) {
   const path = usePathname();
@@ -25,16 +27,26 @@ export function Shell({ children }: { children: ReactNode }) {
     return () => { current = false; };
   }, []);
   const open = state?.items.filter((i) => i.attention).length ?? 0;
+  const ws = useWs();
   const controllerName = account?.name || account?.given_name;
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
+  // the workspace (UI revamp 2's pages) first; the rest of the dashboard under More
   const nav = [
+    { href: "/portfolio", label: "Portfolio", icon: Home },
+    { href: "/properties", label: "Properties", icon: Building, count: ws.needs.length, hot: true },
+    { href: "/invoices", label: "Invoices", icon: ListIcon, count: ws.invoices.length },
+    { href: "/judgment", label: "Judgment", icon: Gavel },
+  ];
+  const more = [
     { href: "/overview", label: "Overview", icon: Home },
     { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/simulation", label: "Simulated flow", icon: Spark },
     // the number is what still needs someone; it goes when everything is cleared
-    { href: "/cases", label: "Review queue", icon: Inbox, count: open, hot: true },
-    { href: "/invoices", label: "Invoices", icon: ListIcon },
-    { href: "/properties", label: "Properties", icon: Building },
+    { href: "/cases", label: "Review queue", icon: Inbox, count: open },
+    { href: "/agents", label: "Agents", icon: Spark },
+    { href: "/proof", label: "Proof & evals", icon: Spark },
+    { href: "/guardrails", label: "Guardrails", icon: Shield },
+    { href: "/console", label: "Judge Console", icon: Gavel },
   ];
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
@@ -46,20 +58,31 @@ export function Shell({ children }: { children: ReactNode }) {
             <Wordmark />
           </Link>
           <nav className="nav" aria-label="Main">
+            <div className="ws-navlabel">Navigation</div>
             {nav.map(({ href, label, icon: I, count, hot }) => (
               <Link key={href} href={href} className={hot && count ? "attention" : undefined}
-                aria-current={active(href) || (href === "/cases" && active("/items")) ? "page" : undefined}
-                aria-label={count ? `${label}, ${count} need attention` : undefined}>
+                aria-current={active(href) ? "page" : undefined}
+                aria-label={count ? `${label}, ${count}` : undefined}>
                 <I /> {label}
                 {count ? <span className="count">{count}</span> : null}
               </Link>
             ))}
-            <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
-              <Link href="/agents"><Spark /> Agents</Link>
-              <Link href="/proof"><Spark /> Proof & evals</Link>
-              <Link href="/guardrails"><Shield /> Guardrails</Link>
+            {active("/properties") && ws.properties.length > 0 && <>
+              <div className="ws-navlabel">Select property</div>
+              <div className="ws-propnav">{ws.properties.map((p) => (
+                <button key={p} type="button" className={ws.property === p ? "on" : ""} onClick={() => ws.setProperty(p)}>
+                  {p}{ws.needs.some((i) => i.property === p) && <i className="ws-dot" aria-label="needs review" />}
+                </button>))}</div>
+            </>}
+            <Disclosure className="nav-disclosure" title="More from Keyway" hint="Live investigation, review queue, agents">
+              {more.map(({ href, label, icon: I, count }) => (
+                <Link key={href} href={href} aria-current={active(href) || (href === "/cases" && active("/items")) ? "page" : undefined}>
+                  <I /> {label}{count ? <span className="count">{count}</span> : null}
+                </Link>))}
             </Disclosure>
-            <Link href="/console" aria-current={active("/console") ? "page" : undefined}><Gavel /> Judge Console</Link>
+            <Link href="/settings" aria-current={active("/settings") ? "page" : undefined}><Shield /> Settings</Link>
+            <Link href="/help" aria-current={active("/help") ? "page" : undefined}><Spark /> Help &amp; Support</Link>
+            <button type="button" className="ws-navbtn" onClick={() => ws.openDialog(<LogoutDialog />)}><Arrow /> Log Out</button>
           </nav>
           <DemoBar />
           <div className="side-foot">
@@ -75,9 +98,10 @@ export function Shell({ children }: { children: ReactNode }) {
         </aside>
         <main className="main">
           <Aura />
-          <div className="wrap">{children}</div>
+          <div className="wrap"><TopBar />{children}</div>
         </main>
         <ResponsesPanel />
+        <WorkspaceLayer />
       </div>
     </DocProvider>
   );

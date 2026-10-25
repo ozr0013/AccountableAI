@@ -5,6 +5,7 @@ import { SmoothScroll } from "@/components/SmoothScroll";
 import "lenis/dist/lenis.css";
 import "./globals.css";
 import "./aura.css";
+import "./workspace.css";
 
 const sans = IBM_Plex_Sans({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-sans" });
 const mono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-plex-mono" });
