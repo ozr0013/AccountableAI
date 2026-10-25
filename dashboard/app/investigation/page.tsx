@@ -1,14 +1,15 @@
 "use client";
 
-import { Simulation } from "@/components/Simulation";
-import { useFeed } from "@/components/Feed";
-import { Loading, PageTop } from "@/components/ui";
+import Link from "next/link";
+import { PageTop } from "@/components/ui";
 
-/** Live investigation: 15 days through the real workflow, step by step (components/Simulation). */
+/** Live investigation: real paperwork run through the system. The 15-day simulation is on /simulation. */
 export default function Investigation() {
-  const { state } = useFeed();
   return <>
     <PageTop title="Live investigation" />
-    {state ? <Simulation /> : <Loading />}
+    <section className="sim-empty">
+      <p>Real paperwork runs land here.</p>
+      <Link className="pill" href="/simulation">Open the simulated flow ↗</Link>
+    </section>
   </>;
 }

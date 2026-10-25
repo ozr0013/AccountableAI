@@ -31,6 +31,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
     { href: "/investigation", label: "Live investigation", icon: Spark },
+    { href: "/simulation", label: "Simulated flow", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
     { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
     { href: "/keyway", label: "Keyway money trail", icon: Building },

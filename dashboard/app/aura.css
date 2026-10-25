@@ -289,3 +289,7 @@
   .sim-actions { width: 100%; justify-content: space-between; }
 }
 @media (prefers-reduced-motion: reduce) { .sm-comet { animation: none; display: none; } }
+
+/* Live investigation before a real run */
+.sim-empty { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px; background: #fff; border: 1px dashed var(--box-line); }
+.sim-empty p { margin: 0; font-size: 15px; color: var(--n10); }
