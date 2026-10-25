@@ -177,12 +177,6 @@ def demo_invoices() -> list[dict]:
     return pipeline.ledger_view(r, service._mirror(), r.now())
 
 
-@router.get("/demo/scorecard")
-def demo_scorecard() -> dict:
-    """Planted errors (the generator's answer key) against what the system caught so far."""
-    return demo.scorecard(_demo_rails(), service._mirror())
-
-
 @router.get("/demo/flow/{invoice_id}")
 def demo_flow(invoice_id: str) -> dict:
     try:

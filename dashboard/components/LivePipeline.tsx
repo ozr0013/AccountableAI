@@ -32,11 +32,6 @@ type LiveTool = { tool: string; state: "running" | "done" | "refused"; preview?:
 type Live = { task_id: string; agent: string; invoice_id: string; day: string; reason: string;
   thinking: string; text: string; tools: LiveTool[]; decision: string | null; status: "working" | "done" | "failed" };
 type Line = { at: string; agent: string; kind: string; detail: string };
-type Score = { as_of: string; caught: number; missed: number; false_alarms: number; clear: number; not_yet: number;
-  recall: number | null; precision: number | null;
-  by_category: { planted_as: string; category: string; planted: number; caught: number; missed: number; not_yet: number;
-    clear: number; false_alarm: number }[];
-  rows: { invoice_id: string; planted: string; category: string; expected: string; result: string; detail: string }[] };
 type Row = { invoice_id: string; vendor: string; amount: number; funded_amount: number; deadline: string | null;
   deadline_source: string | null; paid_on: string | null; paid_amount: number; state: string; days: number | null;
   reminders: string[]; escalated: boolean; flags?: string[]; usage?: { calls: number; input: number; cached: number; output: number } | null;
@@ -157,45 +152,6 @@ function CaseStrip({ flow, today }: { flow: Flow; today: string }) {
   );
 }
 
-function Proof({ score, onSelect }: { score: Score; onSelect: (id: string) => void }) {
-  const [show, setShow] = useState(false);
-  const pct = (x: number | null) => (x == null ? "—" : `${Math.round(x * 100)}%`);
-  const problems = score.rows.filter(r => r.result === "missed" || r.result === "false alarm");
-  return (
-    <section className={`card ${s.panel}`}>
-      <div className={s.panelHead}>
-        <span className="micro">Proof · planted vs caught</span>
-        <span className={s.mono}>answer key from the data generator; the agents never see it · as of {day(score.as_of)}</span>
-        <span className={s.grow} />
-        <button className={`${s.filter} ${show ? s.filterOn : ""}`} onClick={() => setShow(!show)}>{show ? "Hide invoices" : "Show invoices"}</button>
-      </div>
-      <div className={s.proofTop}>
-        {[["Caught", score.caught], ["Missed", score.missed], ["False alarms", score.false_alarms],
-          ["Clean, left alone", score.clear], ["Not happened yet", score.not_yet],
-          ["Recall", pct(score.recall)], ["Precision", pct(score.precision)]].map(([k, v]) =>
-          <div key={String(k)}><span className="micro">{k}</span><b>{v}</b></div>)}
-      </div>
-      <table className={s.table}>
-        <thead><tr><th>Planted problem</th><th className={s.num}>Planted</th><th className={s.num}>Caught</th>
-          <th className={s.num}>Missed</th><th className={s.num}>Not yet</th><th className={s.num}>Left alone</th><th className={s.num}>False alarm</th></tr></thead>
-        <tbody>{score.by_category.map(b => <tr key={b.planted_as}>
-          <td>{b.category}</td><td className={s.num}>{b.planted}</td><td className={s.num}>{b.caught || ""}</td>
-          <td className={s.num}>{b.missed || ""}</td><td className={s.num}>{b.not_yet || ""}</td>
-          <td className={s.num}>{b.clear || ""}</td><td className={s.num}>{b.false_alarm || ""}</td></tr>)}</tbody>
-      </table>
-      {problems.length > 0 && <div className={s.proofNotes}>{problems.map(r =>
-        <p key={r.invoice_id}><button className={s.linkBtn} onClick={() => onSelect(r.invoice_id)}>{r.invoice_id}</button> {r.category}: {r.result}, {r.detail}</p>)}</div>}
-      {show && <div className={s.tableWrap}><table className={s.table}>
-        <thead><tr><th>Invoice</th><th>Planted</th><th>Expected</th><th>Result</th><th>What the system did</th></tr></thead>
-        <tbody>{score.rows.filter(r => r.result !== "not yet").map(r => <tr key={r.invoice_id} onClick={() => onSelect(r.invoice_id)}>
-          <td className={s.mono}>{r.invoice_id}</td><td>{r.category}</td><td className={s.lastCell}>{r.expected}</td>
-          <td><span className={`${s.pill} ${r.result === "caught" || r.result === "clear" ? s.st_ok : s.st_overdue}`}>{r.result}</span></td>
-          <td className={s.lastCell}>{r.detail}</td></tr>)}</tbody>
-      </table></div>}
-    </section>
-  );
-}
-
 function InvoiceTable({ rows, selected, working, onSelect }:
     { rows: Row[]; selected: string; working: string | null; onSelect: (id: string) => void }) {
   const [filter, setFilter] = useState("attention");
@@ -247,7 +203,6 @@ export function LivePipeline() {
   const [playing, setPlaying] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
-  const [score, setScore] = useState<Score | null>(null);
   const [selected, setSelected] = useState("");
   const selectedRef = useRef("");
   const playRef = useRef(false);
@@ -261,7 +216,6 @@ export function LivePipeline() {
       const pick = selectedRef.current || d.focus;
       const [f, r] = await Promise.all([call<Flow>(`/pipeline/demo/flow/${pick}`), call<Row[]>("/pipeline/demo/invoices")]);
       setFlow(f); setRows(r);
-      call<Score>("/pipeline/demo/scorecard").then(setScore).catch(() => setScore(null));
     } catch (e) {
       if (!/demo not started/.test(String(e))) setError(String((e as Error).message || e));
       setDemo(null);
@@ -400,8 +354,6 @@ export function LivePipeline() {
           </div>;
         })}
       </div>}
-
-      {demo && score && <Proof score={score} onSelect={select} />}
 
       {demo && <InvoiceTable rows={rows} selected={current} working={activeAgent ? live?.invoice_id || null : null} onSelect={select} />}
 

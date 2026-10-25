@@ -95,18 +95,7 @@ def feed(demo, mirror) -> dict:
         # days' paperwork, which would change the vendors' usual amounts and so the whole month.
         from rails.real import RealRails
         _FEED = demo_feed.build(demo_feed.vendors(RealRails(), mirror), START, END, pipeline.MANAGER)
-        global FATES
-        FATES = dict(demo_feed.build.fates)
     return _FEED
-
-
-FATES: dict[str, str] = {}          # the answer key: what the generator planted, by invoice
-
-
-def scorecard(demo, mirror) -> dict:
-    from . import scorecard as sc
-    feed(demo, mirror)
-    return sc.score(demo, mirror, demo.now(), FATES, pipeline.MANAGER)
 
 
 def _arrive(demo, mirror, today: date) -> list[dict]:
