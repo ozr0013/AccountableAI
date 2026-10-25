@@ -1,10 +1,12 @@
 "use client";
 
 // Overview's two charts, from the same invoices every tab reads:
-//  - what Oakline sent Keyway, by week, month or quarter (one series: columns, no legend);
-//  - what's still unpaid to vendors, by vendor type, split past due (status red, labelled) and not.
+//  - what Oakline paid Keyway, by week, month or quarter (one series: columns, no legend);
+//  - Oakline's money still with Keyway, by vendor type, split past due (status red, labelled) and not
+//    (the same rules as the boxes above: lib/balances.ts).
 
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
+import { lateToPay, leftToPay } from "@/lib/balances";
 import { money } from "@/lib/format";
 import type { Item } from "@/lib/types";
 
@@ -15,8 +17,6 @@ const TRADE: Record<string, string> = {
   hvac: "HVAC", cleaner: "Cleaning", plumber: "Plumbing", roofer: "Roofing", landscaper: "Landscaping",
   electrician: "Electrical", handyman: "Handyman", painter: "Painting",
 };
-/** Owed and past its due date. Not money the agreement lets Keyway retain, and not a bill sent twice. */
-export const pastDue = (i: Item) => i.owed > 0 && i.days_late > 0 && !i.duplicate_of && i.cause !== "authorized_hold";
 const tradeName = (t: string | null | undefined) => (t ? TRADE[t] ?? t[0].toUpperCase() + t.slice(1) : "Other");
 const short = (n: number) => (n >= 1000 ? `$${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : `$${Math.round(n)}`);
 
@@ -100,7 +100,7 @@ export function FundingChart({ items }: { items: Item[] }) {
   return (
     <figure className="ov-chart">
       <figcaption>
-        <div><b>Sent to Keyway by Oakline</b><span>{money(total)} across {rows.length} {grain === "week" ? "weeks" : grain === "month" ? "months" : "quarters"}</span></div>
+        <div><b>Paid by Oakline to Keyway</b><span>{money(total)} across {rows.length} {grain === "week" ? "weeks" : grain === "month" ? "months" : "quarters"}</span></div>
         <div className="ov-seg" role="tablist" aria-label="Group by">
           {(["week", "month", "quarter"] as Grain[]).map((g) => <button key={g} role="tab" aria-selected={grain === g} className={grain === g ? "on" : ""} onClick={() => setGrain(g)}>{g === "week" ? "Weekly" : g === "month" ? "Monthly" : "Quarterly"}</button>)}
         </div>
@@ -122,7 +122,7 @@ export function FundingChart({ items }: { items: Item[] }) {
         </svg>
         {tip && <div className="ov-tip" style={{ left: `${tip.x}%`, top: `${tip.y}%` }}><b>{tip.title}</b>{tip.lines.map((l) => <span key={l}>{l}</span>)}</div>}
       </div>
-      <div className="sr-only"><table><caption>Sent to Keyway by {grain}</caption><tbody>{rows.map((r) => <tr key={r.start}><th>{r.label}</th><td>{money(r.sum)}</td><td>{r.n}</td></tr>)}</tbody></table></div>
+      <div className="sr-only"><table><caption>Paid by Oakline to Keyway, by {grain}</caption><tbody>{rows.map((r) => <tr key={r.start}><th>{r.label}</th><td>{money(r.sum)}</td><td>{r.n}</td></tr>)}</tbody></table></div>
     </figure>
   );
 }
@@ -134,15 +134,16 @@ export function OutstandingChart({ items }: { items: Item[] }) {
   const rows = useMemo(() => {
     const m = new Map<string, { name: string; late: number; due: number; n: number }>();
     for (const i of items) {
-      if (i.owed <= 0) continue;
+      const left = leftToPay(i);
+      if (left <= 0) continue;
       const name = tradeName(i.trade);
       const r = m.get(name) ?? { name, late: 0, due: 0, n: 0 };
-      if (pastDue(i)) r.late += i.owed; else r.due += i.owed;
+      if (lateToPay(i)) r.late += left; else r.due += left;
       r.n += 1; m.set(name, r);
     }
     return [...m.values()].sort((a, b) => b.late + b.due - (a.late + a.due));
   }, [items]);
-  if (!rows.length) return <figure className="ov-chart"><figcaption><div><b>Outstanding by vendor type</b><span>Every vendor bill is paid.</span></div></figcaption></figure>;
+  if (!rows.length) return <figure className="ov-chart"><figcaption><div><b>Left to pay, by vendor type</b><span>Keyway has paid every vendor it was funded for.</span></div></figcaption></figure>;
 
   const rowH = 36, L = 100, R = 96, T = 6;
   const H = T + rows.length * rowH;
@@ -152,11 +153,11 @@ export function OutstandingChart({ items }: { items: Item[] }) {
   return (
     <figure className="ov-chart">
       <figcaption>
-        <div><b>Outstanding by vendor type</b><span>Not yet paid to vendors, {money(rows.reduce((t, r) => t + r.late + r.due, 0))}</span></div>
+        <div><b>Left to pay, by vendor type</b><span>Oakline's money not yet paid to vendors, {money(rows.reduce((t, r) => t + r.late + r.due, 0))}</span></div>
         <div className="ov-legend"><span><i style={{ background: RED }} />Past due</span><span><i style={{ background: BLUE }} />Not past due</span></div>
       </figcaption>
       <div className="ov-plot" ref={box} onMouseLeave={() => setTip(null)}>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Outstanding by vendor type: ${rows.map((r) => `${r.name} ${money(r.late + r.due)}, ${money(r.late)} past due`).join("; ")}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Left to pay, by vendor type: ${rows.map((r) => `${r.name} ${money(r.late + r.due)}, ${money(r.late)} past due`).join("; ")}`}>
           {rows.map((r, i) => {
             const y0 = T + i * rowH + (rowH - bh) / 2;
             const wl = x(r.late), wd = x(r.due), gap = wl > 0 && wd > 0 ? 2 : 0;
@@ -167,13 +168,13 @@ export function OutstandingChart({ items }: { items: Item[] }) {
               {wd > 0 && <path d={bar(L + wl + gap, y0, Math.max(wd - gap, 1), bh, 4, true)} fill={BLUE} />}
               <text x={L + wl + wd + 8} y={y0 + bh / 2 + 4} className="ov-val">{money(r.late + r.due)}</text>
               <rect x={0} y={T + i * rowH} width={W} height={rowH} fill="transparent"
-                onMouseEnter={enter(r.name, [`${money(r.late + r.due)} outstanding · ${r.n} bill${r.n === 1 ? "" : "s"}`, `Past due ${money(r.late)}`, `Not past due ${money(r.due)}`])} />
+                onMouseEnter={enter(r.name, [`${money(r.late + r.due)} left to pay · ${r.n} bill${r.n === 1 ? "" : "s"}`, `Past due ${money(r.late)}`, `Not past due ${money(r.due)}`])} />
             </g>;
           })}
         </svg>
         {tip && <div className="ov-tip" style={{ left: `${Math.min(tip.x, 80)}%`, top: `${tip.y}%` }}><b>{tip.title}</b>{tip.lines.map((l) => <span key={l}>{l}</span>)}</div>}
       </div>
-      <div className="sr-only"><table><caption>Outstanding by vendor type</caption><tbody>{rows.map((r) => <tr key={r.name}><th>{r.name}</th><td>{money(r.late)} past due</td><td>{money(r.due)} not past due</td></tr>)}</tbody></table></div>
+      <div className="sr-only"><table><caption>Left to pay, by vendor type</caption><tbody>{rows.map((r) => <tr key={r.name}><th>{r.name}</th><td>{money(r.late)} past due</td><td>{money(r.due)} not past due</td></tr>)}</tbody></table></div>
     </figure>
   );
 }

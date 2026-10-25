@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { Disclosure } from "@/components/Disclosure";
 import { useFeed } from "@/components/Feed";
-import { FundingChart, OutstandingChart, pastDue } from "@/components/OverviewCharts";
+import { FundingChart, OutstandingChart } from "@/components/OverviewCharts";
 import { Badge, Loading, PageTop } from "@/components/ui";
+import { flow } from "@/lib/balances";
 import { ALERT, money } from "@/lib/format";
 
 const SHOWN = 3;
@@ -16,13 +17,11 @@ export default function Overview() {
   const open = state.alerts.filter((a) => a.open && a.kind !== "recurring_pattern")
     .sort((a, b) => Number(b.kind === "unexplained_unpaid") - Number(a.kind === "unexplained_unpaid") || b.amount - a.amount);
   const pending = state.cases.find((c) => c.status === "pending" && c.kind === "funding");
-  const billed = items.reduce((t, i) => t + i.amount, 0);
-  const paid = items.reduce((t, i) => t + i.paid, 0);
-  const unpaid = items.filter((i) => i.owed > 0);
-  const late = items.filter(pastDue);
-  const owed = unpaid.reduce((t, i) => t + i.owed, 0);
-  const lateSum = late.reduce((t, i) => t + i.owed, 0);
-  const funded = items.filter((i) => i.funded > 0);
+  const f = flow(state);
+  const fundedBills = items.filter((i) => i.funded > 0).length;
+  const paidBills = items.filter((i) => i.paid > 0).length;
+  const parts = [[f.owed, "owed"], [f.retained, "retained"], [f.duplicate, "billed twice"]] as const;
+  const oldest = f.late.length ? Math.max(...f.late.map((i) => i.days_late)) : 0;
 
   return (
     <>
@@ -50,10 +49,10 @@ export default function Overview() {
       )}
 
       <div className="ov-boxes">
-        <Link href="/keyway"><span>Sent to Keyway by Oakline</span><strong>{money(state.recon.funded)}</strong><small>funding for {funded.length} vendor bills ↗</small></Link>
-        <Link href="/invoices"><span>Keyway has to pay vendors</span><strong>{money(billed)}</strong><small>{items.length} bills · {money(paid)} paid so far ↗</small></Link>
-        <Link href="/invoices"><span>Outstanding</span><strong>{money(owed)}</strong><small>{unpaid.length} bills not paid to vendors yet ↗</small></Link>
-        <Link href="/cases" className="late"><span>Past due</span><strong>{money(lateSum)}</strong><small>{late.length} bills past due{late.length ? ` · oldest ${Math.max(...late.map((i) => i.days_late))} days` : ""} ↗</small></Link>
+        <Link href="/keyway"><span>Paid by Oakline to Keyway</span><strong>{money(f.funded)}</strong><small>funding for {fundedBills} vendor bills ↗</small></Link>
+        <Link href="/keyway"><span>Paid to vendors by Keyway</span><strong>{money(f.paid)}</strong><small>{paidBills} bills, proven by bank or vendor ↗</small></Link>
+        <Link href="/invoices"><span>Left to pay</span><strong>{money(f.left)}</strong><small>{parts.filter(([v]) => v > 0).map(([v, w]) => `${money(v)} ${w}`).join(" · ")} ↗</small></Link>
+        <Link href="/cases" className="late"><span>Past due</span><strong>{money(f.lateSum)}</strong><small>{f.late.length} bills{oldest ? `, oldest ${oldest} days` : ""}{f.lateUnexplained ? ` · ${money(f.lateUnexplained)} unexplained` : ""} ↗</small></Link>
       </div>
 
       <div className="ov-charts">
