@@ -25,8 +25,7 @@
 .home-nav::before { left: -6px; }
 .home-nav::after { right: -6px; }
 .nav-cell { display: flex; align-items: center; padding: 0 22px; }
-.home-logo { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; line-height: 24px; font-weight: 500; letter-spacing: -.045em; white-space: nowrap; }
-.home-logo svg { width: 26px; height: 26px; color: var(--blue); }
+.home-logo { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
 .home-beta { margin-left: 6px; font: 10px var(--font-geist-mono), monospace; letter-spacing: .06em; color: var(--mute); }
 .nav-links { display: flex; justify-content: flex-end; border-left: 1px solid var(--hl); }
 .nav-links a { display: flex; align-items: center; padding: 0 22px; border-right: 1px solid var(--hl); font-size: 14px; color: #273043; transition: background .2s ease, color .2s ease; }
@@ -220,8 +219,6 @@
   .home-page .ruled { margin-inline: -16px; padding-inline: 16px; }
   .home-nav { grid-template-columns: minmax(0, 1fr) auto; height: 52px; }
   .nav-cell { padding: 0 14px; }
-  .home-logo { font-size: 17px; gap: 7px; letter-spacing: -.045em; }
-  .home-logo svg { width: 22px; height: 22px; }
   .nav-links { display: none; }
   .nav-cta { font-size: 12px; gap: 10px; }
   .home-hero { padding-top: 64px; }

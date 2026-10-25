@@ -59,8 +59,6 @@
 
 /* sidebar: white, one hairline */
 .theme-aura .side { background: #ffffffd9; border-right: 1px solid var(--line); box-shadow: none; }
-.theme-aura .brand-mark { color: var(--o); }
-.theme-aura .brand-word { color: var(--ink); }
 .theme-aura .org-badge { background: var(--wine-grad); }
 .theme-aura .nav a { color: var(--n10); }
 .theme-aura .nav a:hover { color: var(--o-ink); }
@@ -139,8 +137,6 @@
 .theme-aura .side { padding: 20px 0 16px; border-left: 1px solid var(--line); }
 .theme-aura .side > :not(.brand) { margin-inline: 16px; }
 .theme-aura .brand { flex: none; height: 58px; padding: 0 22px; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-.theme-aura .brand-mark { width: 26px; height: 26px; }
-.theme-aura .brand-word { font-size: 20px; line-height: 24px; font-weight: 500; letter-spacing: -.045em; }
 .theme-aura .main { min-height: 100vh; padding-top: 20px; border-right: 1px solid var(--line); }
 .theme-aura .main > .wrap { max-width: 1600px; }
 .theme-aura .top { position: relative; padding-bottom: 22px; margin-bottom: 28px; }
@@ -200,10 +196,14 @@
   .shell.theme-aura { padding-inline: 12px; }
   .theme-aura .side { padding-top: 12px; border-right: 1px solid var(--line); }
   .theme-aura .brand { height: 52px; padding: 0 14px; gap: 7px; }
-  .theme-aura .brand-mark { width: 22px; height: 22px; }
-  .theme-aura .brand-word { font-size: 17px; }
   .theme-aura .main { border-left: 1px solid var(--line); padding: 20px 16px 0; }
   .theme-aura .top::after { left: -16px; right: -16px; }
   .theme-aura .top::before { display: none; }
 }
 .theme-aura .nav .nav-disclosure { border-radius: 0; background: transparent; }
+
+/* ---------- the wordmark: Accountable in Geist, a blue dot, AI in italic serif ---------- */
+.wordmark { display: inline-flex; align-items: baseline; font-family: var(--font-geist), "Geist", system-ui, sans-serif; font-size: 23px; line-height: 24px; font-weight: 600; letter-spacing: -.055em; color: #0b1220; white-space: nowrap; }
+.wordmark .wm-dot { color: #2d5bff; letter-spacing: 0; margin: 0 .5px 0 1px; }
+.wordmark em { font-family: var(--font-serif), "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; font-size: 1.14em; letter-spacing: -.01em; color: #2d5bff; }
+@media (max-width: 760px) { .wordmark { font-size: 20px; } }

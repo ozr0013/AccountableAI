@@ -5,7 +5,8 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
-import { Building, Gavel, Home, Inbox, ListIcon, Mark, Shield, Spark } from "./Icons";
+import { Wordmark } from "./Wordmark";
+import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
 import { DemoBar } from "./DemoBar";
 import { Disclosure } from "./Disclosure";
 import { ResponsesPanel } from "./Responses";
@@ -45,9 +46,8 @@ export function Shell({ children }: { children: ReactNode }) {
     <DocProvider>
       <div className="shell theme-aura">
         <aside className="side" data-lenis-prevent>
-          <Link href="/" className="brand" aria-label="AccountableAI home">
-            <Mark className="brand-mark" />
-            <span className="brand-word">AccountableAI</span>
+          <Link href="/" className="brand" aria-label="Accountable.AI home">
+            <Wordmark />
           </Link>
           <div className="org">
             <span className="org-badge">O</span>

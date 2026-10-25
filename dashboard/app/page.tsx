@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState, type CSSProperties } from "react";
 import { Aura } from "@/components/Aura";
-import { Mark, Shield, ListIcon, Spark } from "@/components/Icons";
+import { Shield, ListIcon, Spark } from "@/components/Icons";
 import { Story } from "@/components/Story";
+import { Wordmark } from "@/components/Wordmark";
 import "./home.css";
 
 const Arrow = () => <span aria-hidden="true">↗</span>;
@@ -77,7 +78,7 @@ export default function Home() {
     <div className="home-page">
       <Aura variant="hero" />
       <header className="home-nav">
-        <Link href="/" className="home-logo nav-cell"><Mark />AccountableAI<span className="home-beta">/ CAL HACKS</span></Link>
+        <Link href="/" className="home-logo nav-cell" aria-label="Accountable.AI home"><Wordmark /><span className="home-beta">/ CAL HACKS</span></Link>
         <nav aria-label="Product" className="nav-links"><a href="#story">The story</a><a href="#how-it-works">How it works</a><a href="#proof">The proof</a><a href="#control">Your control</a></nav>
         <Link href="/overview" className="nav-cell nav-cta">Open dashboard <Arrow /></Link>
       </header>
@@ -124,7 +125,7 @@ export default function Home() {
 
         <section className="home-closing ruled"><span className="home-eyebrow">/ FOLLOW THE MONEY. FIND THE PROOF.</span><h2>Meet your new<em>second set of eyes.</em></h2><Link href="/overview" className="home-button home-button-dark">Open the live demo <Arrow /></Link><p>Fictional vendors. Real workflow. You’re in control.</p></section>
       </main>
-      <footer className="home-footer"><Link href="/" className="home-logo"><Mark />AccountableAI</Link><span>Built at Cal Hacks · 2026</span><Link href="/overview">Enter dashboard ↗</Link></footer>
+      <footer className="home-footer"><Link href="/" className="home-logo" aria-label="Accountable.AI home"><Wordmark /></Link><span>Built at Cal Hacks · 2026</span><Link href="/overview">Enter dashboard ↗</Link></footer>
     </div>
   );
 }
