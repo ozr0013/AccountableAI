@@ -580,3 +580,6 @@
 .inv-boxes > button.paid.on { background: #e6f4e8; box-shadow: inset 0 -3px 0 #0ca30c; }
 .ov-cross { stroke: #98a6bf; stroke-width: 1; }
 .ov-val.zero { fill: var(--n7); }
+.ov-range { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.ov-dates { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--n9); }
+.ov-dates input { height: 30px; padding: 0 8px; font: 12px var(--mono); color: var(--ink); border: 1px dashed var(--box-line); background: #fff; }

@@ -1,7 +1,7 @@
 "use client";
 
 // Overview's two charts, from the same invoices every tab reads:
-//  - what Oakline paid Keyway, by week, month or quarter (one series: a line, no legend);
+//  - what Oakline paid Keyway over 1W, 1M, 6M, 1Y, 2Y or a custom range (one series: a line, no legend);
 //  - what Keyway is late paying, by vendor type (status red; the same rules as the boxes: lib/balances.ts).
 
 import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
@@ -9,7 +9,24 @@ import { lateToPay, leftToPay } from "@/lib/balances";
 import { money } from "@/lib/format";
 import type { Item } from "@/lib/types";
 
-type Grain = "week" | "month" | "quarter";
+type Grain = "day" | "week" | "month";
+type Range = "1W" | "1M" | "6M" | "1Y" | "2Y" | "custom";
+const RANGES: Range[] = ["1W", "1M", "6M", "1Y", "2Y", "custom"];
+const DAY = 864e5;
+const iso = (t: number) => new Date(t).toISOString().slice(0, 10);
+const ut = (d: string) => Date.parse(d + "T00:00:00Z");
+const fmtDay = (t: number) => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+/** The first day a preset covers, counting back from the books' date. */
+function rangeStart(r: Exclude<Range, "custom">, end: number): number {
+  const d = new Date(end);
+  if (r === "1W") return end - 6 * DAY;
+  const months = { "1M": 1, "6M": 6, "1Y": 12, "2Y": 24 }[r];
+  d.setUTCMonth(d.getUTCMonth() - months);
+  return d.getTime() + DAY;
+}
+/** Daily points for a month or less, weekly up to about six months, monthly beyond. */
+const grainFor = (days: number): Grain => (days <= 31 ? "day" : days <= 190 ? "week" : "month");
 const BLUE = "#2d5bff";
 const RED = "#d03b3b";                   // status: critical. Always next to the words "past due".
 const TRADE: Record<string, string> = {
@@ -26,15 +43,20 @@ function bar(x: number, y: number, w: number, h: number, r = 4): string {
   return `M${x},${y} H${x + w - k} Q${x + w},${y} ${x + w},${y + k} V${y + h - k} Q${x + w},${y + h} ${x + w - k},${y + h} H${x} Z`;
 }
 
-function periodOf(d: string, g: Grain): { key: string; label: string; start: number } {
-  const t = new Date(d + "T00:00:00Z");
-  if (g === "month") return { key: d.slice(0, 7), label: t.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" }), start: Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1) };
-  if (g === "quarter") {
-    const q = Math.floor(t.getUTCMonth() / 3);
-    return { key: `${t.getUTCFullYear()}-Q${q + 1}`, label: `Q${q + 1} ${t.getUTCFullYear()}`, start: Date.UTC(t.getUTCFullYear(), q * 3, 1) };
-  }
-  const mon = new Date(t); mon.setUTCDate(t.getUTCDate() - ((t.getUTCDay() + 6) % 7));     // weeks start Monday
-  return { key: mon.toISOString().slice(0, 10), label: mon.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }), start: mon.getTime() };
+function periodStart(t: number, g: Grain): number {
+  const d = new Date(t);
+  if (g === "month") return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
+  if (g === "week") return t - ((d.getUTCDay() + 6) % 7) * DAY;              // weeks start Monday
+  return t;
+}
+function nextPeriod(t: number, g: Grain): number {
+  if (g === "month") { const d = new Date(t); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1); }
+  return t + (g === "week" ? 7 : 1) * DAY;
+}
+function periodLabel(t: number, g: Grain, years: boolean): string {
+  const o: Intl.DateTimeFormatOptions = g === "month" ? { month: "short", timeZone: "UTC" } : { month: "short", day: "numeric", timeZone: "UTC" };
+  if (years && g === "month") o.year = "2-digit";
+  return new Date(t).toLocaleDateString("en-US", o);
 }
 
 /** A top for the axis that splits into four round steps (10k, 20k, 2.5k…). */
@@ -59,31 +81,34 @@ function useWidth(ref: RefObject<HTMLDivElement | null>, fallback: number): numb
   return w;
 }
 
-export function FundingChart({ items }: { items: Item[] }) {
-  const [grain, setGrain] = useState<Grain>("month");
+export function FundingChart({ items, asOf }: { items: Item[]; asOf: string }) {
+  const [range, setRange] = useState<Range>("6M");
+  const end = ut(asOf);
+  const first = useMemo(() => Math.min(...items.filter((i) => i.funded_on).map((i) => ut(i.funded_on!)), end), [items, end]);
+  const [custom, setCustom] = useState<{ from: string; to: string }>({ from: iso(first), to: asOf });
   const [tip, setTip] = useState<Tip>(null);
   const box = useRef<HTMLDivElement>(null);
   const W = useWidth(box, 560);
   const [hover, setHover] = useState<number | null>(null);
+  const [from, to] = range === "custom"
+    ? [Math.min(ut(custom.from), ut(custom.to)), Math.max(ut(custom.from), ut(custom.to))]
+    : [rangeStart(range, end), end];
+  const grain = grainFor((to - from) / DAY + 1);
   const rows = useMemo(() => {
-    const m = new Map<string, { label: string; start: number; sum: number; n: number }>();
+    // every period in the range, empty ones as zero, so the line shows quiet weeks too
+    const out: { label: string; start: number; sum: number; n: number }[] = [];
+    const years = new Date(from).getUTCFullYear() !== new Date(to).getUTCFullYear();
+    for (let t = periodStart(from, grain); t <= to; t = nextPeriod(t, grain)) out.push({ label: periodLabel(t, grain, years), start: t, sum: 0, n: 0 });
     for (const i of items) {
       if (!i.funded_on || !i.funded) continue;
-      const p = periodOf(i.funded_on, grain);
-      const r = m.get(p.key) ?? { label: p.label, start: p.start, sum: 0, n: 0 };
-      r.sum += i.funded; r.n += 1; m.set(p.key, r);
-    }
-    const out = [...m.values()].sort((a, b) => a.start - b.start);
-    if (grain === "week" && out.length) {                     // empty weeks show as empty, not skipped
-      const filled: typeof out = [];
-      for (let t = out[0].start; t <= out[out.length - 1].start; t += 7 * 864e5) {
-        const hit = out.find((r) => r.start === t);
-        filled.push(hit ?? { label: new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }), start: t, sum: 0, n: 0 });
-      }
-      return filled;
+      const t = ut(i.funded_on);
+      if (t < from || t > to) continue;
+      const k = periodStart(t, grain);
+      const r = out.find((o) => o.start === k);
+      if (r) { r.sum += i.funded; r.n += 1; }
     }
     return out;
-  }, [items, grain]);
+  }, [items, from, to, grain]);
 
   const H = 240, L = 52, R = 16, T = 14, B = 28;
   const max = niceMax(Math.max(...rows.map((r) => r.sum), 0));
@@ -107,13 +132,20 @@ export function FundingChart({ items }: { items: Item[] }) {
   return (
     <figure className="ov-chart">
       <figcaption>
-        <div><b>Total invoiced</b><span>{money(total)} across {rows.length} {grain === "week" ? "weeks" : grain === "month" ? "months" : "quarters"}</span></div>
-        <div className="ov-seg" role="tablist" aria-label="Group by">
-          {(["week", "month", "quarter"] as Grain[]).map((g) => <button key={g} role="tab" aria-selected={grain === g} className={grain === g ? "on" : ""} onClick={() => { setGrain(g); setHover(null); setTip(null); }}>{g === "week" ? "Weekly" : g === "month" ? "Monthly" : "Quarterly"}</button>)}
+        <div><b>Total invoiced</b><span>{money(total)} · {fmtDay(from)} to {fmtDay(to)} · by {grain}</span></div>
+        <div className="ov-range">
+          <div className="ov-seg" role="tablist" aria-label="Time range">
+            {RANGES.map((r) => <button key={r} role="tab" aria-selected={range === r} className={range === r ? "on" : ""} onClick={() => { setRange(r); setHover(null); setTip(null); }}>{r === "custom" ? "Custom" : r}</button>)}
+          </div>
+          {range === "custom" && <div className="ov-dates">
+            <input type="date" aria-label="From" value={custom.from} max={custom.to} onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} />
+            <span>to</span>
+            <input type="date" aria-label="To" value={custom.to} min={custom.from} max={asOf} onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} />
+          </div>}
         </div>
       </figcaption>
       <div className="ov-plot" ref={box} onMouseLeave={() => { setTip(null); setHover(null); }}>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Total invoiced by ${grain}: ${rows.map((r) => `${r.label} ${money(r.sum)}`).join(", ")}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Total invoiced, ${fmtDay(from)} to ${fmtDay(to)}, by ${grain}: ${rows.map((r) => `${r.label} ${money(r.sum)}`).join(", ")}`}>
           {ticks.map((t) => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="ov-grid" /><text x={L - 8} y={y(t) + 4} textAnchor="end" className="ov-tick">{short(t)}</text></g>)}
           <line x1={L} x2={W - R} y1={H - B} y2={H - B} className="ov-axis" />
           <path d={area} fill={BLUE} opacity={0.1} />
@@ -123,7 +155,7 @@ export function FundingChart({ items }: { items: Item[] }) {
             {(rows.length <= 16 || i === hover) && <circle cx={px(i)} cy={y(r.sum)} r={i === hover ? 5 : 4} fill={BLUE} stroke="#fff" strokeWidth={2} />}
             {i % every === 0 && <text x={px(i)} y={H - 8} textAnchor={i === 0 && rows.length > 1 ? "start" : "middle"} className="ov-tick">{r.label}</text>}
           </g>)}
-          {rows.length > 0 && hover == null && (() => {
+          {rows.length > 0 && rows[rows.length - 1].sum > 0 && hover == null && (() => {
             // the end value sits on the side away from the line coming into it
             const k = rows.length - 1, falling = k > 0 && rows[k - 1].sum > rows[k].sum;
             return <text x={px(k) - 8} y={y(rows[k].sum) + (falling ? 18 : -10)} textAnchor="end" className="ov-val">{short(rows[k].sum)}</text>;
@@ -132,7 +164,7 @@ export function FundingChart({ items }: { items: Item[] }) {
         </svg>
         {tip && <div className="ov-tip" style={{ left: `${tip.x}%`, top: `${tip.y}%` }}><b>{tip.title}</b>{tip.lines.map((l) => <span key={l}>{l}</span>)}</div>}
       </div>
-      <div className="sr-only"><table><caption>Total invoiced, by {grain}</caption><tbody>{rows.map((r) => <tr key={r.start}><th>{r.label}</th><td>{money(r.sum)}</td><td>{r.n}</td></tr>)}</tbody></table></div>
+      <div className="sr-only"><table><caption>Total invoiced, {fmtDay(from)} to {fmtDay(to)}, by {grain}</caption><tbody>{rows.map((r) => <tr key={r.start}><th>{r.label}</th><td>{money(r.sum)}</td><td>{r.n}</td></tr>)}</tbody></table></div>
     </figure>
   );
 }

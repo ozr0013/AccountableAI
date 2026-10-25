@@ -46,7 +46,7 @@ export default function Overview() {
       <MoneyStrip items={items} />
 
       <div className="ov-charts">
-        <FundingChart items={items} />
+        <FundingChart items={items} asOf={state.meta.as_of} />
         <OutstandingChart items={items} />
       </div>
 
