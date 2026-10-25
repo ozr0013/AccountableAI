@@ -54,6 +54,7 @@ export type State = {
     as_of: string; parent: string; manager_id: string; manager: string; funding_pending: number;
     controller: string; vendors: number; documents: number; events: number; agents: string;
     names: Record<string, string>; generated_at: string;
+    paperwork?: { records: number; documents: number; flagged: number; ignored: number } | null;
     live_available?: boolean; start?: string; actions?: number;
     meter?: { limit: number; spent: number; calls: number; recent: { who: string; model: string; cost: number }[] };
   };
@@ -83,10 +84,13 @@ export type State = {
 export type Response = { agent: string; what: string; type: string; invoice_id: string | null };
 
 export type ActionResult =
-  | { ok: true; kind: string; summary: string; affected: string[]; trace: string[]; diff: Diff; responses: Response[]; cost: number; live: boolean; state: State; events: unknown[] }
+  | { ok: true; kind: string; summary: string; affected: string[]; trace: string[]; diff: Diff; responses: Response[]; cost: number; live: boolean; state: State; events: unknown[]; parsed?: Parsed }
   | { ok: false; error: string; suggestions?: string[]; state?: State };
 
 export type ConsoleResult = ActionResult;
+
+/** What the parser read from a file added to the inbox (dashboard/feed/session.py add_file). */
+export type Parsed = { file: string; kind: string | string[]; flags: string[] };
 
 export type Briefing = {
   manager_id: string; question: string; answer: string;

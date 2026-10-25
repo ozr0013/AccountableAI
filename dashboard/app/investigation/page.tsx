@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { LiveReasoning } from "@/components/AgentStream";
 import { DayTimeline } from "@/components/DayTimeline";
+import { FlowLive } from "@/components/FlowLive";
 import { useFeed } from "@/components/Feed";
 import { Badge, Cites, Loading, PageTop } from "@/components/ui";
 import { money, named } from "@/lib/format";
@@ -149,6 +150,8 @@ export default function Investigation() {
     <PageTop title="Live investigation" sub="One evidence trail, from a new claim to your decision. Agents recommend; Omar controls the money.">
       <span className={`chip ${isLive ? "live" : "replay"}`}>{isLive ? (state.meta.agents === "live" ? "Claude agents · metered" : "Rules agents · live feed") : "Replay only · agents are not running"}</span>
     </PageTop>
+
+    <FlowLive />
 
     <section className="investigation-hero">
       <div>

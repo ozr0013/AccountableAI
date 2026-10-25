@@ -24,6 +24,7 @@ type Ctx = {
   reply: (invoiceId: string, text: string, proof: "none" | "bank" | "vendor") => Promise<ActionResult>;
   decide: (approvalId: string, approve: boolean, identityVerified?: boolean) => Promise<ActionResult>;
   advance: (days: number) => Promise<ActionResult>;
+  addFile: (name: string) => Promise<ActionResult>;
   setLive: (on: boolean) => Promise<{ ok: boolean; error?: string }>;
   brief: (question: string) => Promise<Briefing>;
   reset: () => Promise<void>;
@@ -122,6 +123,9 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const advance: Ctx["advance"] = (days) =>
     act(() => (mode === "live" ? post<ActionResult>("/api/clock", { days }) : replayOnly()));
 
+  const addFile: Ctx["addFile"] = (name) =>
+    act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()));
+
   const setLive: Ctx["setLive"] = async (on) => {
     if (mode !== "live") return { ok: false, error: NEEDS_LIVE };
     const r = await post<{ ok: boolean; error?: string; state: State }>("/api/live", { on });
@@ -149,7 +153,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, setLive, brief, reset }}>
+    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, addFile, setLive, brief, reset }}>
       {children}
     </FeedCtx.Provider>
   );
