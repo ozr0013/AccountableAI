@@ -32,11 +32,11 @@ for line in Path(REPO, ".env").read_text().splitlines():          # the API key,
     if line.startswith("ANTHROPIC_API_KEY=") and not os.getenv("ANTHROPIC_API_KEY"):
         os.environ["ANTHROPIC_API_KEY"] = line.split("=", 1)[1].strip().strip('"')
 
-from pydantic import BaseModel, Field  # noqa: E402
+from pydantic import BaseModel, Field
 
-from agents.extract.readers import pdf_text  # noqa: E402
-from agents.llm import guarded_call  # noqa: E402
-from evals.harness import Budget, _MeteredLLM  # noqa: E402
+from agents.extract.readers import pdf_text
+from agents.llm import guarded_call
+from evals.harness import Budget, _MeteredLLM
 
 MODEL = os.getenv("PACK_MODEL", "claude-sonnet-5-5")
 TODAY = date(2026, 4, 22)
@@ -337,17 +337,17 @@ def build(readings: dict, terms: dict) -> tuple[list, dict]:
 
 
 def run_company(docs, terms, agreement_name, llm, budget, replies, agreement_text="", clauses=None):
-    from contracts.fakes import FakeApprovals, FakeVerifier
+    from agents import RealAgents
+    from agents.verifier import LLMVerifier
+    from contracts.fakes import FakeApprovals
     from contracts.models import Citation, Event, SourceKind
+    from evals.harness import _MeteredVerifier
     from rails.events.ingest import document_event
     from workflow.book import WorkflowBook
     from workflow.memrails import MemoryRails
     from workflow.run import funding_event, scan_events
     from workflow.runner import Workflow
     from workflow.steps import Deps
-    from agents import RealAgents
-    from agents.verifier import LLMVerifier
-    from evals.harness import _MeteredVerifier
     start = datetime(2026, 1, 1, tzinfo=UTC)
     rails = MemoryRails()
     setup = [Event(id="ev-world-meta", type="world_meta", valid_from=start, learned_at=start, payload={"as_of": TODAY.isoformat()}),
@@ -383,6 +383,7 @@ def run_company(docs, terms, agreement_name, llm, budget, replies, agreement_tex
 
     # the autonomous clock: each day the engine runs its scheduled check on its own
     from datetime import timedelta
+
     from contracts.models import AlertKind
 
     def unexplained():
@@ -411,8 +412,8 @@ def run_company(docs, terms, agreement_name, llm, budget, replies, agreement_tex
 
 
 if __name__ == "__main__" and sys.argv[3] == "--full":
-    from contracts.models import Document, SourceKind
     from agents.agreement import AgreementAgent
+    from contracts.models import Document, SourceKind
     out_dir = Path(sys.argv[4]); out_dir.mkdir(parents=True, exist_ok=True)
     budget = Budget(2.00)
     names = sorted(p.name for p in FOLDER.glob("*.pdf"))

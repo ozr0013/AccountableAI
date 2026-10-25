@@ -57,7 +57,7 @@ first = next((c for c in rep["cases"] if c), "")
 m = re.search(r"holding \$([\d,]+\.\d\d)", first)
 start = float(m[1].replace(",", "")) if m else (rep["days"][0]["unexplained"] if rep["days"] else 0)
 last_hold = next((h for d in reversed(rep["days"]) for h in d["holds"]), None) or (first.split(". ")[0] if first else None)
-named = lambda t: re.sub(r"\((v-[a-z]+)\)", lambda x: f"({NAMES.get(x[1], x[1])})", t)  # noqa: E731
+named = lambda t: re.sub(r"\((v-[a-z]+)\)", lambda x: f"({NAMES.get(x[1], x[1])})", t)
 days = [{**d, "alerts": [named(a) for a in d["alerts"]]} for d in rep["days"]]
 out = {"pack": "messy_pack_v1 · 20 PDFs", "model": rep["model"].replace("claude-", "").replace("-", " ").title(),
        "cost_usd": round(rep["cost_usd"] + READ_COST, 2), "calls": rep["model_calls"], "files": files, "ledger": ledger, "writes": rep["event_log_writes"],
