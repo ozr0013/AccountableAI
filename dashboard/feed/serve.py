@@ -24,6 +24,11 @@ from typing import Literal
 ROOT = Path(__file__).resolve().parents[2]
 sys.path[:0] = [str(ROOT), str(Path(__file__).parent)]
 
+from dotenv import load_dotenv
+
+# Load ignored local server credentials; explicit process settings take precedence.
+load_dotenv(ROOT / ".env")
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
@@ -123,6 +128,30 @@ def brief(body: BriefIn):
         # Gemini (free tier) whenever its key is set; Claude only when asked for, since it is paid.
         use_model = bool(os.getenv("GEMINI_API_KEY")) or os.getenv("DASHBOARD_BRIEF_MODEL") == "1"
         return session().brief(body.question, use_model=use_model)
+
+
+@app.post("/api/brief/stream")
+def brief_stream(body: BriefIn):
+    from agents.briefing import Briefer
+    from session import MANAGER
+
+    def events():
+        with _lock:
+            s = session()
+            if not os.getenv("ANTHROPIC_API_KEY"):
+                yield 'data: ' + json.dumps({"event": "error", "message": "Set ANTHROPIC_API_KEY in the server's .env to use Claude."}) + '\n\n'
+                return
+            if not s.meter.ok():
+                yield 'data: ' + json.dumps({"event": "error", "message": "The local model budget has been reached."}) + '\n\n'
+                return
+            b = Briefer(s.rails, provider="anthropic")
+            for event in b.stream_brief(MANAGER, body.question):
+                if event["event"] == "usage":
+                    s.meter.add("Briefing", event["model"], event["input_tokens"], event["output_tokens"])
+                yield 'data: ' + json.dumps(event) + '\n\n'
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @app.post("/api/loop/{step}")

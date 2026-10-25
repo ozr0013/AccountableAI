@@ -5,6 +5,7 @@ import { useFeed } from "@/components/Feed";
 import { Cites, Loading, PageTop, SectionTitle } from "@/components/ui";
 import { named } from "@/lib/format";
 import type { Briefing } from "@/lib/types";
+import { streamBrief } from "@/lib/brief-stream";
 
 const SUGGESTED = ["What's open with Keyway Management?", "Why are we holding money from Keyway Management?", "Is any of this not Keyway Management's fault?"];
 
@@ -14,13 +15,17 @@ export default function Ask() {
   const [b, setB] = useState<Briefing | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   if (!state) return <><PageTop title="Ask about Keyway Management" /><Loading /></>;
   const names = state.meta.names;
 
   const ask = async (question: string) => {
-    setQ(question); setBusy(true); setErr(null);
-    try { setB(await brief(question)); } catch (e) { setErr(String(e)); }
-    setBusy(false);
+    if (busy || !question.trim()) return;
+    setQ(question); setBusy(true); setErr(null); setB(null); setDraft("");
+    try {
+      setB(mode === "live" ? await streamBrief(question, setDraft) : await brief(question));
+    } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
+    finally { setBusy(false); setDraft(""); }
   };
 
   return (
@@ -32,16 +37,21 @@ export default function Ask() {
           <button className="btn" style={{ height: 52, padding: "0 24px" }} disabled={busy}>{busy ? "Reading the record" : "Ask"}</button>
         </form>
         <div className="row" style={{ marginTop: 12, flexWrap: "wrap" }}>
-          {SUGGESTED.map((s) => <button key={s} className="kicker" style={{ border: 0, cursor: "pointer" }} onClick={() => ask(s)}>{s}</button>)}
+          {SUGGESTED.map((s) => <button key={s} className="kicker" disabled={busy} style={{ border: 0, cursor: "pointer" }} onClick={() => ask(s)}>{s}</button>)}
         </div>
         {mode === "replay" && <p className="micro muted" style={{ marginTop: 12 }}>Replay feed: answers to the suggested questions, before or after the moment.</p>}
       </div>
 
       {err && <div className="notice err" style={{ marginTop: 16 }}>{err}</div>}
+      {busy && <div className="card" role="status" style={{ marginTop: 24, padding: 28 }}>
+        <div className="micro muted">{draft ? "Streaming draft — checking citations when complete" : "Waiting for response"}</div>
+        <p className="lead" style={{ whiteSpace: "pre-wrap" }}>{named(draft, names)}</p>
+      </div>}
+      {b?.meta?.why && <div className="notice err" role="status" style={{ marginTop: 16 }}>{String(b.meta.why)} Showing the rules-based answer below.</div>}
       {b && (
         <div className="grid g-main section" style={{ marginTop: 24 }}>
           <div>
-            <SectionTitle right={String(b.meta?.mode ?? "code") + " briefing"}>Answer</SectionTitle>
+            <SectionTitle right={(b.meta?.mode === "model" ? (b.meta?.provider === "anthropic" ? "Claude" : "Model") : "Code") + " briefing"}>Answer</SectionTitle>
             <div className="card" style={{ padding: 28 }}>
               <p className="lead" style={{ margin: 0, color: "var(--ink)", fontSize: "calc(20px * var(--dashboard-type-scale, 1))", lineHeight: "30px" }}>{named(b.answer, names)}</p>
             </div>

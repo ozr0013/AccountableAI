@@ -171,3 +171,44 @@ def test_gemini_tries_the_next_model_when_one_is_busy(rails):
     briefer.brief("keyway", Q)
     assert [c["model"] for c in stub.calls] == ["gemini-flash-lite-latest", "gemini-flash-latest"]
     assert briefer.last["mode"] == "model" and briefer.last["model"] == "gemini-flash-latest"
+
+
+def test_partial_stream_answer_decodes_escapes():
+    from agents.briefing.briefer import partial_answer
+    assert partial_answer('{"answer":"Hello') == 'Hello'
+    assert partial_answer('{"answer":"A\\nB", "claims":[') == 'A\nB'
+    assert partial_answer('{"answer":"A\\u00') is None
+    assert partial_answer('{"claims": []}') is None
+
+
+
+
+def test_anthropic_stream_yields_checked_claude_answer(rails, monkeypatch):
+    monkeypatch.setenv('BRIEFING_PROVIDER', 'anthropic')
+    briefer = Briefer(rails, use_model=False)
+    out = _BriefingOut(answer='Keyway has unpaid vendor items.', prior_rulings=[], claims=[
+        _ClaimOut(text='INV-KW-0301 is unpaid', source_ids=['doc-bank-kw-2026-03'])])
+
+    class Stream:
+        def __enter__(self): return self
+        def __exit__(self, *args): return False
+        text_stream = [out.model_dump_json()[:20], out.model_dump_json()[20:]]
+        def get_final_message(self):
+            return SimpleNamespace(stop_reason='end_turn', usage=SimpleNamespace(input_tokens=100, output_tokens=30))
+
+    briefer.client = SimpleNamespace(messages=SimpleNamespace(stream=lambda **kwargs: Stream()))
+    events = list(briefer.stream_brief('keyway', Q))
+    assert any(e['event'] == 'answer' for e in events)
+    assert events[-2]['event'] == 'usage'
+    assert events[-1]['briefing']['meta']['provider'] == 'anthropic'
+
+
+def test_explicit_anthropic_key_takes_priority_without_bearer_header(rails, monkeypatch):
+    monkeypatch.setenv('BRIEFING_PROVIDER', 'anthropic')
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'test-key')
+    monkeypatch.setenv('OPENAI_API_KEY', 'old-key')
+    client = SimpleNamespace(auth_token='old-auth-token')
+    monkeypatch.setattr(anthropic, 'Anthropic', lambda **kwargs: client)
+    briefer = Briefer(rails)
+    assert briefer.client is client
+    assert briefer.client.auth_token is None

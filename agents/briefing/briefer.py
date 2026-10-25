@@ -12,8 +12,10 @@ Two layers, same output (contracts.models.Briefing):
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 
 import anthropic
 from pydantic import BaseModel
@@ -61,6 +63,17 @@ class _BriefingOut(BaseModel):
     answer: str
     claims: list[_ClaimOut]
     prior_rulings: list[str]
+
+
+def partial_answer(text: str) -> str | None:
+    """Decode the answer string while the structured JSON is still arriving."""
+    match = re.search(r'"answer"\s*:\s*"((?:[^"\\]|\\.)*)', text)
+    if match is None:
+        return None
+    try:
+        return json.loads('"' + match.group(1) + '"')
+    except ValueError:  # An escape (e.g. a Unicode character) spans chunks.
+        return None
 
 
 def _cites(alert: Alert) -> list[Citation]:
@@ -184,12 +197,17 @@ class Briefer:
     With GEMINI_API_KEY set, the model is Gemini; otherwise Claude."""
 
     def __init__(self, rails: Rails, client: anthropic.Anthropic | None = None,
-                 model: str | None = None, use_model: bool = True, gemini: GeminiBriefer | None = None):
+                 model: str | None = None, use_model: bool = True, gemini: GeminiBriefer | None = None,
+                 provider: str | None = None):
         self.rails = rails
         self.model = model or os.getenv("BRIEFING_MODEL", DEFAULT_MODEL)
         self.client = client
         self.gemini = gemini
-        if gemini is None and client is None and use_model and os.getenv("GEMINI_API_KEY"):
+        if gemini is None and client is None and use_model and (provider or os.getenv("BRIEFING_PROVIDER")) == "anthropic":
+            self.client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"),
+                                              timeout=30.0, max_retries=0)
+            self.client.auth_token = None  # Use API key authentication for this provider.
+        elif gemini is None and client is None and use_model and os.getenv("GEMINI_API_KEY"):
             self.gemini = GeminiBriefer()
         elif client is None and use_model and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")):
             self.client = anthropic.Anthropic()
@@ -213,8 +231,47 @@ class Briefer:
         if resp.stop_reason == "refusal" or out is None:
             self.last = {"mode": "code", "why": f"no model answer ({resp.stop_reason})"}
             return fallback
-        meta = {"model": resp.model, "input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
+        meta = {"provider": "anthropic", "model": resp.model, "input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
         return self._check(rec, question, out, fallback, meta)
+
+    def stream_brief(self, manager_id: str, question: str):
+        yield from self._stream_anthropic(manager_id, question)
+
+    def _stream_anthropic(self, manager_id: str, question: str):
+        if self.client is None:
+            yield {"event": "error", "message": "Anthropic is not configured on the server."}
+            return
+        rec = Record(self.rails, manager_id)
+        model = os.getenv("ANTHROPIC_BRIEFING_MODEL", self.model)
+        yield {"event": "status", "message": "Claude is reading the record."}
+        try:
+            with self.client.messages.stream(
+                model=model, max_tokens=4096,
+                system=SYSTEM + '\nKeep the answer to 2-3 sentences, at most 4 claims and 2 prior rulings. Return only JSON, without Markdown fences, matching this schema: ' + json.dumps(_BriefingOut.model_json_schema()),
+                messages=[{"role": "user", "content": _prompt(rec, question)}]) as stream:
+                text, previous = "", ""
+                for delta in stream.text_stream:
+                    text += delta
+                    answer = partial_answer(text)
+                    if answer is not None and answer != previous:
+                        previous = answer
+                        yield {"event": "answer", "text": answer}
+                response = stream.get_final_message()
+            meta = {"provider": "anthropic", "model": model,
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens}
+            yield {"event": "usage", **meta}
+            if response.stop_reason != "end_turn":
+                yield {"event": "error", "message": f"Claude did not return a complete answer ({response.stop_reason})."}
+                return
+            out = _BriefingOut.model_validate_json(text)
+            result = self._check(rec, question, out, code_briefing(rec, question), meta)
+            if self.last.get("mode") != "model":
+                yield {"event": "error", "message": "The generated answer did not pass citation and wording checks."}
+                return
+            yield {"event": "done", "briefing": {**result.model_dump(mode="json"), "meta": self.last}}
+        except (anthropic.APIError, ValueError) as exc:
+            yield {"event": "error", "message": f"Anthropic could not complete the request ({type(exc).__name__})."}
 
     def _brief_gemini(self, rec: Record, question: str, fallback: Briefing) -> Briefing:
         import httpx
