@@ -332,3 +332,8 @@
 .theme-aura .nav > a.nav-sub.attention .count { background: #e0894a; color: #fff; }
 .theme-aura .nav > a.nav-sub.attention[aria-current="page"] { background: #ffefe3; color: #9a4209; }
 .theme-aura .nav > a.nav-sub.attention[aria-current="page"]::before { background: #e0894a; }
+
+/* the account at the foot of the sidebar carries the company */
+.theme-aura .who { align-items: center; }
+.theme-aura .who-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.theme-aura .who-text small { font-size: 11px; color: var(--n9); }

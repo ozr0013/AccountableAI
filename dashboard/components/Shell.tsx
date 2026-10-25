@@ -47,10 +47,6 @@ export function Shell({ children }: { children: ReactNode }) {
           <Link href="/" className="brand" aria-label="Accountable.AI home">
             <Wordmark />
           </Link>
-          <div className="org">
-            <span className="org-badge">O</span>
-            <span>{state?.meta.parent ?? "Oakline Homes"}</span>
-          </div>
           <nav className="nav" aria-label="Main">
             {nav.map(({ href, label, icon: I, count }) => (
               <Link key={href} href={href} aria-current={active(href) ? "page" : undefined}>
@@ -79,7 +75,10 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="side-foot">
             <Link href="/agreements" className="who" title={account?.signed_in ? "Manage your Google profile" : "Connect your Google account"}>
               <span className="who-av">{account?.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : controllerInitial}</span>
-              <span>{controllerName ? `${controllerName} · Your account` : "Your account"}</span>
+              <span className="who-text">
+                <span>{controllerName ? `${controllerName} · Your account` : "Your account"}</span>
+                <small>{state?.meta.parent ?? "Oakline Homes"}</small>
+              </span>
             </Link>
             <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway</Link>
           </div>
