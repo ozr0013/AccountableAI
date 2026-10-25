@@ -6,9 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
-import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
-import { DemoBar } from "./DemoBar";
-import { Disclosure } from "./Disclosure";
+import { Building, Gavel, Home, Inbox, ListIcon, Spark } from "./Icons";
 import { ResponsesPanel } from "./Responses";
 import { DocProvider } from "./ui";
 
@@ -54,14 +52,8 @@ export function Shell({ children }: { children: ReactNode }) {
                 {count ? <span className="count">{count}</span> : null}
               </Link>
             ))}
-            <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
-              <Link href="/agents"><Spark /> Agents</Link>
-              <Link href="/proof"><Spark /> Proof & evals</Link>
-              <Link href="/guardrails"><Shield /> Guardrails</Link>
-            </Disclosure>
             <Link href="/console" aria-current={active("/console") ? "page" : undefined}><Gavel /> Judge Console</Link>
           </nav>
-          <DemoBar />
           <div className="side-foot">
             <Link href="/agreements" className="who" title={account?.signed_in ? "Manage your Google profile" : "Connect your Google account"}>
               <span className="who-av">{account?.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : controllerInitial}</span>
