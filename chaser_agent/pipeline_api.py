@@ -106,8 +106,45 @@ def _demo_rails():
         r = demo.rails()
         r.now()
         return r
-    except Exception as exc:  # noqa: BLE001 - no demo copy yet
+    except Exception as exc:  # noqa: BLE001 - no demo copy yet, or a dropped connection
+        demo._forget()
         raise HTTPException(409, "demo not started; POST /pipeline/demo/reset") from exc
+
+
+@router.get("/stream")
+async def stream():
+    """Live events (Server-Sent Events): reasoning as it is written, each tool call and result,
+    decisions, hand-offs, new evidence and day boundaries."""
+    import asyncio
+    import json as _json
+    import queue as _queue
+
+    from fastapi.responses import StreamingResponse
+
+    from . import runtime
+    q = runtime.subscribe()
+
+    async def events():
+        try:
+            yield "event: ready\ndata: {}\n\n"
+            idle = 0.0
+            while True:
+                try:
+                    ev = q.get_nowait()
+                except _queue.Empty:
+                    await asyncio.sleep(0.05)
+                    idle += 0.05
+                    if idle >= 15:
+                        idle = 0.0
+                        yield ": keep-alive\n\n"
+                    continue
+                idle = 0.0
+                yield f"event: {ev['type']}\ndata: {_json.dumps(ev, default=str)}\n\n"
+        finally:
+            runtime.unsubscribe(q)
+
+    return StreamingResponse(events(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 @router.get("/demo")

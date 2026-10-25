@@ -38,9 +38,26 @@ STORYBOARD = {
 }
 
 
+_RAILS = None
+
+
 def rails():
-    from rails.real import RealRails
-    return RealRails(SCHEMA)
+    """One shared connection to the demo copy (a new one per request would exhaust Postgres)."""
+    global _RAILS
+    if _RAILS is None:
+        from rails.real import RealRails
+        _RAILS = RealRails(SCHEMA)
+    return _RAILS
+
+
+def _forget():
+    global _RAILS
+    if _RAILS is not None:
+        try:
+            _RAILS.store.conn.close()
+        except Exception:  # noqa: BLE001 - closing a dead connection
+            pass
+    _RAILS = None
 
 
 def _stamp(day: date) -> datetime:
@@ -51,6 +68,7 @@ def reset(mirror) -> dict:
     """Fresh copy of the books at the start date; clears the queue and the chaser's records."""
     from rails.db import connect
     from rails.real import RealRails
+    _forget()
     conn = connect()
     conn.execute(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE')
     conn.close()
@@ -85,8 +103,9 @@ def _deliver(demo, mirror, today: date) -> list[str]:
 
 def run_day(demo, mirror, client=None) -> dict:
     """Run today's work without moving the clock (used for the first day after a reset)."""
-    from . import connected
+    from . import connected, runtime
     today = demo.now()
+    runtime.emit({"type": "day_started", "day": today.isoformat()})
     queued = pipeline.dispatch(demo, mirror, today, since=START)
     processed = pipeline.process(demo, mirror, today, client=client, limit=30)
     cases = connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
@@ -94,6 +113,7 @@ def run_day(demo, mirror, client=None) -> dict:
     from .api import mark_handoffs_reviewed
     mark_handoffs_reviewed(mirror, cases)
     delivered = _deliver(demo, mirror, today)
+    runtime.emit({"type": "day_done", "day": today.isoformat(), "processed": len(processed)})
     return {**state(demo), "queued": queued, "processed": processed, "delivered": delivered}
 
 
@@ -105,7 +125,10 @@ def next_day(demo, mirror, client=None) -> dict:
                             valid_from=_stamp(today), learned_at=_stamp(today),
                             payload={"as_of": today.isoformat()}))
     arrived = []
+    from . import runtime
     for doc in STORYBOARD.get(today, []):
         demo.append_event(document_event(doc, _stamp(today)))
         arrived.append({"id": doc.id, "kind": doc.kind.value})
+        runtime.emit({"type": "evidence", "day": today.isoformat(), "document": doc.id,
+                      "kind": doc.kind.value, "data": doc.data})
     return {**run_day(demo, mirror, client), "arrived": arrived}

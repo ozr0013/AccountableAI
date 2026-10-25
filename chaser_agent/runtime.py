@@ -12,7 +12,10 @@ from __future__ import annotations
 
 import json
 import os
+import queue
+import threading
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -20,6 +23,59 @@ MODEL = os.getenv("PIPELINE_MODEL", "claude-opus-5-5")
 MAX_TURNS = 10
 RESULT_LIMIT = 8000
 SKILLS = Path(__file__).resolve().parent / "skills"
+
+
+# -- live events: every subscriber (the dashboard's SSE stream) gets each event as it happens ----
+_SUBSCRIBERS: set[queue.Queue] = set()
+_SUB_LOCK = threading.Lock()
+CONTEXT: ContextVar[dict] = ContextVar("pipeline_context", default={})
+
+
+def subscribe() -> queue.Queue:
+    q: queue.Queue = queue.Queue(maxsize=5000)
+    with _SUB_LOCK:
+        _SUBSCRIBERS.add(q)
+    return q
+
+
+def unsubscribe(q: queue.Queue) -> None:
+    with _SUB_LOCK:
+        _SUBSCRIBERS.discard(q)
+
+
+def listening() -> bool:
+    return bool(_SUBSCRIBERS)
+
+
+def emit(event: dict) -> None:
+    """Publish one event, tagged with the current task (agent, invoice, day)."""
+    if not _SUBSCRIBERS:
+        return
+    payload = {**CONTEXT.get(), **event}
+    with _SUB_LOCK:
+        for q in list(_SUBSCRIBERS):
+            try:
+                q.put_nowait(payload)
+            except queue.Full:
+                pass
+
+
+def _call(client, **kw):
+    """One model turn. Streamed when someone is watching, so reasoning shows as it is written."""
+    stream_fn = getattr(client.beta.messages, "stream", None)
+    if not listening() or stream_fn is None:
+        return client.beta.messages.create(**kw)
+    with stream_fn(**kw) as stream:
+        for ev in stream:
+            if ev.type == "content_block_start" and ev.content_block.type == "tool_use":
+                emit({"type": "tool_call", "tool": ev.content_block.name})
+            elif ev.type == "content_block_delta":
+                d = ev.delta
+                if d.type == "thinking_delta" and d.thinking:
+                    emit({"type": "thinking", "text": d.thinking})
+                elif d.type == "text_delta" and d.text:
+                    emit({"type": "text", "text": d.text})
+        return stream.get_final_message()
 
 
 def load_skill(name: str) -> str:
@@ -69,9 +125,10 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
     system_blocks = [{"type": "text", "text": f"{system}\n\n<skill>\n{skill}\n</skill>"}]
     messages = [{"role": "user", "content": task}]
     trace = Trace(agent=agent)
+    emit({"type": "agent_started"})
     for _ in range(MAX_TURNS):
-        resp = client.beta.messages.create(
-            model=MODEL, max_tokens=16000, system=system_blocks,
+        resp = _call(
+            client, model=MODEL, max_tokens=16000, system=system_blocks,
             tools=[t.spec() for t in tools], messages=messages,
             thinking={"type": "adaptive", "display": "summarized"},
             output_config={"effort": effort}, cache_control={"type": "ephemeral"},
@@ -82,6 +139,8 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
         trace.usage["output_tokens"] += u.output_tokens or 0
         trace.usage["cache_read_input_tokens"] += getattr(u, "cache_read_input_tokens", 0) or 0
         trace.thinking += [b.thinking for b in resp.content if b.type == "thinking" and b.thinking]
+        emit({"type": "usage", "input_tokens": u.input_tokens or 0, "output_tokens": u.output_tokens or 0,
+              "cache_read_input_tokens": getattr(u, "cache_read_input_tokens", 0) or 0})
         if resp.stop_reason == "refusal":
             trace.error = "model declined the task"
             return trace
@@ -104,12 +163,15 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
             text = json.dumps(out, default=str)
             if len(text) > RESULT_LIMIT:
                 text = text[:RESULT_LIMIT] + ' ... "[truncated]"'
+            emit({"type": "tool_result", "tool": block.name, "input": block.input, "refused": refused,
+                  "terminal": bool(tool and tool.terminal), "preview": text[:600]})
             trace.steps.append({"tool": block.name, "input": block.input,
                                 "result": json.loads(text) if len(text) < 2000 else text[:2000],
                                 "refused": refused, "terminal": bool(tool and tool.terminal)})
             if tool and tool.terminal and not refused and not decided:
                 trace.decision = {"tool": block.name, "input": block.input, "result": out}
                 decided = True
+                emit({"type": "decision", "tool": block.name, "input": block.input})
             results.append({"type": "tool_result", "tool_use_id": block.id, "content": text,
                             "is_error": refused})
         messages.append({"role": "user", "content": results})

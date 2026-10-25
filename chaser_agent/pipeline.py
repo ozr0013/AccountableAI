@@ -139,6 +139,11 @@ def process(rails, mirror, today: date, client=None, limit: int = 20,
             break
         task = sorted(pending, key=lambda t: (t["agent"] != "chaser", t["task_id"]))[0]
         _set(mirror, task["task_id"], "running")
+        from . import runtime
+        token = runtime.CONTEXT.set({"task_id": task["task_id"], "agent": task["agent"],
+                                     "invoice_id": task["invoice_id"], "day": today.isoformat()})
+        runtime.emit({"type": "task_started", "reason": task["reason"],
+                      "created_by": task["created_by"]})
         try:
             result = RUNNERS[task["agent"]](task, rails, mirror, today, client)
             status = "failed" if result["outcome"].get("error") else "done"
@@ -146,6 +151,9 @@ def process(rails, mirror, today: date, client=None, limit: int = 20,
         except Exception as exc:  # noqa: BLE001 - a failed task is recorded, the queue goes on
             result = {"outcome": {"error": f"{type(exc).__name__}: {exc}"[:500]}, "trace": {}}
             _set(mirror, task["task_id"], "failed", result["outcome"])
+            status = "failed"
+        runtime.emit({"type": "task_done", "status": status, "outcome": result["outcome"]})
+        runtime.CONTEXT.reset(token)
         done.append({"task_id": task["task_id"], "agent": task["agent"],
                      "invoice_id": task["invoice_id"], **result["outcome"]})
     return done
