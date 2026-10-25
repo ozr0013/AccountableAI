@@ -39,9 +39,10 @@
 
 /* ---------- dashboard tokens under the aura theme ---------- */
 .theme-aura {
-  --sans: var(--font-geist), "Geist", system-ui, sans-serif;
-  --mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
-  --serif: var(--font-serif), "Instrument Serif", Georgia, serif;
+  /* the dashboard reads in Times New Roman throughout (the landing page keeps its own fonts) */
+  --sans: "Times New Roman", Times, serif;
+  --mono: "Times New Roman", Times, serif;
+  --serif: "Times New Roman", Times, serif;
   --white: #ffffff;
   --n0: #ffffff; --n1: #ffffff; --n2: #f5f7fb; --n3: #eef1f7; --n4: #e6eaf2; --n5: #dde3ee; --n6: #c9d1df;
   --n7: #7a8396; --n8: #6a7386; --n9: #5b6475; --n10: #273043; --n11: #141a2a; --ink: #0b1220;

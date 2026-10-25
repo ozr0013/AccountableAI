@@ -175,12 +175,12 @@ export function OutstandingChart({ items }: { items: Item[] }) {
   const W = useWidth(box, 480);
   // every vendor type with money left to pay; the bar is only the part that's past due
   const rows = useMemo(() => {
-    const m = new Map<string, { name: string; late: number; n: number }>();
+    const m = new Map<string, { name: string; late: number; n: number; vendors: Map<string, number> }>();
     for (const i of items) {
       if (leftToPay(i) <= 0) continue;
       const name = tradeName(i.trade);
-      const r = m.get(name) ?? { name, late: 0, n: 0 };
-      if (lateToPay(i)) { r.late += leftToPay(i); r.n += 1; }
+      const r = m.get(name) ?? { name, late: 0, n: 0, vendors: new Map() };
+      if (lateToPay(i)) { r.late += leftToPay(i); r.n += 1; r.vendors.set(i.vendor, (r.vendors.get(i.vendor) ?? 0) + leftToPay(i)); }
       m.set(name, r);
     }
     return [...m.values()].sort((a, b) => b.late - a.late || a.name.localeCompare(b.name));
@@ -208,7 +208,7 @@ export function OutstandingChart({ items }: { items: Item[] }) {
               <text x={L + w + 8} y={y0 + bh / 2 + 4} className={`ov-val${r.late ? "" : " zero"}`}>{money(r.late)}</text>
               <rect x={0} y={T + i * rowH} width={W} height={rowH} fill="transparent"
                 onMouseEnter={() => setTip({ x: Math.min(((L + w) / W) * 100, 80), y: (y0 / H) * 100, title: r.name,
-                  lines: [`${money(r.late)} past due`, r.n ? `${r.n} bill${r.n === 1 ? "" : "s"} late` : "nothing late"] })} />
+                  lines: r.n ? [...[...r.vendors].sort((a, b) => b[1] - a[1]).map(([v, amt]) => `${v} ${money(amt)}`), `${money(r.late)} past due in all`] : ["nothing past due"] })} />
             </g>;
           })}
         </svg>
