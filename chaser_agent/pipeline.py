@@ -36,8 +36,9 @@ def tasks(mirror, invoice_id=None, agent=None, status=None) -> list[dict]:
 
 
 def enqueue(mirror, agent: str, invoice_id: str, reason: str, payload: dict, today: date,
-            created_by: str) -> str:
-    task_id = f"{agent}:{invoice_id}:{today.isoformat()}"
+            created_by: str, key: str | None = None) -> str:
+    """`key`: a second task for the same invoice on the same day (e.g. woken by the console)."""
+    task_id = f"{agent}:{invoice_id}:{today.isoformat()}" + (f":{key}" if key else "")
     mirror.call("enqueue_task", [task_id, agent, invoice_id, created_by, reason,
                                  json.dumps(payload, default=str), today.isoformat()])
     return task_id
@@ -136,7 +137,7 @@ def run_chaser(task, rails, mirror, today, client=None) -> dict:
                     "trace": {"agent": "chaser", "model": "code check (no model call)", "thinking": [],
                               "steps": [], "decision": {"tool": "verified_paid", "input": {"rationale": reason}},
                               "text": "", "usage": {}, "error": None}}
-    note = task["reason"] if task.get("created_by") == "investigator" else None
+    note = task["reason"] if task.get("created_by") in ("investigator", "console") else None
     trace = llm_chaser.run(tools, client, note)
     return {"outcome": llm_chaser.outcome(trace), "trace": trace.to_dict()}
 
