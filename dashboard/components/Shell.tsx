@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
-import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
+import { Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
 import { DemoBar } from "./DemoBar";
 import { Disclosure } from "./Disclosure";
 import { ResponsesPanel } from "./Responses";
@@ -33,9 +33,6 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/simulation", label: "Simulated flow", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
-    { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
-    { href: "/keyway", label: "Keyway money trail", icon: Building },
-    { href: "/agreements", label: "Your account", icon: Shield },
   ];
   const tools = [
     { href: "/console", label: "Judge Console", icon: Gavel },
@@ -61,6 +58,11 @@ export function Shell({ children }: { children: ReactNode }) {
                 {count ? <span className="count">{count}</span> : null}
               </Link>
             ))}
+            {/* inside the review queue: what still needs someone, highlighted while anything does */}
+            <Link href="/items" className={`nav-sub${open ? " attention" : ""}`} aria-current={active("/items") ? "page" : undefined}>
+              <ListIcon /> Needs attention
+              {open ? <span className="count">{open}</span> : null}
+            </Link>
             <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
               <Link href="/agents"><Spark /> Agents</Link>
               <Link href="/proof"><Spark /> Proof & evals</Link>
@@ -77,7 +79,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="side-foot">
             <Link href="/agreements" className="who" title={account?.signed_in ? "Manage your Google profile" : "Connect your Google account"}>
               <span className="who-av">{account?.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : controllerInitial}</span>
-              <span>{controllerName ? `${controllerName} · Controller` : "Connect Google account"}</span>
+              <span>{controllerName ? `${controllerName} · Your account` : "Your account"}</span>
             </Link>
             <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway</Link>
           </div>
