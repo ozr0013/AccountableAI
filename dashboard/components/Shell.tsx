@@ -32,6 +32,8 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/cases", label: "Review queue", icon: Inbox, count: open, hot: true },
     { href: "/invoices", label: "Invoices", icon: ListIcon },
     { href: "/properties", label: "Properties", icon: Building },
+    { href: "/agents", label: "Agents", icon: Spark },
+    { href: "/proof", label: "Proof & evals", icon: ListIcon },
   ];
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
