@@ -39,10 +39,9 @@
 
 /* ---------- dashboard tokens under the aura theme ---------- */
 .theme-aura {
-  /* the dashboard reads in Times New Roman throughout (the landing page keeps its own fonts) */
-  --sans: "Times New Roman", Times, serif;
-  --mono: "Times New Roman", Times, serif;
-  --serif: "Times New Roman", Times, serif;
+  --sans: var(--font-geist), "Geist", system-ui, sans-serif;
+  --mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --serif: var(--font-serif), "Instrument Serif", Georgia, serif;
   /* Enlarge dashboard text only; the shared logo and frame keep their original geometry. */
   --dashboard-type-scale: 1.08;
   font-size: calc(14px * var(--dashboard-type-scale, 1));
