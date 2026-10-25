@@ -1,0 +1,1695 @@
+{
+  "schema": "connected_verify_928aa16294ef",
+  "shared_spacetime": "fixture",
+  "postgres": "real isolated schema",
+  "external_mail_sent": false,
+  "trace": [
+    {
+      "step": "Real Claude agreement review -> immediate PostgreSQL case creation",
+      "http_status": 200,
+      "output": {
+        "review": {
+          "doc_id": "9b5f2667dfdc3458",
+          "filename": "rio.pdf",
+          "source": "upload",
+          "sender": null,
+          "subject": null,
+          "kind": "agreement",
+          "kind_reason": "agreement wording: agreement, between, shall, services, terms, fees, (\"owner\"), (\"vendor\")",
+          "relevant": true,
+          "fields": [
+            {
+              "name": "owner_name",
+              "label": "Owner company name",
+              "status": "found",
+              "value": "Oakline Homes LLC",
+              "quote": "Oakline Homes LLC (\"Owner\")",
+              "location": "p.1",
+              "note": "",
+              "by": "model"
+            },
+            {
+              "name": "vendor_name",
+              "label": "Vendor company name",
+              "status": "found",
+              "value": "Rio Grande Plumbing LLC",
+              "quote": "Rio Grande Plumbing LLC (\"Vendor\")",
+              "location": "p.1",
+              "note": "",
+              "by": "model"
+            },
+            {
+              "name": "payment_due",
+              "label": "Payment due date or terms",
+              "status": "found",
+              "value": "Within 30 days of receipt of each undisputed invoice",
+              "quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+              "location": "\u00a73",
+              "note": "",
+              "by": "model"
+            },
+            {
+              "name": "payment_amount",
+              "label": "Payment amount or rate",
+              "status": "found",
+              "value": "$95 per hour plus approved materials",
+              "quote": "at the rate of $95 per hour plus approved materials",
+              "location": "\u00a72",
+              "note": "",
+              "by": "model"
+            },
+            {
+              "name": "payment_info",
+              "label": "Payment information",
+              "status": "found",
+              "value": "ACH to First Mesa Bank, routing 102000021, account 4471029, in the name of Rio Grande Plumbing LLC",
+              "quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,",
+              "location": "\u00a74",
+              "note": "",
+              "by": "model"
+            },
+            {
+              "name": "effective_date",
+              "label": "Effective date",
+              "status": "found",
+              "value": "March 1, 2026",
+              "quote": "This Services Agreement is made as of March 1, 2026",
+              "location": "p.1",
+              "note": "",
+              "by": "model"
+            },
+            {
+              "name": "reminder_terms",
+              "label": "Reminder or grace terms",
+              "status": "missing",
+              "value": null,
+              "quote": null,
+              "location": null,
+              "note": "Searched \"late\", \"grace\", \"reminder\"; read all sections (services, fees, payment terms, payment info, term, insurance). No grace period, reminder, or late-fee terms.",
+              "by": "model"
+            },
+            {
+              "name": "signatures",
+              "label": "Signatures",
+              "status": "found",
+              "value": "Signed by both parties: Dana Ortiz (Oakline Homes LLC) and Luis Ortega (Rio Grande Plumbing LLC), both dated March 1, 2026",
+              "quote": "By: Luis Ortega, Owner, Rio Grande Plumbing LLC Date: March 1, 2026",
+              "location": "p.1",
+              "note": "",
+              "by": "model"
+            }
+          ],
+          "complete": true,
+          "escalation": null,
+          "steps": [
+            "parsed rio.pdf: 1 page(s), 8 sections, kind agreement (agreement wording: agreement, between, shall, services, terms, fees, (\"owner\"), (\"vendor\"))",
+            "model turn 1: read_header, list_sections",
+            "read the header (top of the document)",
+            "listed 8 sections",
+            "model turn 2: read_section, read_section, read_section, search",
+            "read section 4",
+            "read section 5",
+            "read section Signatures",
+            "searched for 'late': 0 hit(s)",
+            "model turn 3: search, search, record_field, record_field, record_field, record_field, record_field, record_field, record_field",
+            "searched for 'grace': 0 hit(s)",
+            "searched for 'reminder': 0 hit(s)",
+            "recorded Owner company name: Oakline Homes LLC",
+            "recorded Vendor company name: Rio Grande Plumbing LLC",
+            "recorded Payment due date or terms: Within 30 days of receipt of each undisputed invoice",
+            "recorded Payment amount or rate: $95 per hour plus approved materials",
+            "recorded Payment information: ACH to First Mesa Bank, routing 102000021, account 4471029, in the name of Rio Grande Plumbing LLC",
+            "recorded Effective date: March 1, 2026",
+            "recorded Signatures: Signed by both parties: Dana Ortiz (Oakline Homes LLC) and Luis Ortega (Rio Grande Plumbing LLC), both dated March 1, 2026",
+            "model turn 4: mark_missing",
+            "marked Reminder or grace terms missing: Searched \"late\", \"grace\", \"reminder\"; read all sections (services, fees, payment terms, payment info, term, insurance). No grace period, reminder, or late-fee terms.",
+            "model turn 5: done",
+            "checked 8 fields: complete"
+          ],
+          "mode": "model",
+          "cost_usd": 0.04489
+        },
+        "status": "active",
+        "rules": [
+          {
+            "rule_id": "9b5f2667dfdc3458:payee",
+            "rule_type": "payee",
+            "params": {
+              "vendor": "Rio Grande Plumbing LLC"
+            },
+            "check": "Every bank payment for this agreement must name Rio Grande Plumbing LLC.",
+            "status": "active",
+            "source_quote": "Rio Grande Plumbing LLC (\"Vendor\")",
+            "location": "p.1"
+          },
+          {
+            "rule_id": "9b5f2667dfdc3458:pay_within_days",
+            "rule_type": "pay_within_days",
+            "params": {
+              "days": 30,
+              "basis": "calendar",
+              "from": "invoice receipt",
+              "undisputed_only": true
+            },
+            "check": "Pay within 30 calendar days of invoice receipt; chase after that.",
+            "status": "active",
+            "source_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+            "location": "\u00a73"
+          },
+          {
+            "rule_id": "9b5f2667dfdc3458:amount",
+            "rule_type": "amount",
+            "params": {
+              "amount": 95.0,
+              "per": "hour",
+              "extras_allowed": true
+            },
+            "check": "Invoices are billed at $95.00 per hour; flag any other rate.",
+            "status": "active",
+            "source_quote": "at the rate of $95 per hour plus approved materials",
+            "location": "\u00a72"
+          },
+          {
+            "rule_id": "9b5f2667dfdc3458:pay_to_account",
+            "rule_type": "pay_to_account",
+            "params": {
+              "bank": "First Mesa Bank",
+              "routing": "102000021",
+              "account": "4471029"
+            },
+            "check": "Payments must go to bank First Mesa Bank, routing 102000021, account 4471029; any change needs controller approval and identity checks.",
+            "status": "active",
+            "source_quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,",
+            "location": "\u00a74"
+          }
+        ],
+        "saved_to_spacetime": true,
+        "save_error": null,
+        "workflow": {
+          "triggered": true
+        }
+      }
+    },
+    {
+      "step": "Read case created by agreement trigger",
+      "http_status": 200,
+      "output": {
+        "cases": [
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "doc-inv-kw-0301"
+              },
+              {
+                "kind": "funding",
+                "source_id": "doc-funding-kw-0305"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "doc-stmt-kw-2026-03"
+              },
+              {
+                "kind": "vendor_notice",
+                "source_id": "doc-notice-riogrande-0420"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-0301",
+            "source_ids": [
+              "doc-inv-kw-0301",
+              "doc-funding-kw-0305",
+              "doc-stmt-kw-2026-03",
+              "doc-notice-riogrande-0420"
+            ],
+            "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-df60202414d3e41cc291c5b9dc07dce7383b1f52d8aba6680a0d54ae944c1325",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "doc-inv-kw-0301"
+                    },
+                    {
+                      "kind": "funding",
+                      "source_id": "doc-funding-kw-0305"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "doc-stmt-kw-2026-03"
+                    },
+                    {
+                      "kind": "vendor_notice",
+                      "source_id": "doc-notice-riogrande-0420"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-0301",
+                  "source_ids": [
+                    "doc-inv-kw-0301",
+                    "doc-funding-kw-0305",
+                    "doc-stmt-kw-2026-03",
+                    "doc-notice-riogrande-0420"
+                  ],
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-cfaad0c587329e90981fd52007507683923a19892eed7064efd668d4540d49fc",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-0301:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-0301",
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "queued",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-0301:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-0301",
+                "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+              }
+            ]
+          }
+        ],
+        "worker": {
+          "enabled": true,
+          "last_error": null,
+          "last_run": "2026-04-22",
+          "delivery": {
+            "enabled": false,
+            "configured": false,
+            "delivered": [],
+            "errors": []
+          }
+        }
+      }
+    },
+    {
+      "step": "New invoice intake -> ledger and case",
+      "http_status": 200,
+      "output": {
+        "document_id": "workflow-6659b7084ab10a80b28875ed",
+        "cases": [
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "doc-inv-kw-0301"
+              },
+              {
+                "kind": "funding",
+                "source_id": "doc-funding-kw-0305"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "doc-stmt-kw-2026-03"
+              },
+              {
+                "kind": "vendor_notice",
+                "source_id": "doc-notice-riogrande-0420"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-0301",
+            "source_ids": [
+              "doc-inv-kw-0301",
+              "doc-funding-kw-0305",
+              "doc-stmt-kw-2026-03",
+              "doc-notice-riogrande-0420"
+            ],
+            "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-df60202414d3e41cc291c5b9dc07dce7383b1f52d8aba6680a0d54ae944c1325",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "doc-inv-kw-0301"
+                    },
+                    {
+                      "kind": "funding",
+                      "source_id": "doc-funding-kw-0305"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "doc-stmt-kw-2026-03"
+                    },
+                    {
+                      "kind": "vendor_notice",
+                      "source_id": "doc-notice-riogrande-0420"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-0301",
+                  "source_ids": [
+                    "doc-inv-kw-0301",
+                    "doc-funding-kw-0305",
+                    "doc-stmt-kw-2026-03",
+                    "doc-notice-riogrande-0420"
+                  ],
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-cfaad0c587329e90981fd52007507683923a19892eed7064efd668d4540d49fc",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-0301:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-0301",
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "queued",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-0301:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-0301",
+                "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+              }
+            ]
+          },
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "workflow-6659b7084ab10a80b28875ed"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-9996",
+            "source_ids": [
+              "workflow-6659b7084ab10a80b28875ed"
+            ],
+            "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-627273b7f3bd9a00404df261b77ffe4fc8488d1fef0cc99f093f79c494641f3c",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed"
+                  ],
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-a0a568357eaa9166b077b22d42b12d9211081844d8c4837c1f2bd740401a438e",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "invoice_id": "INV-KW-9996",
+                  "kind": "chase_reminder",
+                  "audience": "management:keyway",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "status": "queued",
+                  "created_on": "2026-04-22",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                  "action_id": "INV-KW-9996:reminder:polite:0"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                "invoice_id": "INV-KW-9996",
+                "kind": "chase_reminder",
+                "audience": "management:keyway",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "status": "queued",
+                "created_on": "2026-04-22",
+                "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                "action_id": "INV-KW-9996:reminder:polite:0"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "step": "Payment intake -> review -> statement request",
+      "http_status": 200,
+      "output": {
+        "document_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+        "cases": [
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "doc-inv-kw-0301"
+              },
+              {
+                "kind": "funding",
+                "source_id": "doc-funding-kw-0305"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "doc-stmt-kw-2026-03"
+              },
+              {
+                "kind": "vendor_notice",
+                "source_id": "doc-notice-riogrande-0420"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-0301",
+            "source_ids": [
+              "doc-inv-kw-0301",
+              "doc-funding-kw-0305",
+              "doc-stmt-kw-2026-03",
+              "doc-notice-riogrande-0420"
+            ],
+            "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-df60202414d3e41cc291c5b9dc07dce7383b1f52d8aba6680a0d54ae944c1325",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "doc-inv-kw-0301"
+                    },
+                    {
+                      "kind": "funding",
+                      "source_id": "doc-funding-kw-0305"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "doc-stmt-kw-2026-03"
+                    },
+                    {
+                      "kind": "vendor_notice",
+                      "source_id": "doc-notice-riogrande-0420"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-0301",
+                  "source_ids": [
+                    "doc-inv-kw-0301",
+                    "doc-funding-kw-0305",
+                    "doc-stmt-kw-2026-03",
+                    "doc-notice-riogrande-0420"
+                  ],
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-cfaad0c587329e90981fd52007507683923a19892eed7064efd668d4540d49fc",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-0301:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-0301",
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "queued",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-0301:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-0301",
+                "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+              }
+            ]
+          },
+          {
+            "state": "awaiting_statement",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "workflow-6659b7084ab10a80b28875ed"
+              },
+              {
+                "kind": "manager_bank",
+                "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-9996",
+            "source_ids": [
+              "workflow-6659b7084ab10a80b28875ed",
+              "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+            ],
+            "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-627273b7f3bd9a00404df261b77ffe4fc8488d1fef0cc99f093f79c494641f3c",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed"
+                  ],
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-a0a568357eaa9166b077b22d42b12d9211081844d8c4837c1f2bd740401a438e",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-5699720f53a28dfbd3e0bab5fdbaaa8d9a38f13b766100b9d2619ed31abf389a",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-9aed3c670d412634f80ce7311896908b3f1f262a89c3f89a0bbf5173dd9f99a2",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-a369b8c106014ec580fbde983e154ba22ea01b20cee984df88582b5acdc10259",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "awaiting_statement",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                  ],
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d",
+                  "closure_eligible": false
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-9996:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+              },
+              {
+                "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                "body": "Provide a matching financial statement for INV-KW-9996.",
+                "kind": "request_statement",
+                "status": "queued",
+                "audience": "management:keyway",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "step": "Statement intake -> reconciliation -> automatic case closure",
+      "http_status": 200,
+      "output": {
+        "document_id": "workflow-e3ba1ce8efa0467fd4c5e2f4",
+        "cases": [
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "doc-inv-kw-0301"
+              },
+              {
+                "kind": "funding",
+                "source_id": "doc-funding-kw-0305"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "doc-stmt-kw-2026-03"
+              },
+              {
+                "kind": "vendor_notice",
+                "source_id": "doc-notice-riogrande-0420"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-0301",
+            "source_ids": [
+              "doc-inv-kw-0301",
+              "doc-funding-kw-0305",
+              "doc-stmt-kw-2026-03",
+              "doc-notice-riogrande-0420"
+            ],
+            "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-df60202414d3e41cc291c5b9dc07dce7383b1f52d8aba6680a0d54ae944c1325",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "doc-inv-kw-0301"
+                    },
+                    {
+                      "kind": "funding",
+                      "source_id": "doc-funding-kw-0305"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "doc-stmt-kw-2026-03"
+                    },
+                    {
+                      "kind": "vendor_notice",
+                      "source_id": "doc-notice-riogrande-0420"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-0301",
+                  "source_ids": [
+                    "doc-inv-kw-0301",
+                    "doc-funding-kw-0305",
+                    "doc-stmt-kw-2026-03",
+                    "doc-notice-riogrande-0420"
+                  ],
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-cfaad0c587329e90981fd52007507683923a19892eed7064efd668d4540d49fc",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-0301:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-0301",
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "queued",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-0301:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-0301",
+                "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+              }
+            ]
+          },
+          {
+            "state": "closed",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "workflow-6659b7084ab10a80b28875ed"
+              },
+              {
+                "kind": "manager_bank",
+                "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "workflow-e3ba1ce8efa0467fd4c5e2f4"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-9996",
+            "source_ids": [
+              "workflow-6659b7084ab10a80b28875ed",
+              "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+              "workflow-e3ba1ce8efa0467fd4c5e2f4"
+            ],
+            "fingerprint": "e3f3b0b1068794121425a214cbd391d1a3aa428a74df0e0c8d3226b6dcfdd60b",
+            "closure_eligible": true,
+            "history": [
+              {
+                "id": "wf-627273b7f3bd9a00404df261b77ffe4fc8488d1fef0cc99f093f79c494641f3c",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed"
+                  ],
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-a0a568357eaa9166b077b22d42b12d9211081844d8c4837c1f2bd740401a438e",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-5699720f53a28dfbd3e0bab5fdbaaa8d9a38f13b766100b9d2619ed31abf389a",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-9aed3c670d412634f80ce7311896908b3f1f262a89c3f89a0bbf5173dd9f99a2",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-a369b8c106014ec580fbde983e154ba22ea01b20cee984df88582b5acdc10259",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "awaiting_statement",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                  ],
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-12126eab828f4759d4de02ff86af29a021da70b24001d5ad558bf8c6c2b451b5",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-f97dbbae3874ffa342475ff46c23b078ceecccf02666bc6aca5945a3b4f0abf2",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "closed",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "workflow-e3ba1ce8efa0467fd4c5e2f4"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+                    "workflow-e3ba1ce8efa0467fd4c5e2f4"
+                  ],
+                  "fingerprint": "e3f3b0b1068794121425a214cbd391d1a3aa428a74df0e0c8d3226b6dcfdd60b",
+                  "closure_eligible": true
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-9996:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+              },
+              {
+                "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                "body": "Provide a matching financial statement for INV-KW-9996.",
+                "kind": "request_statement",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "step": "Replay identical statement -> no duplicate evidence or case events",
+      "http_status": 200,
+      "output": {
+        "document_id": "workflow-e3ba1ce8efa0467fd4c5e2f4",
+        "cases": [
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "doc-inv-kw-0301"
+              },
+              {
+                "kind": "funding",
+                "source_id": "doc-funding-kw-0305"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "doc-stmt-kw-2026-03"
+              },
+              {
+                "kind": "vendor_notice",
+                "source_id": "doc-notice-riogrande-0420"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-0301",
+            "source_ids": [
+              "doc-inv-kw-0301",
+              "doc-funding-kw-0305",
+              "doc-stmt-kw-2026-03",
+              "doc-notice-riogrande-0420"
+            ],
+            "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-df60202414d3e41cc291c5b9dc07dce7383b1f52d8aba6680a0d54ae944c1325",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "doc-inv-kw-0301"
+                    },
+                    {
+                      "kind": "funding",
+                      "source_id": "doc-funding-kw-0305"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "doc-stmt-kw-2026-03"
+                    },
+                    {
+                      "kind": "vendor_notice",
+                      "source_id": "doc-notice-riogrande-0420"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-0301",
+                  "source_ids": [
+                    "doc-inv-kw-0301",
+                    "doc-funding-kw-0305",
+                    "doc-stmt-kw-2026-03",
+                    "doc-notice-riogrande-0420"
+                  ],
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-cfaad0c587329e90981fd52007507683923a19892eed7064efd668d4540d49fc",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-0301:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-0301",
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "queued",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-0301:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-0301",
+                "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+              }
+            ]
+          },
+          {
+            "state": "closed",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "workflow-6659b7084ab10a80b28875ed"
+              },
+              {
+                "kind": "manager_bank",
+                "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "workflow-e3ba1ce8efa0467fd4c5e2f4"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-9996",
+            "source_ids": [
+              "workflow-6659b7084ab10a80b28875ed",
+              "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+              "workflow-e3ba1ce8efa0467fd4c5e2f4"
+            ],
+            "fingerprint": "e3f3b0b1068794121425a214cbd391d1a3aa428a74df0e0c8d3226b6dcfdd60b",
+            "closure_eligible": true,
+            "history": [
+              {
+                "id": "wf-627273b7f3bd9a00404df261b77ffe4fc8488d1fef0cc99f093f79c494641f3c",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed"
+                  ],
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-a0a568357eaa9166b077b22d42b12d9211081844d8c4837c1f2bd740401a438e",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-5699720f53a28dfbd3e0bab5fdbaaa8d9a38f13b766100b9d2619ed31abf389a",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-9aed3c670d412634f80ce7311896908b3f1f262a89c3f89a0bbf5173dd9f99a2",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-a369b8c106014ec580fbde983e154ba22ea01b20cee984df88582b5acdc10259",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "awaiting_statement",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                  ],
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-12126eab828f4759d4de02ff86af29a021da70b24001d5ad558bf8c6c2b451b5",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-f97dbbae3874ffa342475ff46c23b078ceecccf02666bc6aca5945a3b4f0abf2",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "closed",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "workflow-e3ba1ce8efa0467fd4c5e2f4"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+                    "workflow-e3ba1ce8efa0467fd4c5e2f4"
+                  ],
+                  "fingerprint": "e3f3b0b1068794121425a214cbd391d1a3aa428a74df0e0c8d3226b6dcfdd60b",
+                  "closure_eligible": true
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-9996:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+              },
+              {
+                "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                "body": "Provide a matching financial statement for INV-KW-9996.",
+                "kind": "request_statement",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "step": "New API client/connections recover closed case from PostgreSQL",
+      "http_status": 200,
+      "output": {
+        "cases": [
+          {
+            "state": "overdue",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "doc-inv-kw-0301"
+              },
+              {
+                "kind": "funding",
+                "source_id": "doc-funding-kw-0305"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "doc-stmt-kw-2026-03"
+              },
+              {
+                "kind": "vendor_notice",
+                "source_id": "doc-notice-riogrande-0420"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-0301",
+            "source_ids": [
+              "doc-inv-kw-0301",
+              "doc-funding-kw-0305",
+              "doc-stmt-kw-2026-03",
+              "doc-notice-riogrande-0420"
+            ],
+            "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+            "closure_eligible": false,
+            "history": [
+              {
+                "id": "wf-df60202414d3e41cc291c5b9dc07dce7383b1f52d8aba6680a0d54ae944c1325",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "doc-inv-kw-0301"
+                    },
+                    {
+                      "kind": "funding",
+                      "source_id": "doc-funding-kw-0305"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "doc-stmt-kw-2026-03"
+                    },
+                    {
+                      "kind": "vendor_notice",
+                      "source_id": "doc-notice-riogrande-0420"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-0301",
+                  "source_ids": [
+                    "doc-inv-kw-0301",
+                    "doc-funding-kw-0305",
+                    "doc-stmt-kw-2026-03",
+                    "doc-notice-riogrande-0420"
+                  ],
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-cfaad0c587329e90981fd52007507683923a19892eed7064efd668d4540d49fc",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-0301:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-0301",
+                  "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-c359acbca9882b1bace8bb3f60f690201046f8c6c61f230e0d6cffc31da037c2",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "queued",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-0301:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-0301",
+                "fingerprint": "b73a1c05db095a19f678edac1a96737748dff56b78ab8be2af3c5b90dfa56a9d"
+              }
+            ]
+          },
+          {
+            "state": "closed",
+            "vendor": "Rio Grande Plumbing",
+            "findings": [],
+            "citations": [
+              {
+                "kind": "vendor_invoice",
+                "source_id": "workflow-6659b7084ab10a80b28875ed"
+              },
+              {
+                "kind": "manager_bank",
+                "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+              },
+              {
+                "kind": "manager_statement",
+                "source_id": "workflow-e3ba1ce8efa0467fd4c5e2f4"
+              }
+            ],
+            "vendor_id": "v-riogrande",
+            "invoice_id": "INV-KW-9996",
+            "source_ids": [
+              "workflow-6659b7084ab10a80b28875ed",
+              "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+              "workflow-e3ba1ce8efa0467fd4c5e2f4"
+            ],
+            "fingerprint": "e3f3b0b1068794121425a214cbd391d1a3aa428a74df0e0c8d3226b6dcfdd60b",
+            "closure_eligible": true,
+            "history": [
+              {
+                "id": "wf-627273b7f3bd9a00404df261b77ffe4fc8488d1fef0cc99f093f79c494641f3c",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "overdue",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed"
+                  ],
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-a0a568357eaa9166b077b22d42b12d9211081844d8c4837c1f2bd740401a438e",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-5699720f53a28dfbd3e0bab5fdbaaa8d9a38f13b766100b9d2619ed31abf389a",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                  "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                  "kind": "chase_reminder",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "action_id": "INV-KW-9996:reminder:polite:0",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+                }
+              },
+              {
+                "id": "wf-9aed3c670d412634f80ce7311896908b3f1f262a89c3f89a0bbf5173dd9f99a2",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "queued",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-a369b8c106014ec580fbde983e154ba22ea01b20cee984df88582b5acdc10259",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "awaiting_statement",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                  ],
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d",
+                  "closure_eligible": false
+                }
+              },
+              {
+                "id": "wf-12126eab828f4759d4de02ff86af29a021da70b24001d5ad558bf8c6c2b451b5",
+                "kind": "workflow_outbox",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                  "body": "Provide a matching financial statement for INV-KW-9996.",
+                  "kind": "request_statement",
+                  "status": "cancelled",
+                  "audience": "management:keyway",
+                  "created_on": "2026-04-22",
+                  "invoice_id": "INV-KW-9996",
+                  "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+                }
+              },
+              {
+                "id": "wf-f97dbbae3874ffa342475ff46c23b078ceecccf02666bc6aca5945a3b4f0abf2",
+                "kind": "workflow_case",
+                "at": "2026-04-22T00:00:00+00:00",
+                "payload": {
+                  "state": "closed",
+                  "vendor": "Rio Grande Plumbing",
+                  "findings": [],
+                  "citations": [
+                    {
+                      "kind": "vendor_invoice",
+                      "source_id": "workflow-6659b7084ab10a80b28875ed"
+                    },
+                    {
+                      "kind": "manager_bank",
+                      "source_id": "workflow-a9d0272b8f3a3ff2a6f8c5ca"
+                    },
+                    {
+                      "kind": "manager_statement",
+                      "source_id": "workflow-e3ba1ce8efa0467fd4c5e2f4"
+                    }
+                  ],
+                  "vendor_id": "v-riogrande",
+                  "invoice_id": "INV-KW-9996",
+                  "source_ids": [
+                    "workflow-6659b7084ab10a80b28875ed",
+                    "workflow-a9d0272b8f3a3ff2a6f8c5ca",
+                    "workflow-e3ba1ce8efa0467fd4c5e2f4"
+                  ],
+                  "fingerprint": "e3f3b0b1068794121425a214cbd391d1a3aa428a74df0e0c8d3226b6dcfdd60b",
+                  "closure_eligible": true
+                }
+              }
+            ],
+            "outbox": [
+              {
+                "id": "out-50597e4330f16b601e6217f267f57c5df055b3cd04a5639e7e65c64ee99a48a7",
+                "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-9996) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+                "kind": "chase_reminder",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "action_id": "INV-KW-9996:reminder:polite:0",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "af8046610488154b99c52071a4bc280641b1892a2178ec8d51877ba967d292fe"
+              },
+              {
+                "id": "out-3bede8c438174eb85280cc6c1181cd62ec5987879736b8a2459bda5675a670d7",
+                "body": "Provide a matching financial statement for INV-KW-9996.",
+                "kind": "request_statement",
+                "status": "cancelled",
+                "audience": "management:keyway",
+                "created_on": "2026-04-22",
+                "invoice_id": "INV-KW-9996",
+                "fingerprint": "0a5987810fe8ad0936875245e54c9be9e18b19bf74df35440c874ed98376e15d"
+              }
+            ]
+          }
+        ],
+        "worker": {
+          "enabled": true,
+          "last_error": null,
+          "last_run": "2026-04-22",
+          "delivery": {
+            "enabled": false,
+            "configured": false,
+            "delivered": [],
+            "errors": []
+          }
+        }
+      }
+    }
+  ]
+}

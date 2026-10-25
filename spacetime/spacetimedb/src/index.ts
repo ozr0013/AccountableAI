@@ -142,6 +142,23 @@ const spacetimedb = schema({
       decidedAt: t.timestamp(),
     }
   ),
+  agentTask: table(
+    { name: 'agent_task', public: true },
+    {
+      taskId: t.string().primaryKey(),
+      agent: t.string().index('btree'),
+      invoiceId: t.string().index('btree'),
+      status: t.string().index('btree'),
+      createdBy: t.string(),
+      reason: t.string(),
+      payload: t.string(),
+      outcome: t.string(),
+      trace: t.string(),
+      asOf: t.string(),
+      createdAt: t.timestamp(),
+      updatedAt: t.timestamp(),
+    }
+  ),
   dependency: table(
     { name: 'dependency', public: true },
     {
@@ -396,4 +413,37 @@ export const clearChaser = spacetimedb.reducer(ctx => {
   requireWriter(ctx);
   for (const row of [...ctx.db.chaseDecision.iter()]) ctx.db.chaseDecision.actionId.delete(row.actionId);
   for (const row of [...ctx.db.chaseAction.iter()]) ctx.db.chaseAction.actionId.delete(row.actionId);
+});
+
+// Agent-to-agent queue. A task is created once (same id = no-op) and then moves
+// pending -> running -> done | failed, carrying the agent's outcome and full trace.
+export const enqueueTask = spacetimedb.reducer(
+  { taskId: t.string(), agent: t.string(), invoiceId: t.string(), createdBy: t.string(),
+    reason: t.string(), payload: t.string(), asOf: t.string() },
+  (ctx, args) => {
+    requireWriter(ctx);
+    if (ctx.db.agentTask.taskId.find(args.taskId)) {
+      return;
+    }
+    ctx.db.agentTask.insert({ ...args, status: 'pending', outcome: '{}', trace: '{}',
+      createdAt: ctx.timestamp, updatedAt: ctx.timestamp });
+  }
+);
+
+export const updateTask = spacetimedb.reducer(
+  { taskId: t.string(), status: t.string(), outcome: t.string(), trace: t.string() },
+  (ctx, { taskId, status, outcome, trace }) => {
+    requireWriter(ctx);
+    const row = ctx.db.agentTask.taskId.find(taskId);
+    if (!row) {
+      throw new SenderError('unknown task');
+    }
+    ctx.db.agentTask.taskId.update({ ...row, status, outcome, trace, updatedAt: ctx.timestamp });
+  }
+);
+
+// Development reset for the agent queue.
+export const clearTasks = spacetimedb.reducer(ctx => {
+  requireWriter(ctx);
+  for (const row of [...ctx.db.agentTask.iter()]) ctx.db.agentTask.taskId.delete(row.taskId);
 });

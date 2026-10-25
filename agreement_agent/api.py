@@ -11,31 +11,33 @@ Each review is saved to SpacetimeDB's `agreement` table (one row per document, r
 re-review), and the rules derived from it (agreement_agent/rules_from_terms.py) to
 `agreement_rule`. The file itself is not stored; the escalation stays a draft, never sent.
 
-A complete agreement's rules go active. An incomplete one waits as `needs_controller`; only a
-controller (Authorization: Bearer $CONTROLLER_API_TOKEN) can then confirm it by supplying the
-missing terms, or reject it:
+A complete agreement's rules go active. An incomplete one waits as `needs_controller` until the
+controller confirms it by supplying the missing terms, or rejects it:
     GET  /agreements, GET /agreements/{doc_id}
     POST /agreements/{doc_id}/confirm  {"values": {"payment_due": "...", ...}, "note": "..."}
     POST /agreements/{doc_id}/reject   {"note": "..."}
 """
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import os
 import re
+import urllib.error
+import urllib.request
+from contextlib import contextmanager, nullcontext
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
+from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
+from .controller import ControllerError, confirm, reject
 from .graph import review
 from .models import Review, SourceDoc
-from .controller import ControllerError, confirm, reject
 from .rules_from_terms import agreement_status, rules_for
 
 log = logging.getLogger(__name__)
@@ -92,24 +94,64 @@ def _mirror():
     return SpacetimeMirror()
 
 
+@contextmanager
+def coordinator_lock(mirror):
+    """Use the same cross-service lock as approvals and evidence mutations."""
+    from rails.live.spacetime import SpacetimeMirror
+    if not isinstance(mirror, SpacetimeMirror):
+        yield
+        return
+    from rails.db import connect
+    with connect() as conn:
+        acquired = conn.execute('SELECT pg_try_advisory_lock(73920126)').fetchone()[0]
+        if not acquired:
+            raise RuntimeError('Coordinator busy; retry agreement mutation.')
+        try:
+            yield
+        finally:
+            conn.execute('SELECT pg_advisory_unlock(73920126)')
+
+
 def save(r: Review, rules: list[dict], status: str, confirmed_by: str | None = None,
-         note: str | None = None) -> str | None:
+         note: str | None = None, *, coordinator_locked: bool = False) -> str | None:
     """Save the agreement and its rules to SpacetimeDB. Returns an error message, or None."""
     try:
         mirror = _mirror()
-        mirror.call("save_agreement", agreement_row(r, status, confirmed_by, note))
-        if r.kind == "agreement":
-            mirror.call("set_agreement_rules", rule_rows(r, rules))
+        with nullcontext() if coordinator_locked else coordinator_lock(mirror):
+            mirror.call("save_agreement", agreement_row(r, status, confirmed_by, note))
+            if r.kind == "agreement":
+                mirror.call("set_agreement_rules", rule_rows(r, rules))
         return None
     except Exception as exc:  # noqa: BLE001 - the review is still returned to the caller
         log.warning("agreement %s not saved to SpacetimeDB: %s", r.doc_id, exc)
         return f"{type(exc).__name__}: {exc}"[:300]
 
 
+def wake_workflow() -> dict:
+    """Wake the consumer after saving; its polling scan repairs a missed wake after restart.
+    Then hand off to the chaser agent: queue a chaser task for every invoice now covered by an
+    agreement (queueing only - the agents run on /pipeline/run or the worker)."""
+    base = 'http://127.0.0.1:' + os.getenv('CHASER_API_PORT', '8773')
+    request = urllib.request.Request(
+        base + '/workflow/tick',
+        data=b'{}', headers={'Content-Type': 'application/json'}, method='POST')
+    try:
+        with urllib.request.urlopen(request, timeout=10):
+            pass
+        with urllib.request.urlopen(urllib.request.Request(
+                base + '/pipeline/dispatch', data=b'{}', method='POST',
+                headers={'Content-Type': 'application/json'}), timeout=10) as resp:
+            queued = json.loads(resp.read() or b'{}').get('queued', [])
+        return {'triggered': True, 'chaser_tasks_queued': len(queued)}
+    except (OSError, urllib.error.URLError) as exc:
+        log.warning('Workflow wake deferred: %s', type(exc).__name__)
+        return {'triggered': False, 'error': 'Saved; coordinator will retry on its next polling tick.'}
+
+
 @app.post("/review")
-async def review_document(file: UploadFile = File(...),
+async def review_document(file: Annotated[UploadFile, File(...)],
                           model: bool = Query(True, description="Claude drives the tools; false runs the fixed rules")) -> dict:
-    data = await file.read()
+    data = await file.read(MAX_BYTES + 1)
     mime = file.content_type or "application/octet-stream"
     if file.filename and file.filename.lower().endswith(".txt"):
         mime = "text/plain"
@@ -127,7 +169,8 @@ async def review_document(file: UploadFile = File(...),
     status = agreement_status(result, rules)
     error = save(result, rules, status)
     return {"review": result.model_dump(mode="json"), "status": status, "rules": rules,
-            "saved_to_spacetime": error is None, "save_error": error}
+            "saved_to_spacetime": error is None, "save_error": error,
+            "workflow": wake_workflow() if error is None else {'triggered': False, 'error': 'Review was not saved.'}}
 
 
 # -- controller sign-off -----------------------------------------------------------------
@@ -135,14 +178,12 @@ async def review_document(file: UploadFile = File(...),
 _DOC_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
-def controller(authorization: str | None = Header(default=None)) -> str:
-    expected = os.getenv("CONTROLLER_API_TOKEN")
-    if not expected:
-        raise HTTPException(503, "controller sign-off is not configured (CONTROLLER_API_TOKEN)")
-    if authorization is None or not hmac.compare_digest(authorization.encode(),
-                                                        f"Bearer {expected}".encode()):
-        raise HTTPException(401, "controller token required")
-    return os.getenv("CONTROLLER_ID", "controller")
+APPROVER = "controller"
+
+
+def controller() -> str:
+    """Who human decisions are recorded as. No sign-in: every decision is the controller's."""
+    return APPROVER
 
 
 class ConfirmIn(BaseModel):
@@ -189,15 +230,17 @@ def get_agreement(doc_id: str) -> dict:
 
 
 def _decide(doc_id: str, decide) -> dict:
-    row, rules = _load(doc_id)
-    try:
-        result, new_rules, status, note, by = decide(row, rules)
-    except ControllerError as exc:
-        raise HTTPException(409, str(exc)) from exc
-    error = save(result, new_rules, status, by, note)
-    if error:
-        raise HTTPException(502, f"not saved to SpacetimeDB: {error}")
-    return _public(*_load(doc_id))
+    with coordinator_lock(_mirror()):
+        row, rules = _load(doc_id)
+        try:
+            result, new_rules, status, note, by = decide(row, rules)
+        except ControllerError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        error = save(result, new_rules, status, by, note, coordinator_locked=True)
+        if error:
+            raise HTTPException(502, f"not saved to SpacetimeDB: {error}")
+        public = _public(*_load(doc_id))
+    return {**public, 'workflow': wake_workflow()}
 
 
 @app.post("/agreements/{doc_id}/confirm")

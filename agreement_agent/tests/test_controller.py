@@ -9,8 +9,6 @@ from fastapi.testclient import TestClient
 from agreement_agent import api
 
 SAMPLES = Path(__file__).resolve().parents[1] / "samples"
-TOKEN = "test-controller-token"
-AUTH = {"Authorization": f"Bearer {TOKEN}"}
 COLUMNS = ["doc_id", "filename", "kind", "owner_name", "vendor_name", "payment_due",
            "payment_amount", "payment_info", "effective_date", "complete", "missing",
            "escalation_subject", "escalation_body", "fields", "steps", "mode", "cost_usd",
@@ -46,8 +44,6 @@ class FakeSpacetime:
 def stdb(monkeypatch):
     fake = FakeSpacetime()
     monkeypatch.setattr(api, "_mirror", lambda: fake)
-    monkeypatch.setenv("CONTROLLER_API_TOKEN", TOKEN)
-    monkeypatch.setenv("CONTROLLER_ID", "controller.dana")
     return fake
 
 
@@ -76,47 +72,33 @@ def test_controller_supplies_missing_terms_and_rules_go_active(stdb):
     body = {"values": {"payment_due": "within 15 days of invoice receipt",
                        "payment_info": "ACH to Desert Bank, routing 123456789, account 99887766"},
             "note": "Confirmed by phone with GreenEdge"}
-    r = client.post(f"/agreements/{doc}/confirm", json=body, headers=AUTH)
+    r = client.post(f"/agreements/{doc}/confirm", json=body)
     assert r.status_code == 200, r.text
     out = r.json()
-    assert out["status"] == "confirmed" and out["confirmed_by"] == "controller.dana"
+    assert out["status"] == "confirmed" and out["confirmed_by"] == "controller"
     rules = {x["rule_type"]: x for x in out["rules"]}
     assert "hold_payment" not in rules and all(x["status"] == "active" for x in out["rules"])
     assert json.loads(json.dumps(rules["pay_within_days"]["params"]))["days"] == 15
-    assert rules["pay_to_account"]["location"] == "controller:controller.dana"
+    assert rules["pay_to_account"]["location"] == "controller:controller"
 
 
 def test_confirm_needs_every_missing_term_and_only_those(stdb):
     doc = _upload("greenedge_landscaping_agreement.pdf")["review"]["doc_id"]
     partial = {"values": {"payment_due": "Net 30"}}
-    assert client.post(f"/agreements/{doc}/confirm", json=partial, headers=AUTH).status_code == 409
+    assert client.post(f"/agreements/{doc}/confirm", json=partial).status_code == 409
     sneaky = {"values": {"payment_due": "Net 30", "payment_info": "check", "payment_amount": "$1"}}
-    assert client.post(f"/agreements/{doc}/confirm", json=sneaky, headers=AUTH).status_code == 409
-
-
-def test_only_the_controller_can_decide(stdb):
-    doc = _upload("greenedge_landscaping_agreement.pdf")["review"]["doc_id"]
-    body = {"values": {"payment_due": "Net 30", "payment_info": "check payable to GreenEdge"}}
-    assert client.post(f"/agreements/{doc}/confirm", json=body).status_code == 401
-    bad = {"Authorization": "Bearer wrong"}
-    assert client.post(f"/agreements/{doc}/confirm", json=body, headers=bad).status_code == 401
+    assert client.post(f"/agreements/{doc}/confirm", json=sneaky).status_code == 409
 
 
 def test_complete_agreement_cannot_be_confirmed_again(stdb):
     doc = _upload("rio_grande_services_agreement.pdf")["review"]["doc_id"]
-    r = client.post(f"/agreements/{doc}/confirm", json={"values": {}}, headers=AUTH)
+    r = client.post(f"/agreements/{doc}/confirm", json={"values": {}})
     assert r.status_code == 409
 
 
 def test_controller_can_reject(stdb):
     doc = _upload("greenedge_landscaping_agreement.pdf")["review"]["doc_id"]
-    r = client.post(f"/agreements/{doc}/reject", json={"note": "Unsigned draft"}, headers=AUTH)
+    r = client.post(f"/agreements/{doc}/reject", json={"note": "Unsigned draft"})
     out = r.json()
     assert out["status"] == "rejected" and out["controller_note"] == "Unsigned draft"
     assert all(x["status"] == "rejected" for x in out["rules"])
-
-
-def test_sign_off_is_off_without_a_token(stdb, monkeypatch):
-    monkeypatch.delenv("CONTROLLER_API_TOKEN")
-    doc = _upload("greenedge_landscaping_agreement.pdf")["review"]["doc_id"]
-    assert client.post(f"/agreements/{doc}/reject", json={"note": "x"}).status_code == 503

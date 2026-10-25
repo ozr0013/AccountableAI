@@ -5,9 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
-import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
-import { DemoBar } from "./DemoBar";
-import { Disclosure } from "./Disclosure";
+import { Building, Gavel, Home, Inbox, ListIcon, Spark } from "./Icons";
 import { ResponsesPanel } from "./Responses";
 import { DocProvider } from "./ui";
 
@@ -28,6 +26,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
+    { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/console", label: "Judge Console", icon: Gavel },
     // the number is what still needs someone; it goes when everything is cleared
     { href: "/cases", label: "Review queue", icon: Inbox, count: open, hot: true },
@@ -52,13 +51,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 {count ? <span className="count">{count}</span> : null}
               </Link>
             ))}
-            <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
-              <Link href="/agents"><Spark /> Agents</Link>
-              <Link href="/proof"><Spark /> Proof & evals</Link>
-              <Link href="/guardrails"><Shield /> Guardrails</Link>
-            </Disclosure>
           </nav>
-          <DemoBar />
           <div className="side-foot">
             <Link href="/agreements" className="who" title={account?.signed_in ? "Manage your Google profile" : "Connect your Google account"}>
               <span className="who-av">{account?.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : controllerInitial}</span>
