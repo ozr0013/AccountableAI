@@ -20,6 +20,10 @@ def main() -> None:
     ap.add_argument("--fresh", action="store_true")
     a = ap.parse_args()
     if a.fresh:
+        from .real import books_backend
+        if books_backend() == "spacetime":
+            raise SystemExit("the books in SpacetimeDB are append-only and are never dropped; "
+                             "load a new world into a fresh SpacetimeDB database instead")
         connect().execute("DROP TABLE IF EXISTS dependencies, event_facts, events CASCADE")
     rails = RealRails()
     w = generate(a.seed, tuple(a.scenarios), a.clean)

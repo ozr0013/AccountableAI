@@ -1,82 +1,64 @@
 """Read-only SQL over the books, for the agents to investigate with.
 
-The event log in PostgreSQL is flattened into a few plain views (one schema per source schema,
-`books_<schema>`). An agent may run a single SELECT against these views only, inside a read-only
-transaction with a time limit and a row cap. Every query is streamed to the page with its
-purpose and a preview of the rows, so anyone watching sees exactly what the agent looked at.
+The books (the event log, in SpacetimeDB) are flattened into a few plain tables inside an
+in-process DuckDB snapshot, rebuilt whenever the log grows. SpacetimeDB's own SQL has no GROUP BY,
+SUM, subqueries or ORDER BY, which an investigation needs; the snapshot gives the agents full SQL
+without a second database server. An agent may run a single SELECT against these tables only:
+DuckDB has no file or network access here, its settings are locked, and each query has a time
+limit and a row cap. Every query is streamed to the page with its purpose and a preview of the
+rows, so anyone watching sees exactly what the agent looked at.
 """
 from __future__ import annotations
 
 import re
-from decimal import Decimal
+import threading
+from datetime import date, datetime
 
 ROW_CAP = 200
 ROWS_TO_MODEL = 60
 TIMEOUT_MS = 4000
 
-# name -> (columns described for the model, SQL over <schema>.events)
-VIEWS: dict[str, tuple[str, str]] = {
-    "vendors": ("vendor_id, vendor_name, trade", """
-        SELECT payload->>'id' AS vendor_id, payload->>'name' AS vendor_name, payload->>'trade' AS trade
-        FROM {s}.events WHERE type = 'entity_registered' AND payload->>'kind' = 'vendor'"""),
-    "documents": ("document_id, kind, vendor_id, dated, invoice_id, text, filed_at", """
-        SELECT payload->>'id' AS document_id, payload->>'kind' AS kind, payload->>'vendor_id' AS vendor_id,
-               (payload->>'dated')::date AS dated, payload->'data'->>'invoice_id' AS invoice_id,
-               left(payload->>'text', 400) AS text, learned_at AS filed_at
-        FROM {s}.events WHERE type = 'document_ingested'"""),
-    "invoices": ("invoice_id, vendor_id, vendor_name, amount, received_on, document_id, text", """
-        SELECT d.payload->'data'->>'invoice_id' AS invoice_id, d.payload->>'vendor_id' AS vendor_id,
-               v.vendor_name, (d.payload->'data'->>'amount')::numeric AS amount,
-               (d.payload->'data'->>'received')::date AS received_on, d.payload->>'id' AS document_id,
-               left(d.payload->>'text', 300) AS text
-        FROM {s}.events d LEFT JOIN books_{s}.vendors v ON v.vendor_id = d.payload->>'vendor_id'
-        WHERE d.type = 'document_ingested' AND d.payload->>'kind' = 'vendor_invoice'"""),
-    "fundings": ("invoice_id, amount, funded_on, document_id", """
-        SELECT payload->'data'->>'invoice_id' AS invoice_id, (payload->'data'->>'amount')::numeric AS amount,
-               (payload->'data'->>'funded_on')::date AS funded_on, payload->>'id' AS document_id
-        FROM {s}.events WHERE type = 'document_ingested' AND payload->>'kind' = 'funding'"""),
+# name -> (columns described for the model, DuckDB column types)
+TABLES: dict[str, tuple[str, str]] = {
+    "vendors": ("vendor_id, vendor_name, trade", "vendor_id VARCHAR, vendor_name VARCHAR, trade VARCHAR"),
+    "documents": ("document_id, kind, vendor_id, dated, invoice_id, text, filed_at",
+                  "document_id VARCHAR, kind VARCHAR, vendor_id VARCHAR, dated DATE, invoice_id VARCHAR, "
+                  "text VARCHAR, filed_at TIMESTAMPTZ"),
+    "invoices": ("invoice_id, vendor_id, vendor_name, amount, received_on, document_id, text",
+                 "invoice_id VARCHAR, vendor_id VARCHAR, vendor_name VARCHAR, amount DECIMAL(14,2), "
+                 "received_on DATE, document_id VARCHAR, text VARCHAR"),
+    "fundings": ("invoice_id, amount, funded_on, document_id",
+                 "invoice_id VARCHAR, amount DECIMAL(14,2), funded_on DATE, document_id VARCHAR"),
     "bank_payments": ("document_id, export_date, paid_on, invoice_id (may be null), vendor_id, vendor_name, "
-                      "amount, payee, bank, account, memo", """
-        SELECT e.payload->>'id' AS document_id, (e.payload->>'dated')::date AS export_date,
-               (p->>'on')::date AS paid_on, p->>'invoice_id' AS invoice_id, p->>'vendor_id' AS vendor_id,
-               v.vendor_name, (p->>'amount')::numeric AS amount, p->>'payee' AS payee, p->>'bank' AS bank,
-               p->>'account' AS account, p->>'memo' AS memo
-        FROM {s}.events e CROSS JOIN LATERAL jsonb_array_elements(e.payload->'data'->'payments') p
-        LEFT JOIN books_{s}.vendors v ON v.vendor_id = p->>'vendor_id'
-        WHERE e.type = 'document_ingested' AND e.payload->>'kind' = 'manager_bank'"""),
-    "statement_lines": ("document_id, statement_date, line, invoice_id, amount, status, paid_on", """
-        SELECT e.payload->>'id' AS document_id, (e.payload->>'dated')::date AS statement_date,
-               l->>'line' AS line, l->>'invoice_id' AS invoice_id, (l->>'amount')::numeric AS amount,
-               l->>'status' AS status, (l->>'on')::date AS paid_on
-        FROM {s}.events e CROSS JOIN LATERAL jsonb_array_elements(e.payload->'data'->'lines') l
-        WHERE e.type = 'document_ingested' AND e.payload->>'kind' = 'manager_statement'"""),
+                      "amount, payee, bank, account, memo",
+                      "document_id VARCHAR, export_date DATE, paid_on DATE, invoice_id VARCHAR, vendor_id VARCHAR, "
+                      "vendor_name VARCHAR, amount DECIMAL(14,2), payee VARCHAR, bank VARCHAR, account VARCHAR, "
+                      "memo VARCHAR"),
+    "statement_lines": ("document_id, statement_date, line, invoice_id, amount, status, paid_on",
+                        "document_id VARCHAR, statement_date DATE, line VARCHAR, invoice_id VARCHAR, "
+                        "amount DECIMAL(14,2), status VARCHAR, paid_on DATE"),
     "vendor_messages": ("document_id, kind (vendor_confirmation | vendor_notice), vendor_id, invoice_id, "
-                        "dated, amount, status, text", """
-        SELECT payload->>'id' AS document_id, payload->>'kind' AS kind, payload->>'vendor_id' AS vendor_id,
-               payload->'data'->>'invoice_id' AS invoice_id, (payload->>'dated')::date AS dated,
-               (payload->'data'->>'amount')::numeric AS amount, payload->'data'->>'status' AS status,
-               left(payload->>'text', 300) AS text
-        FROM {s}.events WHERE type = 'document_ingested'
-          AND payload->>'kind' IN ('vendor_confirmation', 'vendor_notice')"""),
-    "manager_replies": ("document_id, dated, invoice_id, status, text", """
-        SELECT payload->>'id' AS document_id, (payload->>'dated')::date AS dated,
-               payload->'data'->>'invoice_id' AS invoice_id, payload->'data'->>'status' AS status,
-               left(payload->>'text', 400) AS text
-        FROM {s}.events WHERE type = 'document_ingested' AND payload->>'kind' = 'manager_reply'"""),
+                        "dated, amount, status, text",
+                        "document_id VARCHAR, kind VARCHAR, vendor_id VARCHAR, invoice_id VARCHAR, dated DATE, "
+                        "amount DECIMAL(14,2), status VARCHAR, text VARCHAR"),
+    "manager_replies": ("document_id, dated, invoice_id, status, text",
+                        "document_id VARCHAR, dated DATE, invoice_id VARCHAR, status VARCHAR, text VARCHAR"),
 }
+VIEWS = TABLES                      # the names the guard and the prompts refer to
 
-GUIDE = ("Read-only SQL (PostgreSQL) over the books. One SELECT (or WITH ... SELECT) using only these "
-         "views: " + "; ".join(f"{n}({c})" for n, (c, _) in VIEWS.items()) +
-         f". Money is numeric dollars, dates are date. At most {ROW_CAP} rows; {TIMEOUT_MS} ms limit. "
+GUIDE = ("Read-only SQL (DuckDB, close to PostgreSQL) over the books. One SELECT (or WITH ... SELECT) "
+         "using only these tables: " + "; ".join(f"{n}({c})" for n, (c, _) in TABLES.items()) +
+         f". Money is decimal dollars, dates are date. At most {ROW_CAP} rows; {TIMEOUT_MS} ms limit. "
          "bank_payments.invoice_id can be null or name another invoice: match by vendor, amount and "
          "date when it does.")
 
 _FORBIDDEN = re.compile(
     r"\b(insert|update|delete|merge|drop|alter|create|truncate|grant|revoke|copy|call|do|execute|"
-    r"prepare|listen|notify|vacuum|analyze|set|reset|lock|comment|refresh|security|into)\b|pg_\w+|"
+    r"prepare|listen|notify|vacuum|analyze|set|reset|lock|comment|refresh|security|into|attach|detach|"
+    r"install|load|pragma|export|import|checkpoint|getenv|query|query_table|glob|"
+    r"read_\w+|sniff_\w+|parquet_\w+|duckdb_\w+)\b|pg_\w+|"
     r"\binformation_schema\b|--|/\*|\\\\", re.IGNORECASE)
 _RELATION = re.compile(r"\b(?:from|join)\s+([a-zA-Z_][\w.]*)", re.IGNORECASE)
-_ensured: set[str] = set()
 
 
 class QueryRefused(ValueError):
@@ -100,60 +82,124 @@ def check(sql: str) -> str:
     scan = re.sub(r"\b(extract|substring|trim|overlay|position)\s*\([^()]*\)", "f()", scan, flags=re.IGNORECASE)
     for rel in _RELATION.findall(scan):
         name = rel.lower()
-        if "." in name or (name not in VIEWS and name not in ctes and name != "lateral"):
-            raise QueryRefused(f"unknown table {rel!r}; use only: {', '.join(VIEWS)}")
+        if "." in name or (name not in TABLES and name not in ctes and name not in ("lateral", "unnest")):
+            raise QueryRefused(f"unknown table {rel!r}; use only: {', '.join(TABLES)}")
     return text
 
 
-def ensure_views(conn, schema: str) -> None:
-    """(Re)create the views for one source schema. Cheap; done after every demo reset."""
-    if not re.fullmatch(r"[a-z_][a-z0-9_]*", schema):
-        raise ValueError("bad schema name")
-    conn.execute(f'CREATE SCHEMA IF NOT EXISTS "books_{schema}"')
-    for name, (_, body) in VIEWS.items():
-        conn.execute(f'CREATE OR REPLACE VIEW "books_{schema}".{name} AS {body.format(s=schema)}')
-    _ensured.add(schema)
+# -- the snapshot ---------------------------------------------------------------------------
+def _d(v) -> date | None:
+    if not v:
+        return None
+    try:
+        return v if isinstance(v, date) else date.fromisoformat(str(v)[:10])
+    except ValueError:
+        return None
 
 
-def forget(schema: str) -> None:
-    _ensured.discard(schema)
+def _n(v) -> float | None:
+    try:
+        return None if v is None else round(float(v), 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def _rows(events) -> dict[str, list[tuple]]:
+    """Flatten the event log into the tables the agents query."""
+    out: dict[str, list[tuple]] = {name: [] for name in TABLES}
+    names = {}
+    for e in events:
+        p = e.payload
+        if e.type == "entity_registered" and p.get("kind") == "vendor":
+            names[p.get("id")] = p.get("name")
+            out["vendors"].append((p.get("id"), p.get("name"), p.get("trade")))
+    for e in events:
+        if e.type != "document_ingested":
+            continue
+        p, data = e.payload, e.payload.get("data") or {}
+        doc, kind, vendor, dated = p.get("id"), p.get("kind"), p.get("vendor_id"), _d(p.get("dated"))
+        text = (p.get("text") or "")[:400]
+        out["documents"].append((doc, kind, vendor, dated, data.get("invoice_id"), text, e.learned_at))
+        if kind == "vendor_invoice":
+            out["invoices"].append((data.get("invoice_id"), vendor, names.get(vendor), _n(data.get("amount")),
+                                    _d(data.get("received")), doc, text[:300]))
+        elif kind == "funding":
+            out["fundings"].append((data.get("invoice_id"), _n(data.get("amount")), _d(data.get("funded_on")), doc))
+        elif kind == "manager_bank":
+            for r in data.get("payments") or []:
+                out["bank_payments"].append((doc, dated, _d(r.get("on")), r.get("invoice_id"), r.get("vendor_id"),
+                                             names.get(r.get("vendor_id")), _n(r.get("amount")), r.get("payee"),
+                                             r.get("bank"), r.get("account"), r.get("memo")))
+        elif kind == "manager_statement":
+            for r in data.get("lines") or []:
+                out["statement_lines"].append((doc, dated, r.get("line"), r.get("invoice_id"), _n(r.get("amount")),
+                                               r.get("status"), _d(r.get("on"))))
+        elif kind in ("vendor_confirmation", "vendor_notice"):
+            out["vendor_messages"].append((doc, kind, vendor, data.get("invoice_id"), dated, _n(data.get("amount")),
+                                           data.get("status"), text[:300]))
+        elif kind == "manager_reply":
+            out["manager_replies"].append((doc, dated, data.get("invoice_id"), data.get("status"), text))
+    return out
+
+
+_cache: dict[int, tuple[tuple, object]] = {}
+_cache_lock = threading.Lock()
+
+
+def _snapshot(rails):
+    """A locked-down DuckDB connection holding the books, rebuilt when the log has grown."""
+    import duckdb
+    events = rails.events()
+    stamp = (len(events), events[-1].id if events else None)
+    with _cache_lock:
+        hit = _cache.get(id(rails))
+        if hit and hit[0] == stamp:
+            return hit[1]
+        con = duckdb.connect(":memory:")
+        for name, rows in _rows(events).items():
+            con.execute(f"CREATE TABLE {name} ({TABLES[name][1]})")
+            if rows:
+                marks = ", ".join("?" * len(rows[0]))
+                con.executemany(f"INSERT INTO {name} VALUES ({marks})", rows)
+        con.execute("SET enable_external_access = false")
+        con.execute("SET lock_configuration = true")
+        _cache[id(rails)] = (stamp, con)
+        return con
 
 
 def _plain(v):
-    if isinstance(v, Decimal):
-        return float(v)
-    if hasattr(v, "isoformat"):
+    if isinstance(v, (datetime, date)):
         return v.isoformat()
-    return v
-
-
-def run(schema: str, sql: str) -> dict:
-    """Run one checked SELECT read-only. Returns columns, rows (capped) and the total count."""
-    from rails.db import connect
-    text = check(sql)
-    conn = connect()
+    if v is None or isinstance(v, (str, int, bool)):
+        return v
     try:
-        if schema not in _ensured:
-            ensure_views(conn, schema)
-            conn.commit()
-        with conn.transaction():
-            conn.execute("SET TRANSACTION READ ONLY")
-            conn.execute(f"SET LOCAL statement_timeout = {TIMEOUT_MS}")
-            conn.execute(f'SET LOCAL search_path = "books_{schema}"')
-            cur = conn.execute(f"SELECT * FROM ({text}) AS q LIMIT {ROW_CAP + 1}")
-            cols = [c.name for c in cur.description or []]
-            rows = [[_plain(v) for v in r] for r in cur.fetchall()]
-        return {"columns": cols, "rows": rows[:ROW_CAP], "row_count": min(len(rows), ROW_CAP),
-                "truncated": len(rows) > ROW_CAP}
+        return float(v)                      # Decimal and friends
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def run(rails, sql: str) -> dict:
+    """Run one checked SELECT on the books' snapshot. Returns columns, rows (capped) and count."""
+    text = check(sql)
+    con = _snapshot(rails).cursor()
+    timer = threading.Timer(TIMEOUT_MS / 1000, con.interrupt)
+    timer.start()
+    try:
+        cur = con.execute(f"SELECT * FROM ({text}) AS q LIMIT {ROW_CAP + 1}")
+        cols = [d[0] for d in cur.description or []]
+        rows = [[_plain(v) for v in r] for r in cur.fetchall()]
     finally:
-        conn.close()
+        timer.cancel()
+        con.close()
+    return {"columns": cols, "rows": rows[:ROW_CAP], "row_count": min(len(rows), ROW_CAP),
+            "truncated": len(rows) > ROW_CAP}
 
 
-def tool_result(schema: str, sql: str, purpose: str) -> dict:
+def tool_result(rails, sql: str, purpose: str) -> dict:
     """What the model gets back, and the event the page shows."""
     from .runtime import emit
     try:
-        out = run(schema, sql)
+        out = run(rails, sql)
     except QueryRefused as exc:
         emit({"type": "query", "purpose": purpose, "sql": sql, "error": str(exc)})
         return {"error": f"query refused: {exc}"}
@@ -169,23 +215,12 @@ def tool_result(schema: str, sql: str, purpose: str) -> dict:
                      if out["row_count"] > len(shown) else None)}
 
 
-def schema_of(rails) -> str | None:
-    """The PostgreSQL schema a rails object reads, or None for in-memory books (tests)."""
-    conn = getattr(getattr(rails, "store", None), "conn", None)
-    if conn is None:
-        return None
-    return conn.execute("SELECT current_schema()").fetchone()[0]
-
-
 def tool_for(rails):
-    """query_books bound to these books (an error result when they are not in PostgreSQL)."""
+    """query_books bound to these books."""
     from .runtime import Tool
-    schema = schema_of(rails)
 
     def query_books(purpose: str, sql: str) -> dict:
-        if schema is None:
-            return {"error": "the books are not in PostgreSQL in this run"}
-        return tool_result(schema, sql, purpose)
+        return tool_result(rails, sql, purpose)
     return Tool("query_books", "Investigate the books yourself with read-only SQL. " + GUIDE,
                 query_tool_spec(), query_books)
 
@@ -195,3 +230,22 @@ def query_tool_spec() -> dict:
             "properties": {"purpose": {"type": "string", "minLength": 5, "maxLength": 200,
                                        "description": "What you want to find out, in plain words"},
                            "sql": {"type": "string", "minLength": 10, "maxLength": 4000}}}
+
+
+def known(rails, table: str, column: str, values: list[str]) -> set[str]:
+    """Which of `values` exist in a table column (used to check what an agent cites)."""
+    if not values or table not in TABLES:
+        return set()
+    con = _snapshot(rails).cursor()
+    try:
+        rows = con.execute(f"SELECT DISTINCT {column} FROM {table} WHERE {column} IN "
+                           f"({', '.join('?' * len(values))})", values).fetchall()
+    finally:
+        con.close()
+    return {r[0] for r in rows}
+
+
+def forget(_book: str | None = None) -> None:
+    """Drop cached snapshots (after a book was cleared)."""
+    with _cache_lock:
+        _cache.clear()

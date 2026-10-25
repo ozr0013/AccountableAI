@@ -34,16 +34,11 @@ class InvestigatorTools:
         self.rails, self.mirror, self.today = rails, mirror, today
         self.record, self.enqueue, self.manager_id = record, enqueue, manager_id
         self.name = names_from(rails)
-        self.schema = books.schema_of(rails)
         self.flags: list[str] = []
         self.handed: list[str] = []
 
     def _known(self, table: str, column: str, values: list[str]) -> set[str]:
-        if self.schema is None or not values:
-            return set()
-        quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
-        out = books.run(self.schema, f"SELECT {column} FROM {table} WHERE {column} IN ({quoted})")
-        return {r[0] for r in out["rows"]}
+        return books.known(self.rails, table, column, values)
 
     def _line(self, invoice_id: str):
         return next((l for l in self.rails.ledger(self.manager_id) if l.invoice_id == invoice_id), None)
