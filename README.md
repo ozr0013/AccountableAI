@@ -322,7 +322,7 @@ python -m rails.console.moment                      # replay the moment: $3,140 
 pytest -q world                                     # world tests (not in testpaths yet)
 python -m evals.run evals/runs/full.json evals/runs/no_verifier.json --out evals/results.md
 RAILS=real pytest evals/test_prohibited.py          # guardrails against the real rails
-python dashboard/feed/serve.py                      # live feed for the dashboard (free, rules mode)
+python dashboard/feed/serve.py                      # backend + the UI revamp 2 frontend at http://127.0.0.1:8765
 python -m agreement_agent.server                    # Gmail agreement agent on :8770 (Sign in with Google)
 python -m agreement_agent --local agreement_agent/samples/batch   # check the 12 test documents, free
 cd dashboard && npm install && npm run dev          # dashboard on :3000 (see dashboard/README.md)

@@ -177,6 +177,63 @@ def reset():
         return session().snapshot()
 
 
+# -- the UI revamp 2 frontend (ui-revamp-2/), served by this backend --------------------------
+_ADDR = None
+_ALERT_ISSUE = {
+    "unexplained_unpaid": "No proof the vendor was paid", "duplicate_billing": "Possible duplicate invoice",
+    "bank_detail_change": "Bank-detail change request", "paperwork_request": "Vendor paperwork missing (W-9)",
+    "owner_pending_approval": "Oakline approval pending", "statement_mismatch": "Statement amount differs from approved",
+}
+
+
+@app.get("/api/ui/invoices")
+def ui_invoices():
+    """Every Keyway invoice in the shape ui-revamp-2/app.js uses: property (the address on the
+    vendor's invoice), vendor, amount, status Paid | Outstanding | Past Due, due date, and the
+    issue a person should review (an open alert other than the lateness pattern)."""
+    import re
+    global _ADDR
+    _ADDR = _ADDR or re.compile(r"\b\d{1,5} [A-Z][a-z]+(?: [A-Z][a-z]+)? (?:St|Ln|Ct|Dr|Ave|Rd|Way|Pl|Blvd)\b")
+    with _lock:
+        s = session()
+        snap = s.snapshot()
+        texts = {d.data.get("invoice_id"): d.text for d in s.rails.documents("keyway")
+                 if d.kind.value == "vendor_invoice" and d.data.get("invoice_id")}
+    out = []
+    for it in snap["items"]:
+        text = texts.get(it["id"], "")
+        where = _ADDR.search(text)
+        desc = re.sub(r"^.*?Invoice [A-Z0-9-]+\.\s*", "", text).split(" Amount due")[0].strip(" .")
+        kinds = [a.split("-")[1] for a in it.get("alerts") or [] if a.count("-") >= 2]
+        issues = [_ALERT_ISSUE[k] for k in kinds if k in _ALERT_ISSUE]
+        if it.get("owed", 0) <= 0.005 and it.get("status") != "unfunded":
+            status = "Paid"
+        elif it.get("days_late", 0) > 0 or it.get("state") == "delayed":
+            status = "Past Due"
+        else:
+            status = "Outstanding"
+        out.append({"id": it["id"], "cid": it.get("vendor_id") or "", "vendor": it["vendor"],
+                    "property": where.group(0) if where else "Portfolio-wide",
+                    "description": desc or (it.get("trade") or "").title(), "amount": it["amount"],
+                    "status": status, "due": it.get("due") or it.get("received") or snap["meta"]["as_of"],
+                    "issue": "; ".join(issues), "cause": it.get("cause_text") or "", "reviewed": False,
+                    "notes": []})
+    props = sorted({i["property"] for i in out if i["property"] != "Portfolio-wide"})
+    if any(i["property"] == "Portfolio-wide" for i in out):
+        props.append("Portfolio-wide")
+    dues = sorted(i["due"] for i in out)
+    return {"as_of": snap["meta"]["as_of"], "manager": snap["meta"]["manager"], "properties": props,
+            "start": dues[0] if dues else snap["meta"]["as_of"], "end": dues[-1] if dues else snap["meta"]["as_of"],
+            "invoices": out, "agents": snap["meta"]["agents"]}
+
+
+# Last, so every /api route above wins: the frontend at this server's root.
+_UI = ROOT / "ui-revamp-2"
+if _UI.is_dir():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_UI), html=True), name="ui")
+
+
 if __name__ == "__main__":
     import uvicorn
     session()                                    # build before the first request

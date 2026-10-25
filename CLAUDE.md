@@ -44,7 +44,8 @@ Built vs planned (keep this honest when you change things):
 | `agreement_agent/` | Standalone Gmail agreement agent: parser, LangGraph tool loop, Gmail connector, Sign in with Google server (`server.py`), CLI |
 | `rails/` | Event log, ledger, matcher, trust rules, recon, policy gate (`rails/guards/policy.py`), templates |
 | `world/` | Deterministic demo world (seed 13, demo date Apr 22 2026, 9 planted scenarios) |
-| `dashboard/` | Next.js owner dashboard; `dashboard/feed/serve.py` is its live backend |
+| `ui-revamp-2/` | The frontend: static HTML/CSS/JS served by `dashboard/feed/serve.py` at its root. `live.js` connects it to the backend (`/api/ui/invoices`, the Agents page with live reasoning); `app.js` is the designer's file, left as is |
+| `dashboard/` | The earlier Next.js dashboard; `dashboard/feed/serve.py` is the backend for both |
 | `evals/` | Scorer, harness, baselines |
 
 ## How an event flows

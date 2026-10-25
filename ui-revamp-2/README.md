@@ -2,6 +2,21 @@
 
 A standalone HTML, CSS, and JavaScript payment dashboard recreated from the five supplied Stitch UI screens.
 
+## Connected to the live backend
+
+`python dashboard/feed/serve.py` serves this folder at http://127.0.0.1:8765, next to its API. `live.js`
+(loaded after `app.js`, which is unchanged) connects the two:
+
+- The Keyway invoices from `GET /api/ui/invoices` replace the demo invoices, so every page shows the
+  real workflow: properties from the invoice addresses, statuses, and the invoices a person should
+  review (open alerts).
+- **Agents**, the first page, runs the three agents one after another (agreement, chaser, anomaly
+  detector) and streams each agent's reasoning into its card as it decides (`/api/loop/*`,
+  `/api/stream`). The backend emails the middleman's reminders and statement note.
+
+Opened any other way (the `python3 -m http.server` steps below), it talks to http://127.0.0.1:8765,
+and falls back to the demo data when the backend isn't running.
+
 ## Push from your VS Code clone
 
 1. Copy this entire `ui-revamp-2` folder into the root of your existing `RepoCalhacks13.0` clone.

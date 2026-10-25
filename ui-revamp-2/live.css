@@ -1,0 +1,30 @@
+/* The Agents page (live.js): three agents in a row, reasoning streamed under each. */
+.flow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:30px;align-items:start}
+.flow-col{position:relative}
+.flow-arrow{position:absolute;right:-23px;top:34px;font-size:18px;color:var(--line);transition:color .3s}
+.flow-arrow.on{color:var(--purple)}
+.flow-card{margin-bottom:0;transition:box-shadow .3s,opacity .3s}
+.flow-card.waiting{opacity:.6}
+.flow-card.running{box-shadow:0 0 0 2px var(--purple)}
+.flow-card header{display:flex;gap:13px;align-items:flex-start}
+.flow-card header .muted{margin-top:4px}
+.flow-n{flex:none;display:grid;place-items:center;width:32px;height:32px;border-radius:50%;background:#f0f4f9;font-weight:600;color:#4b5d77}
+.flow-card.running .flow-n{background:var(--purple);color:#fff}
+.flow-card.done .flow-n{background:#e6f7f2;color:var(--green)}
+.flow-think{margin:18px 0 0;padding:13px 15px;min-height:160px;max-height:340px;overflow:auto;border-radius:12px;background:var(--bg);font-size:12.5px;line-height:19px}
+.flow-line{margin:0 0 4px;color:#4b5d77;animation:flowin .25s ease both}
+.flow-line.question{margin-top:9px;color:var(--ink)}
+.flow-line.question:first-child{margin-top:0}
+.flow-line.result{color:var(--ink);font-weight:600}
+.flow-line.guard{color:#c2410c}
+.flow-line.email{color:var(--green);font-weight:600}
+.flow-line.thinking{font-style:italic;border-left:2px solid var(--purple);padding-left:8px}
+.flow-caret{display:inline-block;width:7px;height:13px;background:var(--purple);animation:flowblink 1s steps(1) infinite}
+.flow-result{margin-top:11px;padding:11px 13px;border-radius:10px;font-size:13px;line-height:19px;animation:flowin .3s ease both}
+.flow-result.good{background:#e6f7f2;color:#05634b}
+.flow-result.warn{background:#fff4ec;color:#9a3412}
+.flow-error{color:var(--red)}
+.badge.live{background:#e6f7f2;color:var(--green)}
+@keyframes flowin{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@keyframes flowblink{50%{opacity:0}}
+@media (max-width:1100px){.flow{grid-template-columns:1fr}.flow-arrow{display:none}}
