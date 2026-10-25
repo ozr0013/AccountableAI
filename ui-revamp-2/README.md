@@ -2,21 +2,14 @@
 
 A standalone HTML, CSS, and JavaScript payment dashboard recreated from the five supplied Stitch UI screens.
 
-## Connected to the live backend
+## The Agent Workflow tab is live
 
-`python dashboard/feed/serve.py` serves this folder at http://127.0.0.1:8765, next to its API. `live.js`
-(loaded after `app.js`, which is unchanged) connects the two:
-
-- The Keyway invoices from `GET /api/ui/invoices` replace the demo invoices, so every page shows the
-  real workflow: properties from the invoice addresses, statuses, and the invoices a person should
-  review (open alerts).
-- **Judgment › Agent Workflow** (the page the app opens on) runs the three agents one after another
-  (agreement, chaser, anomaly detector) and streams each agent's reasoning into its card as it
-  decides (`/api/loop/*`, `/api/stream`). The backend emails the middleman's reminders and
-  statement note. Every other page is `app.js` as designed.
-
-Opened any other way (the `python3 -m http.server` steps below), it talks to http://127.0.0.1:8765,
-and falls back to the demo data when the backend isn't running.
+`python dashboard/feed/serve.py` serves this folder at http://127.0.0.1:8765, next to its API.
+Everything here is the dashboard as designed, with its own demo data, except one tab:
+**Judgment › Agent Workflow**. `live.js` (loaded after the unchanged `app.js`) replaces that page's
+body with the live three-agent workflow: the agreement agent, chaser and anomaly detector run one
+after another (`/api/loop/*`) and each agent's reasoning streams into its card as it decides
+(`/api/stream`). The backend emails the middleman's reminders and statement note.
 
 ## Push from your VS Code clone
 

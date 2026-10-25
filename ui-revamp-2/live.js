@@ -1,48 +1,31 @@
-// Connects this dashboard to the live backend (dashboard/feed/serve.py) without changing app.js.
+// The Agent Workflow tab, connected to the live backend (dashboard/feed/serve.py). Nothing else.
 //
-//  1. Data: the Keyway invoices from GET /api/ui/invoices replace the demo invoices, so every
-//     page (portfolio, properties, invoices, judgment) shows the real workflow's state.
-//  2. Agent workflow: the Judgment page (her "Agent Workflow" screen) runs the three agents one
-//     after another (agreement, chaser, anomaly detector) through POST /api/loop/*, and shows each
-//     agent's reasoning as it decides, from the /api/stream event stream. Reminders and the
-//     statement note are emailed by the backend; each email shows up in the card that sent it.
-//     Every other page is app.js as designed.
+// app.js is the designer's dashboard and stays exactly as designed: its pages, data and opening
+// screen. This file replaces only the body of her Judgment page ("Agent Workflow"): the three
+// agents run one after another (agreement, chaser, anomaly detector) through POST /api/loop/*, and
+// each agent's reasoning shows up in its card as it decides, from the /api/stream event stream.
+// Reminders and the statement note are emailed by the backend; each email shows in its card.
 //
 // Served by the backend at its own address, so the API is same-origin. Opened another way
 // (python -m http.server), it talks to http://127.0.0.1:8765.
 
 const FEED = window.ACCOUNTABLE_FEED ??
   (location.protocol === 'file:' || location.port === '8000' ? 'http://127.0.0.1:8765' : '');
-const LIVE = { on: false, tried: false, asOf: null, agents: 'rules' };
+const LIVE = { on: false, tried: false, agents: 'rules' };
 const INVOICE = 'INV-KW-0301';
 
-// -- 1. live data --------------------------------------------------------------------------------
-async function loadLive(quiet) {
+// is the backend up, and are its agents on Claude or rules?
+async function checkBackend() {
   try {
-    const r = await fetch(`${FEED}/api/ui/invoices`, { cache: 'no-store' });
+    const r = await fetch(`${FEED}/api/state`, { cache: 'no-store' });
     if (!r.ok) throw new Error(r.status);
-    const d = await r.json();
-    const kept = Object.fromEntries(invoices.map(i => [i.id, i]));
-    invoices = d.invoices.map(i => ({ ...i, reviewed: kept[i.id]?.reviewed ?? false, notes: kept[i.id]?.notes ?? [] }));
-    properties.splice(0, properties.length, ...d.properties);
-    if (!properties.includes(state.property)) state.property = properties[0];
-    state.start = d.start; state.end = d.end;
-    Object.assign(LIVE, { on: true, tried: true, asOf: d.as_of, agents: d.agents });
-    render();
+    const m = (await r.json()).meta;
+    Object.assign(LIVE, { on: true, tried: true, agents: m.agents });
   } catch (e) {
-    LIVE.on = false; LIVE.tried = true;
-    render();
-    if (!quiet) toast('Showing demo data. Start the backend for live data: python dashboard/feed/serve.py');
+    Object.assign(LIVE, { on: false, tried: true });
   }
+  if (state.page === 'judgment') paint();
 }
-
-// days late against the workflow's own date, not the demo's
-const _days = days;
-days = function (i) {
-  if (!LIVE.asOf) return _days(i);
-  return i.status === 'Past Due'
-    ? Math.max(0, Math.floor((new Date(LIVE.asOf + 'T12:00:00') - new Date(i.due + 'T12:00:00')) / 86400000)) : 0;
-};
 
 // -- 2. the agent workflow (the Judgment page) ----------------------------------------------------
 const AGENTS = [
@@ -180,7 +163,6 @@ window.runLoop = async function () {
     await runAgent('chaser'); await wait(600);
     await runAgent('anomaly');
     flow.active = null;
-    await loadLive(true);                            // the invoices now show what the agents did
   } catch (e) {
     flow.error = `${e}. Is the backend running? python dashboard/feed/serve.py`;
   }
@@ -189,6 +171,6 @@ window.runLoop = async function () {
 
 // her Judgment page ("Agent Workflow") becomes the live three-agent workflow; nothing else changes
 judgment = agentsPage;
-if (location.hash === '#agents' || !location.hash) go('judgment');   // the agent workflow opens first
-loadLive();
+if (state.page === 'judgment') render();
+checkBackend();
 listen();
