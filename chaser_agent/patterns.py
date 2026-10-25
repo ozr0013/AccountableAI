@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from .daily import _rules_by_vendor, add_days, norm_name
+from .daily import _rules_by_vendor, add_days, rules_for
 
 CHRONIC_MIN_PAID = 3
 CHRONIC_RATE = 0.5
@@ -33,7 +33,7 @@ def vendor_patterns(rails, rule_rows: list[dict], today: date, manager_id: str =
         if line.duplicate_of:
             continue
         vendor = name(line.vendor_id)
-        due, source = _deadline(line, rules.get(norm_name(vendor), []))
+        due, source = _deadline(line, rules_for(rules, vendor, name(manager_id)))
         s = stats.setdefault(vendor, {"vendor": vendor, "vendor_id": line.vendor_id, "paid": 0,
                                       "late": 0, "days_late": [], "overdue_unpaid": [],
                                       "deadline_source": source, "late_invoices": []})

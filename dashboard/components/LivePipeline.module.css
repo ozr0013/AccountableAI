@@ -106,3 +106,34 @@
 .why { margin: 0; font-size: 12.5px; line-height: 18px; color: var(--ink); }
 .controllerItem { box-shadow: inset 0 0 0 1px var(--o-soft), inset 3px 0 0 var(--o); }
 @media (max-width: 1100px) { .caseStrip { grid-template-columns: 1fr 1fr; } }
+
+.metrics { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.caseHead { display: flex; align-items: center; gap: 10px; margin-bottom: -8px; }
+.caseHead .micro { color: var(--n9); }
+.filter { all: unset; cursor: pointer; font-size: 12px; padding: 3px 9px; border-radius: 6px; color: var(--n9); }
+.filterOn { background: var(--n2); color: var(--ink); }
+.tableWrap { max-height: 330px; overflow: auto; margin-top: 6px; }
+.table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.table th { position: sticky; top: 0; background: var(--white); text-align: left; font: 10.5px var(--mono); letter-spacing: .04em;
+  text-transform: uppercase; color: var(--n9); padding: 8px 10px; border-bottom: 1px solid var(--n3); font-weight: 400; }
+.table td { padding: 8px 10px; border-bottom: 1px solid var(--n1); color: var(--ink); white-space: nowrap; }
+.table tr { cursor: pointer; }
+.table tbody tr:hover td { background: var(--n0); }
+.table tr.sel td { background: var(--o-wash); }
+.table tr.workingRow td:first-child { box-shadow: inset 3px 0 0 var(--o); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.src2 { margin-left: 6px; font: 10px var(--mono); color: var(--n9); text-transform: uppercase; }
+.pill { font-size: 12px; padding: 1px 7px; border-radius: 5px; background: var(--n2); color: var(--n10); }
+.st_overdue, .st_partial { background: var(--o-wash); color: var(--o-ink); }
+.st_paid_late { background: var(--n2); color: var(--o-press); }
+.st_paid_on_time { background: transparent; color: var(--n9); padding-left: 0; }
+.ladder { display: inline-flex; gap: 3px; vertical-align: middle; }
+.ladder i { width: 9px; height: 9px; border: 1.5px solid var(--n6); box-sizing: border-box; border-radius: 2px; }
+.ladder i.sent { background: var(--ink); border-color: var(--ink); }
+.raised { margin-left: 8px; font: 10.5px var(--mono); text-transform: uppercase; color: var(--o-ink); }
+.lastCell { color: var(--n9) !important; font-size: 12px; }
+.workingTag { font: 600 10.5px var(--mono); text-transform: uppercase; color: var(--o-ink); }
+.linkBtn { all: unset; cursor: pointer; font-family: var(--mono); font-size: 12px; color: var(--n9); }
+.linkBtn:hover { color: var(--ink); text-decoration: underline; }
+.event.email span:nth-child(3) { color: var(--g-ink); }
+@media (max-width: 1100px) { .metrics { grid-template-columns: repeat(3, 1fr); } }

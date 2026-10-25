@@ -52,9 +52,11 @@ class AnomalyTools:
                 "sources": self.case.get("source_ids", [])}
 
     def get_agreement_rules(self) -> dict:
-        vendor = daily.norm_name((self.case or {}).get("vendor", ""))
+        from workflow.names import names_from
+        manager = names_from(self.rails)(self.manager_id)
+        own = daily.rules_for(daily._rules_by_vendor(self.rule_rows), (self.case or {}).get("vendor", ""), manager)
         rules = [{k: r.get(k) for k in ("rule_id", "rule_type", "status", "check", "source_quote")}
-                 for r in self.rule_rows if daily.norm_name(r["vendor_name"]) == vendor]
+                 for r in own]
         return {"rules": rules} if rules else {"error": "no saved agreement for this vendor"}
 
     def vendor_history(self) -> dict:

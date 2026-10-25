@@ -31,6 +31,15 @@ type LiveTool = { tool: string; state: "running" | "done" | "refused"; preview?:
 type Live = { task_id: string; agent: string; invoice_id: string; day: string; reason: string;
   thinking: string; text: string; tools: LiveTool[]; decision: string | null; status: "working" | "done" | "failed" };
 type Line = { at: string; agent: string; kind: string; detail: string };
+type Row = { invoice_id: string; vendor: string; amount: number; funded_amount: number; deadline: string | null;
+  deadline_source: string | null; paid_on: string | null; paid_amount: number; state: string; days: number | null;
+  reminders: string[]; escalated: boolean; usage?: { calls: number; input: number; cached: number; output: number } | null;
+  last: { agent: string; day: string; decision?: string | null; verdict?: string | null; by: string } | null };
+
+const STATE: Record<string, string> = { overdue: "Overdue", not_due: "Not due", paid_on_time: "Paid on time",
+  paid_late: "Paid late", partial: "Partly paid", not_funded: "Not funded", no_deadline: "No deadline" };
+const RANK: Record<string, number> = { overdue: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4, no_deadline: 5, paid_on_time: 6 };
+const LEVELS = ["polite", "firm", "escalation"];
 
 const FINDING: Record<string, string> = {
   late_payment: "paid after the agreement deadline",
@@ -83,10 +92,12 @@ function describe(t: Task, flow: Flow): { label: string; tone: "" | "hold" | "qu
       return { label: `${level} reminder approved and sent`, tone: "",
         line: `${late} days past the deadline. Held for approval; the controller approved it.` };
     }
-    return { label: `${level} reminder sent`, tone: "",
-      line: `${late} days past the ${day(flow.deadline)} deadline. Sent to Keyway automatically.` };
+    const n = LEVELS.indexOf(r.level || "") + 1;
+    return { label: `${level} reminder sent`, tone: n === 3 ? "hold" : "",
+      line: `${late} days past the ${day(flow.deadline)} deadline. Email ${n} of 3, sent automatically.` };
   }
-  if (o.decision === "escalate") return { label: "Escalated", tone: "hold", line: "Owner and Keyway notified; controller review opened." };
+  if (o.decision === "escalate") return { label: "Raised to Oakline", tone: "hold",
+    line: "No proof of payment after three reminders. Owner and Keyway notified; a hold needs the controller." };
   if (o.decision === "handoff_to_anomaly") return { label: "Handed to Anomaly agent", tone: "",
     line: "Bank payment found. Anomaly agent checks amount, payee and timing." };
   return { label: o.decision || t.status, tone: "", line: plain(o.error) };
@@ -128,6 +139,45 @@ function CaseStrip({ flow, today }: { flow: Flow; today: string }) {
   );
 }
 
+function InvoiceTable({ rows, selected, working, onSelect }:
+    { rows: Row[]; selected: string; working: string | null; onSelect: (id: string) => void }) {
+  const [filter, setFilter] = useState("attention");
+  const attention = (r: Row) => !["paid_on_time", "not_due"].includes(r.state) || r.reminders.length > 0;
+  const shown = rows.filter(r => filter === "all" || attention(r))
+    .sort((a, b) => (RANK[a.state] - RANK[b.state]) || ((b.days || 0) - (a.days || 0)));
+  const count = (k: string) => rows.filter(r => r.state === k).length;
+  return (
+    <section className={`card ${s.panel}`}>
+      <div className={s.panelHead}>
+        <span className="micro">All invoices</span>
+        <span className={s.mono}>{rows.length} checked · {count("overdue")} overdue · {count("paid_late")} paid late · {count("paid_on_time")} on time</span>
+        <span className={s.grow} />
+        {[["attention", "Needs attention"], ["all", "All"]].map(([k, l]) =>
+          <button key={k} className={`${s.filter} ${filter === k ? s.filterOn : ""}`} onClick={() => setFilter(k)}>{l}</button>)}
+      </div>
+      <div className={s.tableWrap}>
+        <table className={s.table}>
+          <thead><tr><th>Invoice</th><th>Vendor</th><th className={s.num}>Funded</th><th>Deadline</th><th>Status</th><th>Emails</th><th>Agents</th></tr></thead>
+          <tbody>
+            {shown.map(r => <tr key={r.invoice_id} onClick={() => onSelect(r.invoice_id)}
+                className={`${r.invoice_id === selected ? s.sel : ""} ${r.invoice_id === working ? s.workingRow : ""}`}>
+              <td className={s.mono}>{r.invoice_id}</td>
+              <td>{r.vendor}</td>
+              <td className={s.num}>{usd(r.funded_amount)}</td>
+              <td>{day(r.deadline)}<span className={s.src2}>{r.deadline_source === "vendor agreement" ? "vendor" : r.deadline_source ? "mgmt" : ""}</span></td>
+              <td><span className={`${s.pill} ${s["st_" + r.state] || ""}`}>{STATE[r.state] || r.state}{r.days ? ` · ${r.days}d` : ""}</span></td>
+              <td><span className={s.ladder}>{LEVELS.map(l => <i key={l} className={r.reminders.includes(l) ? s.sent : ""} title={l} />)}</span>
+                {r.escalated && <span className={s.raised}>raised</span>}</td>
+              <td className={s.lastCell}>{r.invoice_id === working ? <b className={s.workingTag}>working</b>
+                : r.last ? `${r.last.agent} · ${r.last.verdict ? VERDICT[r.last.verdict] || r.last.verdict : r.last.decision === "wait" ? "waited" : (r.last.decision || "").replace(/_/g, " ")}` : "code check"}</td>
+            </tr>)}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function LivePipeline() {
   const [demo, setDemo] = useState<Demo | null>(null);
   const [flow, setFlow] = useState<Flow | null>(null);
@@ -138,6 +188,9 @@ export function LivePipeline() {
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [rows, setRows] = useState<Row[]>([]);
+  const [selected, setSelected] = useState("");
+  const selectedRef = useRef("");
   const playRef = useRef(false);
   const thinkRef = useRef<HTMLDivElement>(null);
   const recordRef = useRef<HTMLDivElement>(null);
@@ -146,7 +199,9 @@ export function LivePipeline() {
     try {
       const d = await call<Demo>("/pipeline/demo");
       setDemo(d);
-      setFlow(await call<Flow>(`/pipeline/demo/flow/${d.focus}`));
+      const pick = selectedRef.current || d.focus;
+      const [f, r] = await Promise.all([call<Flow>(`/pipeline/demo/flow/${pick}`), call<Row[]>("/pipeline/demo/invoices")]);
+      setFlow(f); setRows(r);
     } catch (e) {
       if (!/demo not started/.test(String(e))) setError(String((e as Error).message || e));
       setDemo(null);
@@ -198,6 +253,8 @@ export function LivePipeline() {
       refresh();
     });
     on("day_done", () => refresh());
+    on("email_sent", m => log("system", "email", `${m.invoice_id} · ${m.subject}${m.simulated ? " (simulated)" : ""}`));
+    on("email_failed", m => log("system", "refused", `email not sent: ${m.error}`));
     return () => es.close();
   }, [refresh]);
 
@@ -205,6 +262,7 @@ export function LivePipeline() {
   useEffect(() => { thinkRef.current?.scrollTo({ top: thinkRef.current.scrollHeight }); }, [live?.thinking, live?.tools.length]);
   useEffect(() => { recordRef.current?.scrollTo({ top: recordRef.current.scrollHeight, behavior: "smooth" }); }, [flow?.tasks.length]);
 
+  const select = (id: string) => { selectedRef.current = id; setSelected(id); setOpen(null); refresh(); };
   const act = async (what: string, path: string) => {
     setBusy(what); setError("");
     try { await call(path, "POST"); } catch (e) { setError(String((e as Error).message || e)); playRef.current = false; setPlaying(false); }
@@ -230,18 +288,19 @@ export function LivePipeline() {
     act(approve ? "Approving" : "Rejecting", `/pipeline/demo/actions/${encodeURIComponent(id)}/decide?approve=${approve}&note=${approve ? "approved" : "rejected"}`);
 
   const tasks = flow?.tasks || [];
-  const usage = tasks.reduce((u, t) => {
-    const x = t.trace?.usage || {};
-    if (!x.output_tokens) return u;
-    return { calls: u.calls + 1, input: u.input + (x.input_tokens || 0) + (x.cache_read_input_tokens || 0),
-      cached: u.cached + (x.cache_read_input_tokens || 0), output: u.output + (x.output_tokens || 0) };
-  }, { calls: 0, input: 0, cached: 0, output: 0 });
+  // Every agent call across all invoices, not just the case on screen.
+  const usage = rows.reduce((u, r) => (r.usage ? { calls: u.calls + r.usage.calls, input: u.input + r.usage.input,
+    cached: u.cached + r.usage.cached, output: u.output + r.usage.output } : u), { calls: 0, input: 0, cached: 0, output: 0 });
   const cost = (usage.input - usage.cached) * PRICE.input + usage.cached * PRICE.cached + usage.output * PRICE.output;
   const pending = flow?.chaser_actions.find(a => ["needs_approval", "needs_controller"].includes(a.status));
-  const review = flow?.case?.state === "needs_controller";
+  const raised = !!flow?.chaser_actions.some(a => a.action === "escalate");
+  const review = flow?.case?.state === "needs_controller" || raised;
+  const current = selected || demo?.focus || "";
+  const emails = rows.reduce((n, r) => n + r.reminders.length, 0);
   const controllerWaiting = !!pending || review;
   const activeAgent = live?.status === "working" ? live.agent : null;
-  const ran = (k: string) => (k === "agreement" ? (flow?.rules.length ?? 0) > 0 : tasks.some(t => t.agent === k));
+  const ran = (k: string) => (k === "agreement" ? (flow?.rules.length ?? 0) > 0
+    : tasks.some(t => t.agent === k) || rows.some(r => r.last?.agent === k));
   const finished = !!demo?.done && live?.status !== "working";
 
   return (
@@ -250,7 +309,7 @@ export function LivePipeline() {
         <div className={s.title}>
           <span className={`${s.dot} ${connected ? s.on : ""}`} />
           <span className="micro">{connected ? "Live" : "Connecting"}</span>
-          {demo && flow && <span className={s.mono}>{demo.focus} · {flow.vendor} · {day(demo.today)}</span>}
+          {demo && <span className={s.mono}>Keyway Property Management · {day(demo.today)}</span>}
         </div>
         <div className={s.controls}>
           {busy && <span className={s.busy}>{busy}</span>}
@@ -264,10 +323,8 @@ export function LivePipeline() {
 
       {error && <div className={s.error}>{error}</div>}
 
-      {demo && flow && <CaseStrip flow={flow} today={demo.today} />}
-
       {demo && <div className={s.metrics}>
-        {[["Model calls", num(usage.calls)], ["Input tokens", num(usage.input)],
+        {[["Invoices checked", num(rows.length)], ["Reminder emails", num(emails)], ["Model calls", num(usage.calls)], ["Input tokens", num(usage.input)],
           ["Output tokens", num(usage.output)], ["Cost", `$${cost.toFixed(3)}`]].map(([k, v]) =>
           <div key={k} className={s.metric}><span className="micro">{k}</span><b>{v}</b></div>)}
       </div>}
@@ -282,6 +339,12 @@ export function LivePipeline() {
         })}
       </div>}
 
+      {demo && <InvoiceTable rows={rows} selected={current} working={activeAgent ? live?.invoice_id || null : null} onSelect={select} />}
+
+      {demo && flow && <div className={s.caseHead}><span className="micro">Case</span>
+        <span className={s.mono}>{current} · {flow.vendor}</span></div>}
+      {demo && flow && <CaseStrip flow={flow} today={demo.today} />}
+
       {pending && <div className={s.approval}>
         <span className="micro">Approval required{!playing && " · paused"}</span>
         <span>{(pending.level || pending.action).replace("_", " ")} reminder to Keyway · {pending.invoice_id}</span>
@@ -294,7 +357,7 @@ export function LivePipeline() {
         <section className={`card ${s.panel}`}>
           <div className={s.panelHead}>
             <span className="micro">Live reasoning</span>
-            {live && <span className={s.mono}>{live.agent} agent · {day(live.day)}</span>}
+            {live && <button className={s.linkBtn} onClick={() => select(live.invoice_id)}>{live.agent} agent · {live.invoice_id} · {day(live.day)}</button>}
             {live && <span className={`${s.state} ${s[live.status]}`}>{live.status === "working" ? "Working" : live.status === "failed" ? "Failed" : "Done"}</span>}
           </div>
           {live ? <div className={s.liveBody} ref={thinkRef}>
@@ -316,7 +379,7 @@ export function LivePipeline() {
         </section>
 
         <section className={`card ${s.panel}`}>
-          <div className={s.panelHead}><span className="micro">Decisions</span><span className={s.mono}>oldest first</span></div>
+          <div className={s.panelHead}><span className="micro">Decisions · {current}</span><span className={s.mono}>oldest first</span></div>
           <div className={s.record} ref={recordRef}>
             {tasks.length === 0 && <p className={s.empty}>No decisions yet.</p>}
             {flow && tasks.map(t => {
@@ -343,7 +406,8 @@ export function LivePipeline() {
                 <span className={s.mono}>{day(demo.today)}</span><span className={s.agentTag}>controller</span>
                 <span className={`${s.badge} ${s.hold}`}>Decision pending</span><span className={s.src}>Human</span>
               </div>
-              <p className={s.itemText}>Review: {(flow?.case?.findings || []).map(f => FINDING[f.code] || f.message).join("; ")}. Only a person can close this case or hold funds.</p>
+              <p className={s.itemText}>Review: {[...(flow?.case?.findings || []).map(f => FINDING[f.code] || f.message),
+                ...(raised ? ["no proof of payment after three reminders"] : [])].join("; ")}. Only a person can close this case or hold funds.</p>
             </div>}
           </div>
         </section>

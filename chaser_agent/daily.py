@@ -10,15 +10,21 @@ Code decides every step; nothing here calls a model or sends a message.
     4. Not past the deadline -> wait.
     5. Overdue -> next reminder on the approved ladder (polite -> firm -> escalation). Spacing
        comes from the agreement's reminder or grace clause (`reminder_cadence`), never below the
-       approved 5-day floor. The polite reminder is queued automatically; firm and escalation
-       reminders wait for controller approval. A declined draft is redrafted after one cadence.
+       approved 5-day floor. Levels in CHASER_AUTO_LEVELS (default: all three) are queued
+       automatically; any other level waits for controller approval. A declined draft is
+       redrafted after one cadence. Only proof of payment (a bank record) stops the ladder.
     6. One cadence after the escalation reminder -> escalate: notify the owner and the
        management company, propose holding the amount owed from the next funding, and open a
-       controller review.
+       controller review. The notice goes out automatically (CHASER_AUTO_ESCALATE=on); the hold
+       is always the controller's decision.
+
+A vendor without its own agreement is held to the deadline terms of the owner's management
+agreement with the manager (`rules_for`).
 """
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
@@ -28,7 +34,13 @@ from rails.guards.policy import policy_check
 from rails.guards.templates import LEVEL_ORDER, MIN_DAYS_BETWEEN
 
 _SUFFIX = re.compile(r"\b(llc|inc|co|corp|ltd|company|l\.l\.c\.)\b\.?", re.IGNORECASE)
-AUTO_LEVELS = {"polite"}               # sent without approval; firmer levels need the controller
+# Reminder levels sent without approval (the templates themselves are controller-approved).
+AUTO_LEVELS = {x.strip() for x in os.getenv("CHASER_AUTO_LEVELS", "polite,firm,escalation").split(",")
+               if x.strip()}
+AUTO_ESCALATE = os.getenv("CHASER_AUTO_ESCALATE", "on").lower() == "on"
+# What a management agreement contributes for vendors without their own: when to pay, how often
+# to remind. Its payee and account rules describe paying the manager, not the vendor.
+MANAGEMENT_TERMS = ("pay_within_days", "reminder_cadence")
 DELIVERED = {"queued", "approved"}
 
 
@@ -81,6 +93,15 @@ def _rules_by_vendor(rule_rows: list[dict]) -> dict[str, list[dict]]:
         out.setdefault(norm_name(r["vendor_name"]), []).append(
             {**r, "params": json.loads(r["params"]) if isinstance(r["params"], str) else r["params"]})
     return out
+
+
+def rules_for(by_vendor: dict[str, list[dict]], vendor: str, manager_name: str) -> list[dict]:
+    """The vendor's own agreement rules; without them, the deadline and reminder terms of the
+    management agreement the manager signed with the owner (it says when every vendor is paid)."""
+    own = by_vendor.get(norm_name(vendor), [])
+    if own:
+        return own
+    return [r for r in by_vendor.get(norm_name(manager_name), []) if r["rule_type"] in MANAGEMENT_TERMS]
 
 
 def _cadence(rules: list[dict]) -> tuple[int, str]:
@@ -140,6 +161,9 @@ def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history
         return Decision(**base, **cite, action="not_due", amount_owed=owed,
                         reason=f"due {due} ({(due - today).days} days left) under "
                                f"'{term['check']}'")
+    if not line.funded_amount:
+        return Decision(**base, **cite, action="skip",
+                        reason="Oakline has not funded this invoice; nothing to chase")
     return _chase(base, cite, line, manager_name, rules, history, today, due, owed)
 
 
@@ -167,7 +191,8 @@ def _chase(base, cite, line, manager_name, rules, history, today, due, owed) -> 
                   f"the {due} deadline after all three reminders. Notified: Oakline (owner) and "
                   f"{manager_name} (management). Proposed: hold ${owed:,.2f} from the next funding "
                   f"to {manager_name} until it is paid. Controller decision required.")
-        return Decision(**common, action="escalate", status="needs_controller", message=notice,
+        return Decision(**common, action="escalate", message=notice,
+                        status="queued" if AUTO_ESCALATE else "needs_controller",
                         reason="escalated to owner and management; hold proposed for the controller")
     level = LEVEL_ORDER[LEVEL_ORDER.index(sent[-1]["level"]) + 1] if sent else LEVEL_ORDER[0]
     declined = [h for h in drafts if h["status"] == "rejected"]
@@ -211,7 +236,7 @@ def run(rails, rule_rows: list[dict], history_rows: list[dict], today: date,
         if line.duplicate_of:
             continue
         vendor = name(line.vendor_id)
-        d = decide(line, vendor, name(manager_id), rules.get(norm_name(vendor), []),
+        d = decide(line, vendor, name(manager_id), rules_for(rules, vendor, name(manager_id)),
                    history.get(line.invoice_id, []), today, invoice_docs.get(line.invoice_id))
         if d.action in ("reminder", "escalate", "wait") and vendor in patterns:
             # The vendor's payment history travels with every chasing decision.

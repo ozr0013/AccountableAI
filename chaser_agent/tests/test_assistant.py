@@ -11,7 +11,7 @@ TODAY = date(2026, 4, 22)
 
 
 def _line(inv, vendor, received, paid_on=None, amount=100.0):
-    return LedgerLine(invoice_id=inv, manager_id="keyway", vendor_id=vendor, amount=amount,
+    return LedgerLine(invoice_id=inv, manager_id="keyway", vendor_id=vendor, amount=amount, funded_amount=amount,
                       invoice_received=received, paid_amount=amount if paid_on else 0.0,
                       paid_on=paid_on, due_date=None)
 

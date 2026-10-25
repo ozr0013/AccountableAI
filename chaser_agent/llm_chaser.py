@@ -42,7 +42,7 @@ class ChaserTools:
         self.rule_rows = mirror.query("SELECT * FROM agreement_rule")
         vendor = self.name(self.line.vendor_id) if self.line else ""
         self.vendor = vendor
-        self.rules = daily._rules_by_vendor(self.rule_rows).get(daily.norm_name(vendor), [])
+        self.rules = daily.rules_for(daily._rules_by_vendor(self.rule_rows), vendor, self.name(manager_id))
         self.history = [h for h in history_rows if h["invoice_id"] == invoice_id]
         self.code = (daily.decide(self.line, vendor, self.name(manager_id), self.rules,
                                   self.history, today) if self.line else None)

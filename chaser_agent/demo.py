@@ -9,8 +9,10 @@ calendar, simulated email delivery and resets never touch the real data. Each `n
     4. the agents work the queue: Claude is called only where there is a decision to make
     5. reminders queued today are delivered (simulated, receipt recorded) so the ladder can move
 
-Real: the agents, Claude calls, guardrails, queue, traces, both databases.
-Simulated: the calendar speed, the storyboard evidence and email delivery.
+Real: the agents, Claude calls, guardrails, queue, traces, both databases, and with
+DEMO_EMAIL=on the emails (SMTP_* settings; WORKFLOW_MANAGEMENT_EMAIL / WORKFLOW_OWNER_EMAIL stand in
+for Keyway and Oakline).
+Simulated: the calendar speed, the storyboard evidence, and email delivery when DEMO_EMAIL is off.
 """
 from __future__ import annotations
 
@@ -88,16 +90,37 @@ def state(demo) -> dict:
                            for d, docs in sorted(STORYBOARD.items()) for doc in docs]}
 
 
+MAIL_KINDS = ("chase_reminder", "escalation")
+
+
+def transport_subject(row) -> str:
+    from .transport import _subject
+    return _subject(row)
+
+
 def _deliver(demo, mirror, today: date) -> list[str]:
-    from . import connected
+    import os
+
+    from . import connected, runtime
+    if os.getenv("DEMO_EMAIL", "off").lower() == "on":
+        from . import transport
+        sent = transport.dispatch(demo, mirror, pipeline.MANAGER, enabled=True, kinds=MAIL_KINDS,
+                                  as_of=today)
+        for item in sent["sent"]:
+            runtime.emit({"type": "email_sent", "day": today.isoformat(), **item})
+        for err in sent["errors"]:
+            runtime.emit({"type": "email_failed", "day": today.isoformat(), **err})
+        return sent["delivered"]
     delivered = []
     for case in connected.cases(demo, pipeline.MANAGER):
         for o in case["outbox"]:
-            if o["status"] == "queued" and o.get("action_id") and o["kind"] in (
-                    "chase_reminder", "escalation"):
+            if o["status"] == "queued" and o.get("action_id") and o["kind"] in MAIL_KINDS:
                 connected.acknowledge(demo, mirror, o["id"], f"simulated-email-{today}",
                                       "demo_mailer", pipeline.MANAGER)
                 delivered.append(o["id"])
+                runtime.emit({"type": "email_sent", "day": today.isoformat(), "outbox_id": o["id"],
+                              "invoice_id": case["invoice_id"], "kind": o["kind"],
+                              "subject": transport_subject(o), "simulated": True})
     return delivered
 
 

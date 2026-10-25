@@ -31,14 +31,32 @@ def _recipients(row):
     return list(dict.fromkeys(addresses))
 
 
-def dispatch(rails, mirror, manager="keyway"):
+FOOTER = ("\n\n--\nSent by AccountableAI for Oakline Homes. "
+          "Demo: the companies and invoices are fictional.")
+
+
+def _subject(row):
+    """Mailbox-friendly subject: what the message is and which invoice."""
+    parts = (row.get("action_id") or "").split(":")
+    level = parts[2] if len(parts) > 2 and row["kind"] == "chase_reminder" else None
+    if row["kind"] == "escalation":
+        return f"Unresolved payment raised to Oakline: {row['invoice_id']}"
+    if level:
+        return f"{level.capitalize()} reminder: payment for {row['invoice_id']}"
+    return f"Finance workflow: {row['invoice_id']} — {row['kind']}"
+
+
+def dispatch(rails, mirror, manager="keyway", *, enabled=None, kinds=None, as_of=None):
     """Deliver current approved outbox actions only when explicitly configured.
 
-    Returns enabled/configured booleans, delivered outbox IDs, and sanitized errors.
-    SMTP credentials, message bodies and recipient addresses are never placed in errors.
+    `enabled` overrides WORKFLOW_EMAIL_SEND (the demo has its own switch); `kinds` limits which
+    outbox kinds are sent. Returns enabled/configured booleans, delivered outbox IDs, and
+    sanitized errors. SMTP credentials, message bodies and recipient addresses are never placed
+    in errors.
     """
-    enabled = os.getenv("WORKFLOW_EMAIL_SEND", "off").lower() == "on"
-    result = {"enabled": enabled, "configured": False, "delivered": [], "errors": []}
+    if enabled is None:
+        enabled = os.getenv("WORKFLOW_EMAIL_SEND", "off").lower() == "on"
+    result = {"enabled": enabled, "configured": False, "delivered": [], "sent": [], "errors": []}
     if not enabled:
         return result
     host = os.getenv("SMTP_HOST", "").strip()
@@ -61,7 +79,7 @@ def dispatch(rails, mirror, manager="keyway"):
     ):
         result["errors"].append({"outbox_id": None, "error": "smtp_not_configured"})
         return result
-    current = connected.reconcile(rails, mirror, manager)
+    current = connected.reconcile(rails, mirror, manager, as_of=as_of)
     result["configured"] = True
     attempted = {
         e.payload.get("outbox_id")
@@ -71,7 +89,7 @@ def dispatch(rails, mirror, manager="keyway"):
     for case in current:
         for row in case["outbox"]:
             ident = row["id"]
-            if row["status"] != "queued":
+            if row["status"] != "queued" or (kinds and row["kind"] not in kinds):
                 continue
             if ident in attempted:
                 result["errors"].append(
@@ -96,9 +114,9 @@ def dispatch(rails, mirror, manager="keyway"):
                 message = EmailMessage()
                 message["From"] = sender
                 message["To"] = ", ".join(recipients)
-                message["Subject"] = f"Finance workflow: {row['invoice_id']} — {row['kind']}"
+                message["Subject"] = _subject(row)
                 message["Message-ID"] = message_id
-                message.set_content(row["body"])
+                message.set_content(row["body"] + FOOTER)
                 with smtplib.SMTP(host, port, timeout=30) as client:
                     if os.getenv("SMTP_STARTTLS", "on").lower() != "off":
                         client.starttls(context=ssl.create_default_context())
@@ -116,6 +134,8 @@ def dispatch(rails, mirror, manager="keyway"):
                     manager=manager,
                 )
                 result["delivered"].append(ident)
+                result["sent"].append({"outbox_id": ident, "invoice_id": row["invoice_id"],
+                                       "kind": row["kind"], "subject": _subject(row)})
             except Exception as exc:  # noqa: BLE001 - ambiguous transport outcomes require human review
                 error = type(exc).__name__
                 connected.record(

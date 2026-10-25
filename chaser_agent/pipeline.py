@@ -49,12 +49,13 @@ def dispatch(rails, mirror, today: date, vendor: str | None = None,
     `since`: skip invoices already paid in full before that day (settled history)."""
     from workflow.names import names_from
     name = names_from(rails)
-    covered = {daily.norm_name(r["vendor_name"]) for r in mirror.query("SELECT * FROM agreement_rule")}
+    by_vendor = daily._rules_by_vendor(mirror.query("SELECT * FROM agreement_rule"))
+    manager = name(MANAGER)
     done = {t["invoice_id"] for t in tasks(mirror, agent="anomaly")}
     out = []
     for line in rails.ledger(MANAGER):
         v = name(line.vendor_id)
-        if line.duplicate_of or daily.norm_name(v) not in covered or line.invoice_id in done:
+        if line.duplicate_of or not daily.rules_for(by_vendor, v, manager) or line.invoice_id in done:
             continue
         if vendor and daily.norm_name(vendor) != daily.norm_name(v):
             continue
@@ -172,8 +173,8 @@ def flow(rails, mirror, invoice_id: str) -> dict:
     key = daily.norm_name(vendor)
     agreements = [a for a in mirror.query("SELECT * FROM agreement")
                   if daily.norm_name(a.get("vendor_name") or "") == key]
-    rules = [r for r in mirror.query("SELECT * FROM agreement_rule")
-             if daily.norm_name(r["vendor_name"]) == key]
+    rules = daily.rules_for(daily._rules_by_vendor(mirror.query("SELECT * FROM agreement_rule")),
+                            vendor, names_from(rails)(MANAGER))
     case = next((c for c in connected.cases(rails, MANAGER) if c["invoice_id"] == invoice_id), None)
     return {
         "invoice": line.model_dump(mode="json"), "vendor": vendor,
@@ -204,3 +205,75 @@ def _statement_claims(rails, invoice_id: str) -> list[dict]:
            for d in rails.documents(MANAGER) if d.kind.value == "manager_statement"
            for row in d.data.get("lines", []) if row.get("invoice_id") == invoice_id]
     return sorted(out, key=lambda c: c["dated"])
+
+
+def ledger_view(rails, mirror, today: date) -> list[dict]:
+    """Every invoice checked against its deadline, by code (no model): what was funded, when it
+    was due and under which agreement, whether and when it was paid, how many reminders went out,
+    and what the agents last decided. The live agents work only the rows that need a decision."""
+    from workflow.names import names_from
+
+    from . import api as service
+    name = names_from(rails)
+    manager = name(MANAGER)
+    by_vendor = daily._rules_by_vendor(mirror.query("SELECT * FROM agreement_rule"))
+    actions: dict[str, list[dict]] = {}
+    for h in service.history(mirror):
+        actions.setdefault(h["invoice_id"], []).append(h)
+    last_task: dict[str, dict] = {}
+    usage: dict[str, dict] = {}
+    for t in tasks(mirror):
+        if t["status"] in ("done", "failed"):
+            last_task[t["invoice_id"]] = t
+        u = (t.get("trace") or {}).get("usage") or {}
+        if u.get("output_tokens"):
+            acc = usage.setdefault(t["invoice_id"], {"calls": 0, "input": 0, "cached": 0, "output": 0})
+            acc["calls"] += 1
+            acc["input"] += (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
+            acc["cached"] += u.get("cache_read_input_tokens") or 0
+            acc["output"] += u.get("output_tokens") or 0
+    out = []
+    for line in rails.ledger(MANAGER):
+        if line.duplicate_of:
+            continue
+        vendor = name(line.vendor_id)
+        own = by_vendor.get(daily.norm_name(vendor))
+        rules = daily.rules_for(by_vendor, vendor, manager)
+        term = next((r for r in rules if r["rule_type"] == "pay_within_days" and r["status"] == "active"), None)
+        due = (daily.add_days(line.invoice_received, int(term["params"]["days"]),
+                              term["params"].get("basis", "calendar"))
+               if term and line.invoice_received else None)
+        paid_on = line.paid_on if line.paid_on and line.paid_on <= today else None
+        paid = line.paid_amount if paid_on else 0.0
+        if not line.funded_amount:
+            state, days_ = "not_funded", None
+        elif paid and paid + 0.005 < line.amount:
+            state, days_ = "partial", None
+        elif paid:
+            days_ = (paid_on - due).days if due else None
+            state = "paid_late" if days_ and days_ > 0 else "paid_on_time"
+        elif due is None:
+            state, days_ = "no_deadline", None
+        elif today > due:
+            state, days_ = "overdue", (today - due).days
+        else:
+            state, days_ = "not_due", (due - today).days
+        rows = actions.get(line.invoice_id, [])
+        reminders = [h for h in rows if h["action"] == "reminder" and h["status"] in ("queued", "approved")]
+        t = last_task.get(line.invoice_id)
+        out.append({
+            "invoice_id": line.invoice_id, "vendor": vendor, "amount": line.amount,
+            "funded_amount": line.funded_amount, "deadline": due.isoformat() if due else None,
+            "deadline_source": ("vendor agreement" if own else "management agreement") if term else None,
+            "paid_on": paid_on.isoformat() if paid_on else None, "paid_amount": paid,
+            "state": state, "days": days_,
+            "reminders": sorted({h["level"] for h in reminders if h.get("level")},
+                                key=lambda lv: daily.LEVEL_ORDER.index(lv)),
+            "escalated": any(h["action"] == "escalate" for h in rows),
+            "usage": usage.get(line.invoice_id),
+            "last": ({"agent": t["agent"], "day": t["as_of"], "decision": t["outcome"].get("decision"),
+                      "verdict": t["outcome"].get("verdict"),
+                      "by": "schedule" if t["outcome"].get("decided_by") == "schedule" else "claude"}
+                     if t else None),
+        })
+    return out

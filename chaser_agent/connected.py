@@ -16,7 +16,7 @@ from agents.anomaly import AnomalyAgent
 from contracts.models import Event, SourceKind
 from workflow.names import names_from
 
-from .daily import _rules_by_vendor, add_days, norm_name
+from .daily import _rules_by_vendor, add_days, norm_name, rules_for
 
 
 class _ReconcileSnapshot:
@@ -478,7 +478,8 @@ def reconcile(rails, mirror, manager="keyway", as_of=None):
             continue
         invoice_actions = [a for a in actions if a["invoice_id"] == line.invoice_id]
         state, findings, desired, fingerprint, eligible = _project(
-            rails, line, rules.get(norm_name(name(line.vendor_id)), []), invoice_actions, today
+            rails, line, rules_for(rules, name(line.vendor_id), name(line.manager_id)), invoice_actions,
+            today
         )
         # Approval binds the evidence/rules under which an action first entered the outbox.
         # A changed agreement cannot implicitly authorize another copy of an old draft.

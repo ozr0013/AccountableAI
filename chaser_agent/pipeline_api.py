@@ -170,6 +170,13 @@ def demo_next_day() -> dict:
         return _claude_errors(lambda: demo.next_day(_demo_rails(), service._mirror()))
 
 
+@router.get("/demo/invoices")
+def demo_invoices() -> list[dict]:
+    """Every invoice in the demo books against its deadline (code only, no model calls)."""
+    r = _demo_rails()
+    return pipeline.ledger_view(r, service._mirror(), r.now())
+
+
 @router.get("/demo/flow/{invoice_id}")
 def demo_flow(invoice_id: str) -> dict:
     try:

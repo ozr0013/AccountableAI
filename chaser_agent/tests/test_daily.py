@@ -12,7 +12,7 @@ RULES = [DEADLINE]
 
 def _line(paid=0.0):
     return LedgerLine(invoice_id="INV-KW-0301", manager_id="keyway", vendor_id="v-riogrande",
-                      amount=1240.0, invoice_received=date(2026, 3, 3), paid_amount=paid,
+                      amount=1240.0, funded_amount=1240.0, invoice_received=date(2026, 3, 3), paid_amount=paid,
                       paid_on=date(2026, 3, 20) if paid else None)
 
 
@@ -91,3 +91,35 @@ def test_no_agreement_is_skipped():
 def test_business_days_skip_weekends_and_names_match_without_suffixes():
     assert add_days(date(2026, 4, 24), 2, "business") == date(2026, 4, 28)
     assert norm_name("Rio Grande Plumbing LLC") == norm_name("Rio Grande Plumbing")
+
+
+def test_vendor_without_agreement_uses_the_management_agreement_deadline_only():
+    from chaser_agent.daily import _rules_by_vendor, rules_for
+    rows = [{**DEADLINE, "vendor_name": "Keyway Property Management", "params": {"days": 10}},
+            {"rule_id": "m:payee", "rule_type": "payee", "status": "active", "params": {},
+             "check": "name Keyway", "vendor_name": "Keyway Property Management"},
+            {**DEADLINE, "vendor_name": "Rio Grande Plumbing LLC"}]
+    by_vendor = _rules_by_vendor(rows)
+    assert rules_for(by_vendor, "Rio Grande Plumbing", "Keyway Property Management")[0]["params"]["days"] == 30
+    fallback = rules_for(by_vendor, "Topline Roofing", "Keyway Property Management")
+    assert [r["rule_type"] for r in fallback] == ["pay_within_days"]
+    assert fallback[0]["params"]["days"] == 10
+
+
+def test_unfunded_invoice_is_not_chased():
+    line = LedgerLine(invoice_id="INV-KW-0601", manager_id="keyway", vendor_id="v-x", amount=8400.0,
+                      invoice_received=date(2026, 3, 3))
+    d = decide(line, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22))
+    assert d.action == "skip" and "not funded" in d.reason
+
+
+def test_all_levels_and_the_escalation_notice_go_out_without_approval(monkeypatch):
+    from chaser_agent import daily
+    monkeypatch.setattr(daily, "AUTO_LEVELS", {"polite", "firm", "escalation"})
+    monkeypatch.setattr(daily, "AUTO_ESCALATE", True)
+    firm = _decide(date(2026, 4, 27), [_row("polite", "2026-04-22", "queued")])
+    assert (firm.level, firm.status) == ("firm", "queued")
+    sent = [_row("polite", "2026-04-22", "queued"), _row("firm", "2026-04-27", "queued"),
+            _row("escalation", "2026-05-02", "queued")]
+    raised = _decide(date(2026, 5, 7), sent)
+    assert raised.action == "escalate" and raised.status == "queued"
