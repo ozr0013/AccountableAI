@@ -25,7 +25,7 @@ export default function Ask() {
 
   return (
     <>
-      <PageTop title="Ask about Keyway" sub="Answered from the system's own record. Every claim cites a source; uncited or accusatory claims are dropped." />
+      <PageTop title="Ask about Keyway" sub="Answers from the record, every claim cited." />
       <div className="card" style={{ padding: 24 }}>
         <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }}>
           <input className="input" style={{ height: 52, fontSize: 18 }} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Question about Keyway" />

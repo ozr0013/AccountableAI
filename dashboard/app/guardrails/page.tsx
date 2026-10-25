@@ -19,7 +19,7 @@ export default function Guardrails() {
   if (!state) return <><PageTop title="Guardrails" /><Loading /></>;
   return (
     <>
-      <PageTop title="Guardrails" sub="Your boundaries, enforced in code. Open a rule to learn more." />
+      <PageTop title="Guardrails" sub="Rules the system can't break, enforced in code." />
       <Disclosure title="Policy check results" hint="Inspect actions, actors, and reasons" meta={`${state.guardrails.filter((g) => !g.allowed).length} refused`}>
       <div className="card" style={{ padding: "16px 8px 4px" }}>
         <table className="table">

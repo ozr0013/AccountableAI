@@ -9,7 +9,7 @@ import { PageTop } from "@/components/ui";
  *  (components/JudgeConsole). The recorded 20-PDF run (components/LiveRun) stays below as evidence. */
 export default function Console() {
   return <>
-    <PageTop title="Judge Console" sub="Give the engine something real, your own if you like, and watch each agent it wakes up. It works on the same books every tab shows." />
+    <PageTop title="Judge Console" sub="Give the engine something and watch every agent it wakes." />
     <JudgeConsole />
     <Disclosure title="Recorded run: 20 outside PDFs" hint="Paperwork we didn't write, read by Sonnet over 15 simulated days (Oct 24)">
       <LiveRun />

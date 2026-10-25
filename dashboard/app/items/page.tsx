@@ -9,7 +9,7 @@ export default function Items() {
   const { state } = useFeed();
   if (!state) return <><PageTop title="Needs attention" /><Loading /></>;
   return <>
-    <PageTop title="Needs attention" sub="The few items that need a closer look." />
+    <PageTop title="Needs attention" sub="What still needs someone." />
     <NeedsAttention state={state} />
   </>;
 }

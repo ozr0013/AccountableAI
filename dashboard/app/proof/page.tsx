@@ -48,7 +48,7 @@ export default function Proof() {
   const read = pack ? pack.files.filter((f) => f.use !== "rejected").length : 0;
 
   return <>
-    <PageTop title="Proof, not promises" sub="Every number here comes from a scored run in the repository. Newest first; earlier runs stay below." />
+    <PageTop title="Proof & evals" sub="Scored runs, newest first." />
 
     {pack && <>
       <section className="proof-hero">

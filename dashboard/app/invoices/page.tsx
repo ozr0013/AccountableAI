@@ -38,7 +38,7 @@ export default function Invoices() {
   const total = (k: "amount" | "paid" | "owed") => rows.reduce((s, i) => s + i[k], 0);
 
   return <>
-    <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor invoice Keyway was funded for, across Oakline's homes."} />
+    <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor bill Keyway was funded for."} />
     <div className="sim-stats">
       <div><span>Invoices</span><strong>{rows.length}</strong><small>{state.items.length} in total</small></div>
       <div><span>Billed</span><strong>{money(total("amount"))}</strong><small>by vendors</small></div>

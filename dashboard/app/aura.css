@@ -72,8 +72,8 @@
 .theme-aura .nav-disclosure, .theme-aura .demo-disclosure { background: transparent; }
 
 /* type */
-.theme-aura .top h1 { font-weight: 500; letter-spacing: -.045em; font-size: 40px; line-height: 44px; }
-.theme-aura .top .muted { font-size: 15px; }
+.theme-aura .top h1 { font-weight: 600; letter-spacing: -.03em; font-size: 28px; line-height: 32px; }
+.theme-aura .top .muted { font-size: 13.5px; }
 .theme-aura .label { font-family: var(--mono); color: var(--n9); }
 .theme-aura .chip { background: #ffffffcc; border-color: var(--line); color: var(--n9); }
 
@@ -139,7 +139,7 @@
 .theme-aura .brand { flex: none; height: 58px; padding: 0 22px; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .theme-aura .main { min-height: 100vh; padding-top: 20px; border-right: 1px solid var(--line); }
 .theme-aura .main > .wrap { max-width: 1600px; }
-.theme-aura .top { position: relative; padding-bottom: 22px; margin-bottom: 28px; }
+.theme-aura .top { position: relative; align-items: center; padding-bottom: 16px; margin-bottom: 20px; }
 .theme-aura .top::after { content: ""; position: absolute; left: -40px; right: -40px; bottom: 0; height: 1px; background: var(--line); }
 .theme-aura .top::before { content: ""; position: absolute; left: -45px; right: -45px; bottom: -5px; height: 11px; pointer-events: none;
   background: linear-gradient(#9fb0d2, #9fb0d2) left 5px top 0 / 1px 11px no-repeat, linear-gradient(#9fb0d2, #9fb0d2) left 0 top 5px / 11px 1px no-repeat,

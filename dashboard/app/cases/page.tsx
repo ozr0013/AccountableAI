@@ -107,7 +107,7 @@ export default function Cases() {
 
   return (
     <>
-      <PageTop title="Review queue" sub="What still needs someone, and the holds waiting for your decision. Nothing here moves money." />
+      <PageTop title="Review queue" sub="What needs someone, and the holds waiting for you." />
       <NeedsAttention state={state} />
       <h2 className="lr-h">Waiting for your decision</h2>
       <div className="case-layout">

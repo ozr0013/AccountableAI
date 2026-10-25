@@ -27,7 +27,7 @@ export default function Agents() {
 
   return (
     <>
-      <PageTop title="Agents" sub={`${live ? "Claude (Sonnet agents, verifier model stage), metered" : "Rules mode: the agents' deterministic rules, no API cost"}. Code decides what runs next; agents only judge.`} />
+      <PageTop title="Agents" sub={`${live ? "Claude agents, metered" : "Rules mode, no model cost"}. Code decides what runs; agents only judge.`} />
 
       {session.length > 0 && (
         <Disclosure title="Session history" hint="Actions and their agent responses" meta={`${state.history.length} actions`}>

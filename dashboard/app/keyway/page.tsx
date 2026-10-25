@@ -31,7 +31,7 @@ export default function Keyway() {
 
   return (
     <>
-      <PageTop title={state.meta.manager} sub="The middleman Oakline funds. Every dollar from 'funded' to 'vendor confirmed paid'." />
+      <PageTop title={state.meta.manager} sub="Every dollar from funded to paid." />
 
       <MoneyStrip state={state} />
       <Disclosure title="Where the money went" hint="Reconciliation and payment breakdown">

@@ -26,7 +26,7 @@ export default function Overview() {
 
   return (
     <>
-      <PageTop title="Your money, accounted for." sub="A clear view of Keyway. Start with what needs you." />
+      <PageTop title="Overview" sub="Where Oakline's money to Keyway stands today." />
 
       {open.length > 0 && (
         <section className="ov-alerts" aria-label="Needs a closer look">
