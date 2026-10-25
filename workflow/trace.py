@@ -281,7 +281,8 @@ class TracedAgents:
         return r
 
     def detect_anomalies(self, statement, ledger):
-        q = f"Do the amounts on {statement.id} match what Oakline approved to pay?"
+        which = f"the statement dated {statement.dated:%b} {statement.dated.day}" if statement.dated else statement.id
+        q = f"Do the amounts on {which} match what Oakline approved to pay?"
         r, ms_steps, mode, usage, ms = self._call("anomaly", None, q, self.inner.detect_anomalies,
                                                   statement, ledger)
         steps = [ReasonStep(kind="fact", text=f"Read {r.checked} statement line(s) ({r.read_by})"),

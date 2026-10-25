@@ -1,5 +1,5 @@
-"""Kanishka: payment-trail agent."""
+"""Kanishka: payment trail. Deterministic: the winner comes from rails' source-trust rules."""
 
-from .agent import TrailAgent
+from .rules import build_trail
 
-__all__ = ["TrailAgent"]
+__all__ = ["build_trail"]

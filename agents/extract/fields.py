@@ -96,6 +96,21 @@ _REF = [re.compile(r"\bINV-KW-(\d{3,4})\b", re.IGNORECASE),
         re.compile(r"\b(?:Keyway\s*)?(?:WO|Work\s*Order)\s*#?\s*(\d{3,4})\b", re.IGNORECASE)]
 
 
+# "Invoice #: 4471", "Invoice no. #2210", "INVOICE NO 2231", "INVOICE G-0291", "inv 4502"
+_INVNO = re.compile(r"\b(?:invoice|inv)\.?\s*(?:#|no\.?|number)?\s*[:#]?\s*#?\s*([A-Z]{0,4}-?\d{3,6})\b",
+                    re.IGNORECASE)
+
+
+def vendor_invoice_numbers(text: str) -> list[str]:
+    """The vendor's own invoice numbers mentioned in text, as written (no Keyway references)."""
+    out: list[str] = []
+    for m in _INVNO.finditer(text or ""):
+        no = m[1].upper()
+        if not no.startswith("KW") and no not in out:
+            out.append(no)
+    return out
+
+
 def keyway_refs(text: str) -> list[str]:
     out: list[str] = []
     for rx in _REF:
@@ -129,9 +144,12 @@ def _squash(name: str) -> str:
 class VendorIndex:
     """Fuzzy lookup of a name or email address to a vendor id. Returns (id, score) or (None, s)."""
 
-    def __init__(self, vendors, domains: dict[str, str] | None = None):
+    def __init__(self, vendors, domains: dict[str, str] | None = None,
+                 aliases: dict[str, str] | None = None):
         self.vendors = list(vendors)
         self.domains = {v.lower(): k for k, v in (domains or {}).items()}
+        # known short forms from the vendor master ("RG PLMB"), matched exactly or as a prefix
+        self.aliases = {_squash(a): vid for a, vid in (aliases or {}).items() if _squash(a)}
 
     def by_email(self, addr: str) -> str | None:
         dom = addr.lower().rsplit("@", 1)[-1].strip("> ")
@@ -141,6 +159,9 @@ class VendorIndex:
         if not name or not name.strip():
             return None, 0.0
         sq = _squash(name)
+        for asq, vid in self.aliases.items():
+            if sq == asq or (len(asq) >= 5 and sq.startswith(asq)):
+                return vid, 1.0
         toks = set(_tokens(name))
         scored = []
         for v in self.vendors:

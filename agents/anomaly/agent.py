@@ -38,10 +38,12 @@ class AnomalyAgent:
     def __init__(self, llm: StructuredLLM | None = None):
         self.llm = llm
 
-    def detect_anomalies(self, statement: Document, ledger: list[LedgerLine]) -> AnomalyReport:
+    def detect_anomalies(self, statement: Document, ledger: list[LedgerLine],
+                         bank: list[dict] | None = None,
+                         refs: dict[str, list[str]] | None = None) -> AnomalyReport:
         lines, how = rules.read_lines(statement)
         if how == "data" or self.llm is None:
-            return rules.compare(statement, lines, ledger, how)
+            return rules.compare(statement, lines, ledger, how, bank, refs)
 
         def check(r: StatementReading) -> list[str]:
             p = []
@@ -55,7 +57,7 @@ class AnomalyAgent:
         ans, _ = guarded_call(self.llm, StatementReading, SYSTEM,
                               f"<statement id=\"{statement.id}\">\n{statement.text}\n</statement>", check)
         if ans is None:
-            return rules.compare(statement, lines, ledger, how)
+            return rules.compare(statement, lines, ledger, how, bank, refs)
         read = [{"line": ln.line, "invoice_id": ln.invoice_id, "amount": _amount(ln.amount_text)}
                 for ln in ans.lines]
-        return rules.compare(statement, read, ledger, "model")
+        return rules.compare(statement, read, ledger, "model", bank, refs)

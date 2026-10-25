@@ -95,3 +95,12 @@ def test_reply_requires_proof_to_settle_then_reset(demo):
     assert state['history'] == []
     assert state['decisions'] == []
     assert state['headline']['unexplained'] == 3140
+
+
+def test_a_session_never_emails_unless_the_server_turns_it_on(demo, monkeypatch):
+    import mailer
+    sent = Mock(side_effect=AssertionError("a test session tried to send a real email"))
+    monkeypatch.setattr(mailer, "send", sent)
+    monkeypatch.setattr(mailer, "enabled", lambda: True)      # as if the send token existed
+    demo.advance(5)                                           # reminders go out on this step
+    assert not sent.called and demo.send_email is False

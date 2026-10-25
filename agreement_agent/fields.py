@@ -49,7 +49,7 @@ _TRADE = r"(?:Group|Services|Homes|Plumbing|Electric|HVAC|Roofing|Landscaping|Cl
 # A company name: capitalised words ending in a trade word and/or a legal suffix ("Rio Grande Plumbing LLC")
 _ORG = r"((?:[A-Z][\w&'\-]*\s+){0,5}?(?:" + _TRADE + r"(?:,?\s+" + _SUFFIX + r")?|[A-Z][\w&'\-]*,?\s+" + _SUFFIX + r"))"
 _OWNER_ROLE = r"(?:Owner|Client|Company|Customer|Buyer)"
-_VENDOR_ROLE = r"(?:Vendor|Contractor|Service Provider|Provider|Supplier|Consultant)"
+_VENDOR_ROLE = r"(?:Vendor|Contractor|Service Provider|Provider|Supplier|Consultant|Property Manager|Manager)"
 _MONEY = r"\$\s?\d[\d,]*(?:\.\d{2})?"
 _UNIT = r"(?:\s*(?:per|/)\s*\w+(?:\s+per\s+\w+)?)"      # "$350 per unit per visit"
 _DATE = (r"(?:(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)[a-z]*\.?\s+\d{1,2},?\s+\d{4}"
@@ -60,18 +60,35 @@ def sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENT.split(text) if s and s.strip()]
 
 
+def _units(text: str) -> list[str]:
+    """Sentences, then each short label line joined with the line after it: many PDFs put a label
+    and its value on separate lines ("TOTAL DUE" / "$1,240.00"). A joined pair still passes the
+    quote guard, which compares with whitespace collapsed."""
+    out = sentences(text)
+    lines = [ln.strip() for ln in text.splitlines()]
+    for a, b in zip(lines, lines[1:]):
+        if a and b and len(a) <= 40:
+            out.append(f"{a} {b}")
+    return out
+
+
 def _first(pattern: str, text: str, flags=re.IGNORECASE) -> list[tuple[str, str]]:
-    out = []
-    for s in sentences(text):
+    out, seen = [], set()
+    for s in _units(text):
         if m := re.search(pattern, s, flags):
-            out.append(((m.group(1) if m.groups() else m.group(0)).strip(" .,;:"), s))
+            hit = ((m.group(1) if m.groups() else m.group(0)).strip(" .,;:"), s)
+            if hit[0] not in seen:
+                seen.add(hit[0])
+                out.append(hit)
     return out
 
 
 def _parties(p: Parsed, role: str) -> list[tuple[str, str]]:
     out = []
     head = " ".join(p.header) + "\n" + p.text[:2500]
-    pat = _ORG + r"\s*,?\s*(?:[^()\n]{0,60})?\(\s*(?:the\s+)?[\"“]?" + role + r"[\"”]?\s*\)"
+    # a short gap, or a longer description set off by a comma (", a Colorado limited liability
+    # company with offices at ..."); never across another party's (...) label
+    pat = _ORG + r"(?:,\s*[^()\n]{0,180}|\s*,?\s*[^()\n]{0,60})\(\s*(?:the\s+)?[\"“]?" + role + r"[\"”]?\s*\)"
     for s in sentences(head.replace("\n", " ")):
         for m in re.finditer(pat, s):
             out.append((m.group(1).strip(" ,"), s))
@@ -96,7 +113,7 @@ def find(name: str, p: Parsed) -> list[tuple[str, str]]:
         pats = [r"(within\s+(?:\w+\s+)?\(?\d+\)?\s+(?:business\s+|calendar\s+)?days?\b[^.;]{0,60})",
                 r"\b(net\s*\d{1,3})\b", r"(due\s+(?:on|by)\s+" + _DATE + ")",
                 r"(due\s+date\s*:?\s*" + _DATE + ")", r"(payable\s+(?:on|by)\s+" + _DATE + ")",
-                r"(due\s+upon\s+receipt)", r"(payment\s+(?:is\s+)?due\s+(?:on\s+)?(?:the\s+)?(?:\d{1,2}(?:st|nd|rd|th)?|first|last|fifteenth)\s+(?:day\s+)?of\s+each\s+month)"]
+                r"(due\s+(?:up)?on\s+receipt)", r"(payment\s+(?:is\s+)?due\s+(?:on\s+)?(?:the\s+)?(?:\d{1,2}(?:st|nd|rd|th)?|first|last|fifteenth)\s+(?:day\s+)?of\s+each\s+month)"]
         out = []
         for pat in pats:
             out += [(v, s) for v, s in _first(pat, t) if re.search(r"pay|due|invoice|terms", s, re.IGNORECASE)]

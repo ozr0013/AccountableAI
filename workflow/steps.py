@@ -157,13 +157,19 @@ class Steps:
         name = names_from(self.d.rails)
         ref = a.invoice_id or f"line {a.line or '?'}"
         approved = f"${a.expected_amount:,.2f}" if a.reason == "amount_differs" else "nothing"
-        notice = render_statement_notice(manager_name=name(stmt.manager_id), statement_ref=stmt.id,
+        ref_stmt = f"dated {stmt.dated:%b} {stmt.dated.day}, {stmt.dated.year}" if stmt.dated else stmt.id
+        notice = render_statement_notice(manager_name=name(stmt.manager_id), statement_ref=ref_stmt,
                                          stated=f"${a.statement_amount:,.2f}", invoice_ref=ref,
                                          approved=approved)
         if a.reason == "amount_differs":
             claim = (f"Statement {a.line or ''} shows ${a.statement_amount:,.2f} for {ref}; Oakline "
                      f"approved ${a.expected_amount:,.2f} (funded ${a.funded_amount:,.2f}), a "
-                     f"difference of ${a.difference:+,.2f}.")
+                     f"difference of {'-' if a.difference < 0 else '+'}${abs(a.difference):,.2f}.")
+        elif a.reason == "bank_differs":
+            claim = (f"Statement {a.line or ''} says ${a.statement_amount:,.2f} was paid for {ref}; the "
+                     f"bank shows ${a.bank_amount or 0:,.2f} paid out for it.")
+        elif a.reason == "already_paid":
+            claim = f"Statement {a.line or ''} bills {ref} again (${a.statement_amount:,.2f}); {a.note}."
         else:
             claim = f"Statement {a.line or ''} shows ${a.statement_amount:,.2f} for {ref}, which is not on Oakline's ledger."
         ids = [a.invoice_id or stmt.id]
@@ -174,7 +180,7 @@ class Steps:
             headline=f"{ref}: statement says ${a.statement_amount:,.2f}, approved {approved}",
             claims=[Claim(text=claim.replace("  ", " "), citations=[a.citation])],
             recommended_action=("Owner: review the difference before any further funding. "
-                                f"Draft to the middleman (sent once a controller approves): {notice}"))
+                                f"Note to the middleman: {notice}"))
 
     # -- assess: payment trail + delay cause per invoice ----------------------------------
     def assess(self, s: WorkflowState) -> dict:
