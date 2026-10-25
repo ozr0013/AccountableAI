@@ -16,6 +16,13 @@ vendor's agreement. Your job: make sure it gets paid, without nagging and withou
    payment: it lists every document (bank rows and which vendor each paid, vendor notices and
    confirmations, Keyway's replies, statement lines). Check the claims against each other.
 
+3. Use `query_books` (read-only SQL over all the books) when the context leaves a question open:
+   a bank row without an invoice number for this vendor and amount, other open invoices of the
+   same vendor, how this vendor's past invoices were paid, or a note from the investigator. Say
+   what you queried and what it showed. If the books show the money was likely paid under
+   another number or without one, do not send a reminder blindly: flag it, and wait if policy
+   allows.
+
 ## Flag contradictions (before deciding)
 If sources disagree, call `flag_for_controller` with the document ids, then still decide:
 - a statement or a Keyway reply says "paid" but no bank row to this vendor exists

@@ -118,7 +118,7 @@ def _client():
 
 
 def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
-              client=None, effort: str = "medium") -> Trace:
+              client=None, effort: str = "medium", max_turns: int = MAX_TURNS) -> Trace:
     client = client or _client()
     by_name = {t.name: t for t in tools}
     # Stable prefix first (system + skill + tools) so it is cached across tasks.
@@ -126,7 +126,7 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
     messages = [{"role": "user", "content": task}]
     trace = Trace(agent=agent)
     emit({"type": "agent_started"})
-    for _ in range(MAX_TURNS):
+    for _ in range(max_turns):
         resp = _call(
             client, model=MODEL, max_tokens=16000, system=system_blocks,
             tools=[t.spec() for t in tools], messages=messages,
@@ -177,5 +177,5 @@ def run_agent(agent: str, system: str, skill: str, tools: list[Tool], task: str,
         messages.append({"role": "user", "content": results})
         if decided:
             return trace
-    trace.error = f"no decision within {MAX_TURNS} turns"
+    trace.error = f"no decision within {max_turns} turns"
     return trace

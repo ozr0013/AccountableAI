@@ -136,7 +136,8 @@ def run_chaser(task, rails, mirror, today, client=None) -> dict:
                     "trace": {"agent": "chaser", "model": "code check (no model call)", "thinking": [],
                               "steps": [], "decision": {"tool": "verified_paid", "input": {"rationale": reason}},
                               "text": "", "usage": {}, "error": None}}
-    trace = llm_chaser.run(tools, client)
+    note = task["reason"] if task.get("created_by") == "investigator" else None
+    trace = llm_chaser.run(tools, client, note)
     return {"outcome": llm_chaser.outcome(trace), "trace": trace.to_dict()}
 
 
@@ -163,7 +164,18 @@ def run_anomaly(task, rails, mirror, today, client=None) -> dict:
     return {"outcome": anomaly.outcome(trace), "trace": trace.to_dict()}
 
 
-RUNNERS = {"chaser": run_chaser, "anomaly": run_anomaly}
+def run_investigator(task, rails, mirror, today, client=None) -> dict:
+    from . import investigator
+
+    def handoff(agent, invoice_id, reason, payload, day, created_by):
+        return enqueue(mirror, agent, invoice_id, reason, payload, day, created_by)
+    tools = investigator.InvestigatorTools(rails, mirror, today, _record_chase(mirror, today), handoff, MANAGER)
+    trace = investigator.run(tools, client)
+    return {"outcome": investigator.outcome(trace), "trace": trace.to_dict()}
+
+
+RUNNERS = {"chaser": run_chaser, "anomaly": run_anomaly, "investigator": run_investigator}
+ORDER = {"investigator": 0, "chaser": 1, "anomaly": 2}       # the sweep's notes reach the chaser
 
 
 def process(rails, mirror, today: date, client=None, limit: int = 20,
@@ -175,7 +187,7 @@ def process(rails, mirror, today: date, client=None, limit: int = 20,
                    if t["as_of"] <= today.isoformat()]
         if not pending:
             break
-        task = sorted(pending, key=lambda t: (t["agent"] != "chaser", t["task_id"]))[0]
+        task = sorted(pending, key=lambda t: (ORDER.get(t["agent"], 9), t["task_id"]))[0]
         _set(mirror, task["task_id"], "running")
         from . import runtime
         token = runtime.CONTEXT.set({"task_id": task["task_id"], "agent": task["agent"],

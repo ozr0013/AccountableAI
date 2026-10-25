@@ -90,8 +90,10 @@ class AnomalyTools:
                          "needs_review": "controller review is open"}[verdict]}
 
     def tools(self) -> list[Tool]:
+        from chaser_agent import books
         no_args = {"type": "object", "additionalProperties": False, "properties": {}}
         return [
+            books.tool_for(self.rails),
             Tool("get_payment_case", "The handed-off payment: automatic check findings (codes and "
                  "messages), bank rows, statements, ledger line, closure eligibility.",
                  no_args, self.get_payment_case),

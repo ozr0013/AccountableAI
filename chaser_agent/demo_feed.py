@@ -150,6 +150,7 @@ def build(vendor_list: list[Vendor], start: date, end: date, manager_id: str = "
             statement.append({"on": paid.isoformat(), "amount": amount, "status": "paid", "invoice_id": iid})
         day += timedelta(days=1)
 
+    _cross_invoice(feed, bank, fates, rng, end)
     for posted, payments in sorted(bank.items()):
         add(posted, Document(
             id=f"doc-bank-keyway-live-{posted}", kind=SourceKind.manager_bank, manager_id=manager_id, dated=posted,
@@ -158,6 +159,53 @@ def build(vendor_list: list[Vendor], start: date, end: date, manager_id: str = "
     _statement(add, statement, fates, rng, start, end, manager_id)
     build.fates = fates                      # what was planted, for tests and the run log
     return feed
+
+
+def _cross_invoice(feed: dict, bank: dict[date, list[dict]], fates: dict[str, str], rng, end: date) -> None:
+    """Problems no single invoice shows, for the investigator: a payment without an invoice
+    number, one transfer for two invoices, and money booked under the wrong number. The vendors'
+    receipts for these are left out, so only the bank rows tell the story."""
+    cutoff = (end - timedelta(days=12)).isoformat()      # paid early enough to fall overdue later
+    rows = [(day, r) for day, rs in sorted(bank.items()) for r in rs
+            if fates.get(r.get("invoice_id")) == "on_time" and day.isoformat() <= cutoff]
+    by_vendor: dict[str, list] = {}
+    for day, r in rows:
+        by_vendor.setdefault(r["vendor_id"], []).append((day, r))
+    used: set[str] = set()
+
+    def drop_receipt(iid: str) -> None:
+        for docs in feed.values():
+            docs[:] = [d for d in docs if d.id != f"doc-conf-{iid.lower()}"]
+
+    pairs = [v for v in by_vendor.values() if len(v) >= 2]
+    if pairs:                                            # one transfer, two invoices
+        (d1, a), (d2, b) = rng.choice(pairs)[:2]
+        bank[d2].remove(b)
+        names = f"{a['invoice_id']} + {b['invoice_id']}"
+        a.update({"amount": round(a["amount"] + b["amount"], 2), "invoice_id": None,
+                  "memo": f"Payment {names}"})
+        for iid in names.split(" + "):
+            fates[iid], _ = "bundled", used.add(iid)
+            drop_receipt(iid)
+    anytime: dict[str, list] = {}                       # paid under the other invoice's number
+    for day, rs in sorted(bank.items()):
+        for r in rs:
+            if fates.get(r.get("invoice_id")) == "on_time" and r["invoice_id"] not in used:
+                anytime.setdefault(r["vendor_id"], []).append((day, r))
+    pairs = [v for v in anytime.values() if len(v) >= 2]
+    if pairs:
+        (_, a), (_, b) = rng.choice(pairs)[:2]
+        right = b["invoice_id"]
+        b["invoice_id"] = a["invoice_id"]
+        fates[right], _ = "misapplied", used.add(right)
+        used.add(a["invoice_id"])
+        drop_receipt(right)
+    singles = [x for x in rows if x[1].get("invoice_id") and x[1]["invoice_id"] not in used]
+    for _, r in rng.sample(singles, min(2, len(singles))):   # no invoice number at all
+        iid = r["invoice_id"]
+        r.update({"invoice_id": None, "memo": "Vendor payment"})
+        fates[iid] = "unreferenced"
+        drop_receipt(iid)
 
 
 def _statement(add, lines: list[dict], fates: dict[str, str], rng, start: date, end: date,

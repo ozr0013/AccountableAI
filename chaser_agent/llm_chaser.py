@@ -228,7 +228,9 @@ class ChaserTools:
         return {"waiting": True, "until": until, "schedule_says": self.code.action if self.code else None}
 
     def tools(self) -> list[Tool]:
+        from . import books
         return [
+            books.tool_for(self.rails),
             Tool("get_invoice_context", "Everything about this invoice: ledger line, agreement "
                  "rules with quotes, chaser history and controller decisions, manager replies, "
                  "vendor payment history, and `policy` (what the approved schedule allows today).",
@@ -263,9 +265,11 @@ class ChaserTools:
         ]
 
 
-def run(tools: ChaserTools, client=None) -> Trace:
+def run(tools: ChaserTools, client=None, note: str | None = None) -> Trace:
     task = (f"Task: chase invoice {tools.invoice_id} as of {tools.today.isoformat()}. Read its "
             "context, then make one decision.")
+    if note:
+        task += f"\n{note}\nCheck this against the books before you decide."
     return run_agent("chaser", system_prompt(), load_skill("chasing"), tools.tools(), task, client)
 
 

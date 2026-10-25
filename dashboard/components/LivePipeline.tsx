@@ -29,8 +29,9 @@ type Flow = { vendor: string; invoice: Invoice; tasks: Task[]; chaser_actions: A
   case?: { state?: string; findings?: { code: string; message: string }[] } | null };
 type Demo = { today: string; start: string; end: string; focus: string; done: boolean };
 type LiveTool = { tool: string; state: "running" | "done" | "refused"; preview?: string };
+type Query = { purpose: string; sql: string; columns?: string[]; rows?: unknown[][]; row_count?: number; error?: string };
 type Live = { task_id: string; agent: string; invoice_id: string; day: string; reason: string;
-  thinking: string; text: string; tools: LiveTool[]; decision: string | null; status: "working" | "done" | "failed" };
+  thinking: string; text: string; tools: LiveTool[]; queries: Query[]; decision: string | null; status: "working" | "done" | "failed" };
 type Line = { at: string; agent: string; kind: string; detail: string };
 type Row = { invoice_id: string; vendor: string; amount: number; funded_amount: number; deadline: string | null;
   deadline_source: string | null; paid_on: string | null; paid_amount: number; state: string; days: number | null;
@@ -42,7 +43,10 @@ const STATE: Record<string, string> = { overdue: "Overdue", not_due: "Not due", 
   paid_late: "Paid late", partial: "Partly paid", not_funded: "Not funded", no_deadline: "No deadline" };
 const FLAG: Record<string, string> = { statement_claims_unbacked: "statement claims a payment the bank does not show",
   vendor_reports_unpaid: "vendor reports it was not paid", delivery_failed: "an email could not be confirmed as sent", reply_without_proof: "Keyway says paid without proof",
-  payment_to_other_vendor: "payment went to a different vendor", other_contradiction: "sources disagree" };
+  payment_to_other_vendor: "payment went to a different vendor", other_contradiction: "sources disagree",
+  unreferenced_payment: "a bank payment without an invoice number seems to pay it", bundled_payment: "one transfer covers several invoices",
+  misapplied_payment: "its payment was booked under another invoice number", duplicate_payment: "the same money was paid twice",
+  vendor_pattern: "a repeated pattern with this vendor" };
 const RANK: Record<string, number> = { overdue: 0, misdirected: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4,
   awaiting_funding: 5, no_deadline: 6, paid_on_time: 7 };
 const LEVELS = ["polite", "firm", "escalation"];
@@ -202,6 +206,7 @@ export function LivePipeline() {
   const [error, setError] = useState("");
   const [playing, setPlaying] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [seen, setSeen] = useState<Set<string>>(new Set());
   const [rows, setRows] = useState<Row[]>([]);
   const [selected, setSelected] = useState("");
   const selectedRef = useRef("");
@@ -235,8 +240,13 @@ export function LivePipeline() {
     on("evidence", m => log("system", "evidence", `${String(m.kind).replace("_", " ")} arrived · ${String(m.text || m.document).slice(0, 110)}`));
     on("task_started", m => {
       setLive({ task_id: String(m.task_id), agent: String(m.agent), invoice_id: String(m.invoice_id), day: String(m.day),
-        reason: String(m.reason), thinking: "", text: "", tools: [], decision: null, status: "working" });
+        reason: String(m.reason), thinking: "", text: "", tools: [], queries: [], decision: null, status: "working" });
+      setSeen(prev => new Set(prev).add(String(m.agent)));
       log(String(m.agent), "start", `${m.invoice_id} · ${m.reason}`);
+    });
+    on("query", m => {
+      setLive(l => (l && l.task_id === m.task_id ? { ...l, queries: [...l.queries, m as unknown as Query] } : l));
+      log(String(m.agent), m.error ? "refused" : "query", `${m.purpose}${m.error ? ` · ${m.error}` : ` · ${m.row_count} rows`}`);
     });
     on("thinking", m => setLive(l => (l && l.task_id === m.task_id ? { ...l, thinking: l.thinking + String(m.text) } : l)));
     on("text", m => setLive(l => (l && l.task_id === m.task_id ? { ...l, text: l.text + String(m.text) } : l)));
@@ -277,7 +287,7 @@ export function LivePipeline() {
   useEffect(() => { thinkRef.current?.scrollTo({ top: thinkRef.current.scrollHeight }); }, [live?.thinking, live?.tools.length]);
   useEffect(() => { recordRef.current?.scrollTo({ top: recordRef.current.scrollHeight, behavior: "smooth" }); }, [flow?.tasks.length]);
 
-  const select = (id: string) => { selectedRef.current = id; setSelected(id); setOpen(null); refresh(); };
+  const select = (id: string) => { if (id === "portfolio") return; selectedRef.current = id; setSelected(id); setOpen(null); refresh(); };
   const act = async (what: string, path: string) => {
     setBusy(what); setError("");
     try { await call(path, "POST"); } catch (e) { setError(String((e as Error).message || e)); playRef.current = false; setPlaying(false); }
@@ -316,7 +326,7 @@ export function LivePipeline() {
   const controllerWaiting = !!pending || review;
   const activeAgent = live?.status === "working" ? live.agent : null;
   const ran = (k: string) => (k === "agreement" ? (flow?.rules.length ?? 0) > 0
-    : tasks.some(t => t.agent === k) || rows.some(r => r.last?.agent === k));
+    : seen.has(k) || tasks.some(t => t.agent === k) || rows.some(r => r.last?.agent === k));
   const finished = !!demo?.done && live?.status !== "working";
 
   return (
@@ -346,11 +356,11 @@ export function LivePipeline() {
       </div>}
 
       {demo && <div className={s.engine}>
-        {[["agreement", "Agreement agent"], ["chaser", "Chaser agent"], ["anomaly", "Anomaly agent"], ["controller", "Controller"]].map(([k, n], i) => {
+        {[["agreement", "Agreement agent"], ["investigator", "Investigator"], ["chaser", "Chaser agent"], ["anomaly", "Anomaly agent"], ["controller", "Controller"]].map(([k, n], i) => {
           const waiting = k === "controller" && controllerWaiting;
           return <div key={k} className={s.stage}>
             <span className={`${s.node} ${activeAgent === k ? s.active : ""} ${waiting ? s.waiting : ran(k) ? s.done : ""}`} />
-            <span>{n}{waiting && <em className={s.pendingTag}>decision pending</em>}</span>{i < 3 && <span className={s.link} />}
+            <span>{n}{waiting && <em className={s.pendingTag}>decision pending</em>}</span>{i < 4 && <span className={s.link} />}
           </div>;
         })}
       </div>}
@@ -374,7 +384,9 @@ export function LivePipeline() {
         <section className={`card ${s.panel}`}>
           <div className={s.panelHead}>
             <span className="micro">Live reasoning</span>
-            {live && <button className={s.linkBtn} onClick={() => select(live.invoice_id)}>{live.agent} agent · {live.invoice_id} · {day(live.day)}</button>}
+            {live && (live.invoice_id === "portfolio"
+              ? <span className={s.mono}>investigator · all invoices · {day(live.day)}</span>
+              : <button className={s.linkBtn} onClick={() => select(live.invoice_id)}>{live.agent} agent · {live.invoice_id} · {day(live.day)}</button>)}
             {live && <span className={`${s.state} ${s[live.status]}`}>{live.status === "working" ? "Working" : live.status === "failed" ? "Failed" : "Done"}</span>}
           </div>
           {live ? <div className={s.liveBody} ref={thinkRef}>
@@ -382,8 +394,19 @@ export function LivePipeline() {
             {(live.thinking || live.status === "working" || live.tools.length === 0) && <div className={s.thinking}>
               {plain(live.thinking) || (live.status === "working" ? "" : "Not due yet: the schedule waited without calling the model.")}
               {live.status === "working" && <span className={s.caret} />}</div>}
-            {live.tools.length > 0 && <ol className={s.tools}>
-              {live.tools.map((t, i) => <li key={i} className={s[t.state]}>
+            {live.queries.length > 0 && <div className={s.queries}>
+              {live.queries.map((q, i) => <div key={i} className={`${s.query} ${q.error ? s.refused : ""}`}>
+                <div className={s.queryHead}><span className={s.ring} /><b>{q.purpose}</b>
+                  <span className={s.toolState}>{q.error ? "Refused" : `${q.row_count} rows`}</span></div>
+                <pre className={s.sql}>{q.sql}</pre>
+                {q.error ? <p className={s.queryErr}>{q.error}</p> : !!q.rows?.length && <div className={s.qtableWrap}><table className={s.qtable}>
+                  <thead><tr>{q.columns?.map(c => <th key={c}>{c}</th>)}</tr></thead>
+                  <tbody>{q.rows.map((r, j) => <tr key={j}>{r.map((v, k) => <td key={k}>{v == null ? "—" : String(v)}</td>)}</tr>)}</tbody>
+                </table>{(q.row_count || 0) > q.rows.length && <span className={s.more}>+{(q.row_count || 0) - q.rows.length} more rows</span>}</div>}
+              </div>)}
+            </div>}
+            {live.tools.filter(t => t.tool !== "query_books").length > 0 && <ol className={s.tools}>
+              {live.tools.filter(t => t.tool !== "query_books").map((t, i) => <li key={i} className={s[t.state]}>
                 <span className={s.ring} /><span className={s.mono}>{t.tool}</span>
                 <span className={s.toolState}>{t.state === "running" ? "Running" : t.state === "refused" ? "Refused" : "Done"}</span>
                 {t.preview && <pre>{t.preview}</pre>}

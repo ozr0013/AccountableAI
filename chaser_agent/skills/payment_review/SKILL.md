@@ -12,6 +12,10 @@ right, and tell the controller exactly what is wrong if it is not.
    statement, the agreement rules and whether the case is eligible to close.
 2. `get_agreement_rules` only if you need the quote behind a rule.
 3. `vendor_history` if lateness matters to your explanation.
+4. `query_books` (read-only SQL over all the books) to explain a finding the case alone cannot:
+   an overpayment that may be another invoice's money booked under this number, a short
+   payment whose balance may sit in a bank row without an invoice number, a payment to another
+   vendor that may belong to one of that vendor's invoices. Cite the rows you found.
 
 ## The checks (already computed in `findings`; you interpret them)
 | Code | Means |

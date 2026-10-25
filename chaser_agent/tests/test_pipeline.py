@@ -262,3 +262,18 @@ def test_a_failed_send_is_flagged_to_the_controller(world, monkeypatch):
     assert row["status"] == "needs_controller" and "not retried" in row["reason"]
     assert demo._flag_failed_delivery(rails, mirror, date(2026, 4, 23),
                                       [{"outbox_id": "out-1", "error": "SMTPException"}]) == []
+
+
+def test_the_investigator_must_cite_real_documents_and_can_hand_work_to_the_chaser(world):
+    rails, mirror = world
+    from chaser_agent import investigator
+    today = date(2026, 4, 22)
+    queued = []
+    tools = investigator.InvestigatorTools(rails, mirror, today, pipeline._record_chase(mirror, today),
+                                           lambda *a: queued.append(a) or f"chaser:{a[1]}:{today}")
+    assert "error" in tools.flag_for_controller(INV, "unreferenced_payment", ["doc-x"], "A payment without a number.")
+    assert "error" in tools.flag_for_controller(INV, "not_a_kind", ["doc-x"], "A payment without a number.")
+    assert "error" in tools.flag_for_controller("INV-NOPE", "bundled_payment", ["doc-x"], "One transfer two invoices.")
+    out = tools.hand_to_chaser(INV, "A bank row without an invoice number matches this amount.")
+    assert out["queued"] == f"chaser:{INV}:{today}" and queued[0][5] == "investigator"
+    assert tools.finish_sweep("Checked everything; one hand-off.", ["unreferenced payments"])["handed_to_chaser"] == [INV]

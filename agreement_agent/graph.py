@@ -47,8 +47,17 @@ not in the document; if it refuses, read the section again and copy the exact wo
 there but ambiguous or contradictory (two different due dates, "TBD", a blank), call mark_unclear.
 - Never guess and never fill a field from general knowledge. A missing field is a useful result: \
 the owner will be told.
+- query_books runs read-only SQL over Oakline's books. Use it to check the document against \
+reality once the fields are recorded: the vendor's past invoice amounts against the stated rate, \
+the bank details in the agreement against where Keyway's payments to that vendor actually went. \
+Mention any disagreement in your final sentence; it never changes a quoted field.
 - When every field has been recorded, marked missing or marked unclear, stop calling tools and \
 reply with one sentence summarizing the document."""
+
+
+def _books_guide() -> str:
+    from chaser_agent import books
+    return books.GUIDE
 
 
 class State(TypedDict, total=False):
@@ -138,11 +147,20 @@ class Tools:
         self._log(f"marked {spec.label} {status}: {reason}")
         return "noted"
 
+    def query_books(self, purpose: str, sql: str) -> dict:
+        """Read-only SQL over the books (AGENT_BOOKS_SCHEMA, default the live books)."""
+        import os
+
+        from chaser_agent import books
+        self._log(f"queried the books: {purpose}")
+        return books.tool_result(os.getenv("AGENT_BOOKS_SCHEMA", "public"), sql, purpose)
+
     # langchain tool schemas, for the model
     def as_langchain(self):
         from langchain_core.tools import StructuredTool
         fns = [self.read_header, self.list_sections, self.read_section, self.search,
-               self.find_candidates, self.record_field, self.mark_missing, self.mark_unclear]
+               self.find_candidates, self.record_field, self.mark_missing, self.mark_unclear,
+               self.query_books]
         docs = {
             "read_header": "The first lines of the document: title, parties, date.",
             "list_sections": "Numbered sections with titles and pages.",
@@ -152,6 +170,7 @@ class Tools:
             "record_field": "Record a field's value with a verbatim quote from the document.",
             "mark_missing": "The field is not in the document; say what you searched.",
             "mark_unclear": "The field is present but ambiguous, blank or contradictory; say why.",
+            "query_books": "Investigate the books with read-only SQL (purpose, sql). " + _books_guide(),
         }
         return [StructuredTool.from_function(f, name=f.__name__, description=docs[f.__name__]) for f in fns]
 

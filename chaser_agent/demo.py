@@ -74,6 +74,8 @@ def reset(mirror) -> dict:
     conn = connect()
     conn.execute(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE')
     conn.close()
+    from . import books
+    books.forget(SCHEMA)                  # its views went with the schema
     demo = rails()
     for event in RealRails().store.events():
         demo.append_event(event)
@@ -217,7 +219,12 @@ def run_day(demo, mirror, client=None, arrived=()) -> dict:
     # The books as of this morning, so the agents see what arrived overnight.
     connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
     reviews = _statement_reviews(demo, mirror, today, list(arrived))
-    queued = pipeline.dispatch(demo, mirror, today, since=START) + reviews
+    sweep = []
+    if today.weekday() < 5:              # the investigator works weekdays, before the chaser
+        sweep = [pipeline.enqueue(mirror, "investigator", "portfolio",
+                                  "daily sweep of all invoices and bank payments", {}, today,
+                                  "daily_schedule")]
+    queued = sweep + pipeline.dispatch(demo, mirror, today, since=START) + reviews
     processed = pipeline.process(demo, mirror, today, client=client, limit=80)
     cases = connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
     # Paid and handed off: any reminder draft still waiting for the controller is moot.
