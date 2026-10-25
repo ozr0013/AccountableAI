@@ -11,8 +11,12 @@ Reads
 Controller (Authorization: Bearer $CONTROLLER_API_TOKEN)
     POST /chaser/actions/{action_id}/decide   {"approve": true|false, "note": "..."}
          approves or declines a firm / escalation reminder, or an escalation and its hold
+    GET  /chaser/patterns      how regularly each vendor is paid late (worst first)
 Replies
     POST /chaser/reply         a manager's reply: Claude reads it, code checks the proof
+Questions
+    POST /chaser/ask           {"question": "..."}: Claude answers with read-only tools over
+                               invoices, lateness, agreement rules and chaser actions
 
 In:  invoices and bank payments from PostgreSQL (rails), each vendor's rules from SpacetimeDB
      `agreement_rule`, and earlier actions from `chase_action`.
@@ -124,6 +128,41 @@ def actions(invoice_id: str | None = None) -> list[dict]:
     rows = history(_mirror())
     return sorted((r for r in rows if invoice_id in (None, r["invoice_id"])),
                   key=lambda r: (r["as_of"], r["invoice_id"]))
+
+
+@app.get("/chaser/patterns")
+def patterns(vendor: str | None = None) -> list[dict]:
+    from .patterns import vendor_patterns
+    rails = _rails()
+    rows = vendor_patterns(rails, _mirror().query("SELECT * FROM agreement_rule"), rails.now(),
+                           MANAGER)
+    return [r for r in rows if not vendor or vendor.lower() in r["vendor"].lower()]
+
+
+class AskIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    question: str = Field(min_length=3, max_length=2000)
+
+
+@app.post("/chaser/ask")
+def ask(body: AskIn) -> dict:
+    """Claude picks read-only tools to answer; the response lists every tool it called."""
+    import anthropic
+
+    from .assistant import DataTools
+    from .assistant import ask as run_ask
+    if not os.getenv("ANTHROPIC_API_KEY"):
+        raise HTTPException(400, "needs ANTHROPIC_API_KEY")
+    rails, mirror = _rails(), _mirror()
+    tools = DataTools(rails, mirror, lambda: history(mirror), rails.now(), MANAGER)
+    try:
+        return {"question": body.question, **run_ask(body.question, tools)}
+    except anthropic.RateLimitError as exc:
+        raise HTTPException(429, "Claude rate limit; try again shortly") from exc
+    except anthropic.APIStatusError as exc:
+        raise HTTPException(502, f"Claude API error {exc.status_code}") from exc
+    except anthropic.APIConnectionError as exc:
+        raise HTTPException(502, "could not reach Claude") from exc
 
 
 class ReplyIn(BaseModel):

@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
 
 from rails.guards import render
@@ -185,11 +185,17 @@ def run(rails, rule_rows: list[dict], history_rows: list[dict], today: date,
     history: dict[str, list[dict]] = {}
     for h in history_rows:
         history.setdefault(h["invoice_id"], []).append(h)
+    from .patterns import describe, vendor_patterns
+    patterns = {p["vendor"]: p for p in vendor_patterns(rails, rule_rows, today, manager_id)}
     out = []
     for line in rails.ledger(manager_id):
         if line.duplicate_of:
             continue
         vendor = name(line.vendor_id)
-        out.append(decide(line, vendor, name(manager_id), rules.get(norm_name(vendor), []),
-                          history.get(line.invoice_id, []), today))
+        d = decide(line, vendor, name(manager_id), rules.get(norm_name(vendor), []),
+                   history.get(line.invoice_id, []), today)
+        if d.action in ("reminder", "escalate", "wait") and vendor in patterns:
+            # The vendor's payment history travels with every chasing decision.
+            d = replace(d, reason=f"{d.reason}; history: {describe(patterns[vendor])}")
+        out.append(d)
     return out
