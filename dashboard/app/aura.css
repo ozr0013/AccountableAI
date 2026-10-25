@@ -131,13 +131,21 @@
 .theme-aura .focus-panel::after, .theme-aura .quiet-metrics::after { right: -6px; bottom: -6px; }
 
 /* ---------- one geometry on every dashboard page ---------- */
-/* A drawing frame: the content column has hairline edges down the page, and each page header
-   sits on a rule with "+" marks where it meets the edges. */
-.theme-aura .main { min-height: 100vh; }
-.theme-aura .main > .wrap::before { content: ""; position: absolute; top: -28px; bottom: -32px; left: -20px; right: -20px; border-left: 1px solid var(--line); border-right: 1px solid var(--line); pointer-events: none; z-index: -1; }
+/* The same drawing frame as the landing page: 20px from the window on each side, the sidebar's
+   left edge and the main column's right edge are the frame, and the brand sits in a 58px header
+   cell at exactly the spot the landing page's logo does, so it doesn't move between the two.
+   Each page header sits on a rule with "+" marks where it meets the frame. */
+.shell.theme-aura { padding-inline: 20px; }
+.theme-aura .side { padding: 20px 0 16px; border-left: 1px solid var(--line); }
+.theme-aura .side > :not(.brand) { margin-inline: 16px; }
+.theme-aura .brand { flex: none; height: 58px; padding: 0 22px; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.theme-aura .brand-mark { width: 26px; height: 26px; }
+.theme-aura .brand-word { font-size: 20px; line-height: 24px; font-weight: 500; letter-spacing: -.045em; }
+.theme-aura .main { min-height: 100vh; padding-top: 20px; border-right: 1px solid var(--line); }
+.theme-aura .main > .wrap { max-width: 1600px; }
 .theme-aura .top { position: relative; padding-bottom: 22px; margin-bottom: 28px; }
-.theme-aura .top::after { content: ""; position: absolute; left: -20px; right: -20px; bottom: 0; height: 1px; background: var(--line); }
-.theme-aura .top::before { content: ""; position: absolute; left: -25px; right: -25px; bottom: -5px; height: 11px; pointer-events: none;
+.theme-aura .top::after { content: ""; position: absolute; left: -40px; right: -40px; bottom: 0; height: 1px; background: var(--line); }
+.theme-aura .top::before { content: ""; position: absolute; left: -45px; right: -45px; bottom: -5px; height: 11px; pointer-events: none;
   background: linear-gradient(#9fb0d2, #9fb0d2) left 5px top 0 / 1px 11px no-repeat, linear-gradient(#9fb0d2, #9fb0d2) left 0 top 5px / 11px 1px no-repeat,
     linear-gradient(#9fb0d2, #9fb0d2) right 5px top 0 / 1px 11px no-repeat, linear-gradient(#9fb0d2, #9fb0d2) right 0 top 5px / 11px 1px no-repeat; }
 
@@ -188,7 +196,14 @@
 .theme-aura .pill.on-wine:hover { background: var(--n2); }
 
 @media (max-width: 760px) {
-  .theme-aura .main > .wrap::before, .theme-aura .top::after { left: -8px; right: -8px; }
+  /* matches the landing page on a phone: 12px margins, a 52px header cell */
+  .shell.theme-aura { padding-inline: 12px; }
+  .theme-aura .side { padding-top: 12px; border-right: 1px solid var(--line); }
+  .theme-aura .brand { height: 52px; padding: 0 14px; gap: 7px; }
+  .theme-aura .brand-mark { width: 22px; height: 22px; }
+  .theme-aura .brand-word { font-size: 17px; }
+  .theme-aura .main { border-left: 1px solid var(--line); padding: 20px 16px 0; }
+  .theme-aura .top::after { left: -16px; right: -16px; }
   .theme-aura .top::before { display: none; }
 }
 .theme-aura .nav .nav-disclosure { border-radius: 0; background: transparent; }

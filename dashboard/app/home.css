@@ -2,10 +2,10 @@
 .home-page {
   --hl: #e6eaf2; --mute: #5b6475; --ink: #0b1220; --blue: #2d5bff; --blue-ink: #1f44d6; --attn: #b4530f;
   position: relative; isolation: isolate; overflow-x: clip;
-  background: #fff; color: var(--ink); padding: 20px 28px 0;
+  background: #fff; color: var(--ink); padding: 20px 20px 0;
   font-family: var(--font-geist), "Geist", system-ui, sans-serif; font-size: 16px; line-height: 1.5;
 }
-.home-page main, .home-nav, .home-footer { position: relative; z-index: 1; max-width: 1280px; margin-inline: auto; }
+.home-page main, .home-nav, .home-footer { position: relative; z-index: 1; max-width: 1800px; margin-inline: auto; }
 .home-page section[id] { scroll-margin-top: 96px; }
 /* the drawing frame: the content column's edges run the length of the page */
 .home-page main { padding-inline: 40px; border-left: 1px solid var(--hl); border-right: 1px solid var(--hl); }
@@ -25,7 +25,7 @@
 .home-nav::before { left: -6px; }
 .home-nav::after { right: -6px; }
 .nav-cell { display: flex; align-items: center; padding: 0 22px; }
-.home-logo { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 500; letter-spacing: -.045em; white-space: nowrap; }
+.home-logo { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; line-height: 24px; font-weight: 500; letter-spacing: -.045em; white-space: nowrap; }
 .home-logo svg { width: 26px; height: 26px; color: var(--blue); }
 .home-beta { margin-left: 6px; font: 10px var(--font-geist-mono), monospace; letter-spacing: .06em; color: var(--mute); }
 .nav-links { display: flex; justify-content: flex-end; border-left: 1px solid var(--hl); }
@@ -220,7 +220,7 @@
   .home-page .ruled { margin-inline: -16px; padding-inline: 16px; }
   .home-nav { grid-template-columns: minmax(0, 1fr) auto; height: 52px; }
   .nav-cell { padding: 0 14px; }
-  .home-logo { font-size: 17px; gap: 7px; }
+  .home-logo { font-size: 17px; gap: 7px; letter-spacing: -.045em; }
   .home-logo svg { width: 22px; height: 22px; }
   .nav-links { display: none; }
   .nav-cta { font-size: 12px; gap: 10px; }
