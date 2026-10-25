@@ -165,6 +165,11 @@ class Steps:
             claim = (f"Statement {a.line or ''} shows ${a.statement_amount:,.2f} for {ref}; Oakline "
                      f"approved ${a.expected_amount:,.2f} (funded ${a.funded_amount:,.2f}), a "
                      f"difference of {'-' if a.difference < 0 else '+'}${abs(a.difference):,.2f}.")
+        elif a.reason == "bank_differs":
+            claim = (f"Statement {a.line or ''} says ${a.statement_amount:,.2f} was paid for {ref}; the "
+                     f"bank shows ${a.bank_amount or 0:,.2f} paid out for it.")
+        elif a.reason == "already_paid":
+            claim = f"Statement {a.line or ''} bills {ref} again (${a.statement_amount:,.2f}); {a.note}."
         else:
             claim = f"Statement {a.line or ''} shows ${a.statement_amount:,.2f} for {ref}, which is not on Oakline's ledger."
         ids = [a.invoice_id or stmt.id]

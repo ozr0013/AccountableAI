@@ -73,6 +73,12 @@ def classify(text: str, filename: str = "") -> tuple[str, str]:
     i = [w for w in _INVOICE if w in t]
     if not text.strip():
         return "other", "no readable text (a scan without a text layer?)"
+    head = "\n".join(text.strip().splitlines()[:8])
+    if re.search(r"^\s*From:\s.+$", head, re.MULTILINE) and re.search(r"^\s*(To|Date):\s", head, re.MULTILINE):
+        return "other", "an email (correspondence, not an agreement or invoice)"
+    if re.search(r"\b(owner|monthly|account)?\s*statement\b", head, re.IGNORECASE) and \
+            not re.search(r"\binvoice\b", head, re.IGNORECASE):
+        return "other", "a statement, not an agreement or invoice"
     if len(i) >= 2 and len(i) >= len(a) - 2 and "invoice" in t:
         return "invoice", f"invoice wording: {', '.join(i)}"
     if len(a) >= 3:
