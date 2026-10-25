@@ -79,7 +79,32 @@ def reset(mirror) -> dict:
         demo.append_event(event)
     mirror.call("clear_tasks", [])
     mirror.call("clear_chaser", [])
+    _arrive(demo, mirror, START)          # the first morning's paperwork
     return state(demo)
+
+
+_FEED: dict | None = None
+
+
+def feed(demo, mirror) -> dict:
+    """The seeded daily paperwork (chaser_agent/demo_feed.py), built once from the books."""
+    global _FEED
+    if _FEED is None:
+        from . import demo_feed
+        _FEED = demo_feed.build(demo_feed.vendors(demo, mirror), START, END, pipeline.MANAGER)
+    return _FEED
+
+
+def _arrive(demo, mirror, today: date) -> list[dict]:
+    """File today's documents in the books: the storyboard plus the seeded feed."""
+    from . import runtime
+    arrived = []
+    for doc in STORYBOARD.get(today, []) + feed(demo, mirror).get(today, []):
+        demo.append_event(document_event(doc, _stamp(today)))
+        arrived.append({"id": doc.id, "kind": doc.kind.value, "lines": doc.data.get("lines")})
+        runtime.emit({"type": "evidence", "day": today.isoformat(), "document": doc.id,
+                      "kind": doc.kind.value, "text": doc.text[:240]})
+    return arrived
 
 
 def state(demo) -> dict:
@@ -90,7 +115,7 @@ def state(demo) -> dict:
                            for d, docs in sorted(STORYBOARD.items()) for doc in docs]}
 
 
-MAIL_KINDS = ("chase_reminder", "escalation")
+MAIL_KINDS = ("chase_reminder", "escalation", "statement_notice")
 
 
 def transport_subject(row) -> str:
@@ -114,7 +139,7 @@ def _deliver(demo, mirror, today: date) -> list[str]:
     delivered = []
     for case in connected.cases(demo, pipeline.MANAGER):
         for o in case["outbox"]:
-            if o["status"] == "queued" and o.get("action_id") and o["kind"] in MAIL_KINDS:
+            if o["status"] == "queued" and o["kind"] in MAIL_KINDS:
                 connected.acknowledge(demo, mirror, o["id"], f"simulated-email-{today}",
                                       "demo_mailer", pipeline.MANAGER)
                 delivered.append(o["id"])
@@ -124,13 +149,44 @@ def _deliver(demo, mirror, today: date) -> list[str]:
     return delivered
 
 
-def run_day(demo, mirror, client=None) -> dict:
+PAYMENT_FINDINGS = {"partial_payment", "overpayment", "wrong_vendor", "late_payment"}
+STATEMENT_FINDINGS = {"statement_mismatch", "statement_wrong_vendor", "statement_predates_payment"}
+
+
+def _statement_reviews(demo, mirror, today: date, arrived: list[dict]) -> list[str]:
+    """A statement arrived: the anomaly agent reviews each paid invoice on it that the checks
+    flag. One it already reviewed is reviewed again only if the statement itself disagrees.
+    Unpaid invoices the statement calls paid stay with the chaser, which sees the claim."""
+    from . import connected
+    lines = {l["invoice_id"] for a in arrived if a["kind"] == "manager_statement"
+             for l in (a.get("lines") or [])}
+    if not lines:
+        return []
+    reviewed = {t["invoice_id"] for t in pipeline.tasks(mirror, agent="anomaly")}
+    queued = []
+    for case in connected.cases(demo, pipeline.MANAGER):
+        codes = {f["code"] for f in case["findings"]}
+        if case["invoice_id"] not in lines or not codes & (PAYMENT_FINDINGS | STATEMENT_FINDINGS):
+            continue
+        if case["invoice_id"] in reviewed and not codes & STATEMENT_FINDINGS:
+            continue
+        queued.append(pipeline.enqueue(
+            mirror, "anomaly", case["invoice_id"],
+            "Keyway's new statement covers this invoice and the checks found: "
+            + "; ".join(f["message"] for f in case["findings"]), {}, today, "statement_arrived"))
+    return queued
+
+
+def run_day(demo, mirror, client=None, arrived=()) -> dict:
     """Run today's work without moving the clock (used for the first day after a reset)."""
     from . import connected, runtime
     today = demo.now()
     runtime.emit({"type": "day_started", "day": today.isoformat()})
-    queued = pipeline.dispatch(demo, mirror, today, since=START)
-    processed = pipeline.process(demo, mirror, today, client=client, limit=30)
+    # The books as of this morning, so the agents see what arrived overnight.
+    connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
+    reviews = _statement_reviews(demo, mirror, today, list(arrived))
+    queued = pipeline.dispatch(demo, mirror, today, since=START) + reviews
+    processed = pipeline.process(demo, mirror, today, client=client, limit=80)
     cases = connected.reconcile(demo, mirror, pipeline.MANAGER, as_of=today)
     # Paid and handed off: any reminder draft still waiting for the controller is moot.
     from .api import mark_handoffs_reviewed
@@ -147,11 +203,6 @@ def next_day(demo, mirror, client=None) -> dict:
     demo.append_event(Event(id=f"ev-demo-clock-{today}", type="clock_advanced",
                             valid_from=_stamp(today), learned_at=_stamp(today),
                             payload={"as_of": today.isoformat()}))
-    arrived = []
-    from . import runtime
-    for doc in STORYBOARD.get(today, []):
-        demo.append_event(document_event(doc, _stamp(today)))
-        arrived.append({"id": doc.id, "kind": doc.kind.value})
-        runtime.emit({"type": "evidence", "day": today.isoformat(), "document": doc.id,
-                      "kind": doc.kind.value, "data": doc.data})
-    return {**run_day(demo, mirror, client), "arrived": arrived}
+    arrived = _arrive(demo, mirror, today)
+    return {**run_day(demo, mirror, client, arrived),
+            "arrived": [{"id": a["id"], "kind": a["kind"]} for a in arrived]}

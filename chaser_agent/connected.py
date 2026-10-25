@@ -7,6 +7,7 @@ explicit external receipt marks delivery. No function here calls a model or send
 from __future__ import annotations
 
 import json
+import os
 from copy import deepcopy
 from datetime import UTC, date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -166,6 +167,23 @@ def _case_documents(rails, line, today):
         if data.get("invoice_id") == line.invoice_id or data.get("payments") or data.get("lines"):
             relevant.append(document.model_copy(update={"data": data}))
     return relevant
+
+
+STATEMENT_NOTICE_AUTO = os.getenv("STATEMENT_NOTICE_AUTO", "on").lower() == "on"
+
+
+def _statement_notice(want, statement, line, manager_name):
+    """The anomaly note to the manager when a statement line disagrees with the approved amount,
+    from the controller-approved template; queued automatically unless STATEMENT_NOTICE_AUTO=off."""
+    from rails.guards.templates import render_statement_notice
+    rows = [r for r in statement.data.get("lines", []) if r.get("invoice_id") == line.invoice_id]
+    stated = sum((_money(r.get("amount")) or Decimal(0) for r in rows), Decimal(0))
+    ref = f"dated {statement.dated:%b} {statement.dated.day}, {statement.dated.year}" if statement.dated \
+        else statement.id
+    body = render_statement_notice(manager_name=manager_name, statement_ref=ref, stated=f"${stated:,.2f}",
+                                   invoice_ref=line.invoice_id, approved=f"${_money(line.amount):,.2f}")
+    want("statement_notice", body, "queued" if STATEMENT_NOTICE_AUTO else "needs_approval",
+         key=statement.id)
 
 
 def _project(rails, line, rules, actions, today):
@@ -368,6 +386,7 @@ def _project(rails, line, rules, actions, today):
                 "statement_mismatch",
                 "Financial statement amount differs from the approved invoice.",
             )
+            _statement_notice(want, latest, line, names_from(rails)(line.manager_id))
         matches = line.invoice_id in report.matched and not own
         statement_rows = [
             row for row in latest.data.get("lines", []) if row.get("invoice_id") == line.invoice_id

@@ -41,6 +41,8 @@ def _subject(row):
     level = parts[2] if len(parts) > 2 and row["kind"] == "chase_reminder" else None
     if row["kind"] == "escalation":
         return f"Unresolved payment raised to Oakline: {row['invoice_id']}"
+    if row["kind"] == "statement_notice":
+        return f"Statement does not match the approved amount: {row['invoice_id']}"
     if level:
         return f"{level.capitalize()} reminder: payment for {row['invoice_id']}"
     return f"Finance workflow: {row['invoice_id']} — {row['kind']}"

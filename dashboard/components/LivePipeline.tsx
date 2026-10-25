@@ -37,8 +37,10 @@ type Row = { invoice_id: string; vendor: string; amount: number; funded_amount: 
   last: { agent: string; day: string; decision?: string | null; verdict?: string | null; by: string } | null };
 
 const STATE: Record<string, string> = { overdue: "Overdue", not_due: "Not due", paid_on_time: "Paid on time",
+  awaiting_funding: "Awaiting funding",
   paid_late: "Paid late", partial: "Partly paid", not_funded: "Not funded", no_deadline: "No deadline" };
-const RANK: Record<string, number> = { overdue: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4, no_deadline: 5, paid_on_time: 6 };
+const RANK: Record<string, number> = { overdue: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4,
+  awaiting_funding: 5, no_deadline: 6, paid_on_time: 7 };
 const LEVELS = ["polite", "firm", "escalation"];
 
 const FINDING: Record<string, string> = {
@@ -75,6 +77,8 @@ function describe(t: Task, flow: Flow): { label: string; tone: "" | "hold" | "qu
     return { label: VERDICT[o.verdict || ""] || o.verdict || "Verdict", tone: o.verdict === "clean" ? "ok" : "hold",
       line: found.length ? `Found: ${found.join("; ")}.` : "No problems found." };
   }
+  if (o.decision === "verified_paid") return { label: "Verified paid", tone: "ok",
+    line: "Full amount to the right vendor by the deadline. Checked by code, no model call." };
   if (o.decision === "wait") return o.decided_by === "schedule"
     ? { label: "Waited", tone: "quiet", line: "Next step not due yet. No model call." }
     : { label: "Waited", tone: "quiet", line: "Claude chose to wait." };
@@ -142,7 +146,7 @@ function CaseStrip({ flow, today }: { flow: Flow; today: string }) {
 function InvoiceTable({ rows, selected, working, onSelect }:
     { rows: Row[]; selected: string; working: string | null; onSelect: (id: string) => void }) {
   const [filter, setFilter] = useState("attention");
-  const attention = (r: Row) => !["paid_on_time", "not_due"].includes(r.state) || r.reminders.length > 0;
+  const attention = (r: Row) => !["paid_on_time", "not_due", "awaiting_funding"].includes(r.state) || r.reminders.length > 0;
   const shown = rows.filter(r => filter === "all" || attention(r))
     .sort((a, b) => (RANK[a.state] - RANK[b.state]) || ((b.days || 0) - (a.days || 0)));
   const count = (k: string) => rows.filter(r => r.state === k).length;
@@ -218,7 +222,7 @@ export function LivePipeline() {
     es.onopen = () => setConnected(true);
     es.onerror = () => setConnected(false);
     on("day_started", m => { log("system", "day", `${day(String(m.day))} begins`); refresh(); });
-    on("evidence", m => { log("system", "evidence", `New ${String(m.kind).replace("_", " ")} arrived: ${m.document}`); refresh(); });
+    on("evidence", m => log("system", "evidence", `${String(m.kind).replace("_", " ")} arrived · ${String(m.text || m.document).slice(0, 110)}`));
     on("task_started", m => {
       setLive({ task_id: String(m.task_id), agent: String(m.agent), invoice_id: String(m.invoice_id), day: String(m.day),
         reason: String(m.reason), thinking: "", text: "", tools: [], decision: null, status: "working" });
@@ -383,13 +387,13 @@ export function LivePipeline() {
           <div className={s.record} ref={recordRef}>
             {tasks.length === 0 && <p className={s.empty}>No decisions yet.</p>}
             {flow && tasks.map(t => {
-              const o = t.outcome || {}, quiet = o.decided_by === "schedule", d = describe(t, flow);
+              const o = t.outcome || {}, quiet = o.decided_by === "schedule" || o.decided_by === "code", d = describe(t, flow);
               return <div key={t.task_id} className={`${s.item} ${quiet ? s.quiet : ""}`}>
                 <button className={s.itemHead} onClick={() => setOpen(open === t.task_id ? null : t.task_id)} disabled={quiet}>
                   <span className={s.mono}>{day(t.as_of)}</span>
                   <span className={s.agentTag}>{t.agent}</span>
                   <span className={`${s.badge} ${d.tone ? s[d.tone] : ""}`}>{d.label}</span>
-                  <span className={s.src}>{quiet ? "Schedule" : "Claude"}</span>
+                  <span className={s.src}>{o.decided_by === "code" ? "Code" : quiet ? "Schedule" : "Claude"}</span>
                 </button>
                 <p className={s.itemText}>{d.line}</p>
                 {open === t.task_id && <div className={s.detail}>

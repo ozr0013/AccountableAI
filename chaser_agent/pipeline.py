@@ -51,7 +51,8 @@ def dispatch(rails, mirror, today: date, vendor: str | None = None,
     name = names_from(rails)
     by_vendor = daily._rules_by_vendor(mirror.query("SELECT * FROM agreement_rule"))
     manager = name(MANAGER)
-    done = {t["invoice_id"] for t in tasks(mirror, agent="anomaly")}
+    done = {t["invoice_id"] for t in tasks(mirror)
+            if t["agent"] == "anomaly" or t["outcome"].get("decision") == "verified_paid"}
     out = []
     for line in rails.ledger(MANAGER):
         v = name(line.vendor_id)
@@ -99,6 +100,23 @@ def run_chaser(task, rails, mirror, today, client=None) -> dict:
                 "trace": {"agent": "chaser", "model": "schedule (no model call)", "thinking": [],
                           "steps": [], "decision": {"tool": "wait", "input": {"rationale": reason}},
                           "text": "", "usage": {}, "error": None}}
+    if tools.allowed() == ["handoff_to_anomaly"]:
+        # A payment the code can fully verify (whole amount, the invoice's vendor, by the
+        # deadline, nothing else odd) needs no model: it is closed here, without an anomaly task.
+        from . import connected
+        case = next((c for c in connected.cases(rails, MANAGER)
+                     if c["invoice_id"] == task["invoice_id"]), None)
+        line = tools.line
+        if (case is not None and not case["findings"] and line is not None
+                and line.paid_amount >= line.amount and tools.code.due_date
+                and line.paid_on and line.paid_on.isoformat() <= tools.code.due_date):
+            reason = (f"bank shows ${line.paid_amount:,.2f} paid on {line.paid_on} to the invoice's vendor, "
+                      f"by the {tools.code.due_date} deadline; verified by code")
+            return {"outcome": {"decision": "verified_paid", "rationale": reason, "decided_by": "code",
+                                "result": {"verified": True}, "error": None},
+                    "trace": {"agent": "chaser", "model": "code check (no model call)", "thinking": [],
+                              "steps": [], "decision": {"tool": "verified_paid", "input": {"rationale": reason}},
+                              "text": "", "usage": {}, "error": None}}
     trace = llm_chaser.run(tools, client)
     return {"outcome": llm_chaser.outcome(trace), "trace": trace.to_dict()}
 
@@ -246,7 +264,8 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
         paid_on = line.paid_on if line.paid_on and line.paid_on <= today else None
         paid = line.paid_amount if paid_on else 0.0
         if not line.funded_amount:
-            state, days_ = "not_funded", None
+            recent = line.invoice_received and (today - line.invoice_received).days <= 3
+            state, days_ = ("awaiting_funding" if recent else "not_funded"), None
         elif paid and paid + 0.005 < line.amount:
             state, days_ = "partial", None
         elif paid:
@@ -273,7 +292,7 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
             "usage": usage.get(line.invoice_id),
             "last": ({"agent": t["agent"], "day": t["as_of"], "decision": t["outcome"].get("decision"),
                       "verdict": t["outcome"].get("verdict"),
-                      "by": "schedule" if t["outcome"].get("decided_by") == "schedule" else "claude"}
+                      "by": t["outcome"].get("decided_by") or "claude"}
                      if t else None),
         })
     return out
