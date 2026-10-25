@@ -87,7 +87,7 @@ export default function Home() {
       <header className="home-nav">
         <Link href="/" className="home-logo"><Mark />AccountableAI<span className="home-beta">/ CAL HACKS</span></Link>
         <nav aria-label="Product"><a href="#how-it-works">How it works</a><a href="#proof">The proof</a><a href="#control">Your control</a></nav>
-        <Link href="/overview" className="home-button home-button-dark">Open dashboard <Arrow /></Link>
+        <Link href="/loop" className="home-button home-button-dark">Open dashboard <Arrow /></Link>
       </header>
 
       <main>
@@ -98,7 +98,7 @@ export default function Home() {
             <div className="hero-liquid liquid-two" />
           </div>
           <HeroSnapshot />
-          <div className="hero-top"><div className="hero-top-actions"><span className="home-eyebrow">/ ACCOUNTABILITY, BUILT IN.</span><Link href="/overview" className="home-button hero-cta">See it in action <span className="button-orb"><Arrow /></span></Link></div></div>
+          <div className="hero-top"><div className="hero-top-actions"><span className="home-eyebrow">/ ACCOUNTABILITY, BUILT IN.</span><Link href="/loop" className="home-button hero-cta">See it in action <span className="button-orb"><Arrow /></span></Link></div></div>
           <div className="hero-copy">
             <div><h1 id="home-title">You sent the money.<br /><span>Did it reach them?</span></h1><p>AccountableAI follows your funding all the way to the vendor. It finds missing payments, checks the evidence, and brings you a clear decision before you send more.</p></div>
           </div>
@@ -129,9 +129,9 @@ export default function Home() {
           </Spotlight>
         </div>
 
-        <section className="home-closing"><span className="home-eyebrow">/ FOLLOW THE MONEY. FIND THE PROOF.</span><h2>Meet your new<br />second set of eyes.</h2><Link href="/overview" className="home-button home-button-dark">Open the live demo <Arrow /></Link><p>Fictional vendors. Real workflow. You’re in control.</p></section>
+        <section className="home-closing"><span className="home-eyebrow">/ FOLLOW THE MONEY. FIND THE PROOF.</span><h2>Meet your new<br />second set of eyes.</h2><Link href="/loop" className="home-button home-button-dark">Open the live demo <Arrow /></Link><p>Fictional vendors. Real workflow. You’re in control.</p></section>
       </main>
-      <footer className="home-footer"><Link href="/" className="home-logo"><Mark />AccountableAI</Link><span>Built at Cal Hacks · 2026</span><Link href="/overview">Enter dashboard ↗</Link></footer>
+      <footer className="home-footer"><Link href="/" className="home-logo"><Mark />AccountableAI</Link><span>Built at Cal Hacks · 2026</span><Link href="/loop">Enter dashboard ↗</Link></footer>
     </div>
   );
 }
