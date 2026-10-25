@@ -92,6 +92,18 @@ def record(rails, invoice_id, kind, payload, on=None, manager="keyway"):
         payload=deepcopy(payload),
     )
     rails.append_event(event)
+    # Observability only: publish an actual persisted transition, never infer mail delivery.
+    if kind == 'workflow_outbox':
+        from .runtime import emit
+        simulated = payload.get('acknowledged_by') == 'demo_mailer'
+        emit({'type': 'mail_status', 'agent': 'system', 'invoice_id': invoice_id,
+              'status': payload.get('status'), 'kind': payload.get('kind'),
+              'audience': payload.get('audience'), 'body': payload.get('body', '')[:1200],
+              'simulated': simulated, 'outbox_id': payload.get('id')})
+        if payload.get('kind') == 'escalation' and payload.get('status') == 'needs_approval':
+            emit({'type': 'alert_created', 'agent': 'system', 'invoice_id': invoice_id,
+                  'status': 'needs_controller', 'outbox_id': payload.get('id'),
+                  'summary': payload.get('body', '')[:1200]})
     return event
 
 

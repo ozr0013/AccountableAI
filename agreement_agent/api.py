@@ -33,7 +33,9 @@ from typing import Annotated
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.concurrency import run_in_threadpool
 
 from .controller import ControllerError, confirm, reject
 from .graph import review
@@ -48,6 +50,16 @@ MAX_BYTES = 10 * 1024 * 1024
 ALLOWED = {"application/pdf", "text/plain"}
 
 app = FastAPI(title="Agreement agent", description=__doc__ or "")
+
+
+app.add_middleware(CORSMiddleware,
+    allow_origin_regex=r'https?://(127\.0\.0\.1|localhost)(:\d+)?', allow_methods=['GET', 'POST'])
+
+
+@app.get('/stream')
+async def execution_stream():
+    from chaser_agent.runtime import event_response
+    return event_response()
 
 
 @app.get("/health")
@@ -164,13 +176,14 @@ async def review_document(file: Annotated[UploadFile, File(...)],
     doc = SourceDoc(id=sha256(data).hexdigest()[:16], source="upload",
                     filename=file.filename or "upload", mime=mime, data=data,
                     received_at=datetime.now(UTC))
-    result = review(doc, use_model=model)
+    result = await run_in_threadpool(review, doc, use_model=model)
     rules = rules_for(result)
     status = agreement_status(result, rules)
-    error = save(result, rules, status)
+    error = await run_in_threadpool(save, result, rules, status)
+    workflow = await run_in_threadpool(wake_workflow) if error is None else {'triggered': False, 'error': 'Review was not saved.'}
     return {"review": result.model_dump(mode="json"), "status": status, "rules": rules,
             "saved_to_spacetime": error is None, "save_error": error,
-            "workflow": wake_workflow() if error is None else {'triggered': False, 'error': 'Review was not saved.'}}
+            "workflow": workflow}
 
 
 # -- controller sign-off -----------------------------------------------------------------

@@ -1,0 +1,38 @@
+.wrap { padding: 18px !important; margin-bottom: 16px; }
+.head { display: flex; align-items: center; gap: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--n3); }
+.head .micro { color: var(--n9); }
+.note { flex: 1; font-size: 12.5px; color: var(--n9); }
+.dot { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--n6); box-sizing: border-box; }
+.dot.on { background: var(--o); border-color: var(--o); }
+.cols { display: grid; grid-template-columns: 1fr 1fr 1fr; margin: 12px 0 4px; font: 10.5px var(--mono);
+  letter-spacing: .05em; text-transform: uppercase; color: var(--n9); }
+.cols span:nth-child(2) { text-align: center; }
+.cols span:nth-child(3) { text-align: right; }
+.svg { width: 100%; height: auto; display: block; overflow: visible; }
+
+.edge path { fill: none; stroke: var(--n4); stroke-width: 1.5; transition: stroke .2s; }
+.edge .ghost { stroke: none; }
+.edge.static path:first-child { stroke-dasharray: 4 4; }
+.edgeOn path:first-child { stroke: var(--o); stroke-width: 2.5; stroke-dasharray: 8 6; animation: flow .6s linear infinite; }
+.edgeLabel { font: 11px var(--mono); fill: var(--o-ink); text-anchor: middle; dominant-baseline: text-after-edge; }
+
+.node rect { fill: var(--white); stroke: var(--n4); stroke-width: 1.2; transition: stroke .2s, fill .2s; }
+.node .title { font: 600 13.5px var(--font-sans, inherit); fill: var(--ink); }
+.node .sub { font: 11px var(--font-sans, inherit); fill: var(--n9); }
+.node .count { font: 600 12px var(--mono); fill: var(--n9); }
+.trigger rect { fill: var(--n0); }
+.agent rect { stroke: var(--n6); }
+.data rect { fill: var(--n1); stroke-dasharray: 3 3; }
+.human rect { stroke: var(--ink); }
+.nodeOn rect { stroke: var(--o); stroke-width: 2.2; fill: var(--o-wash); }
+.nodeOn .count { fill: var(--o-ink); }
+
+.why { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--n3); }
+.why .micro { color: var(--n9); }
+.why p { margin: 5px 0 0; font-size: 12.5px; color: var(--n9); display: flex; gap: 10px; }
+.why p span { font-family: var(--mono); flex: none; }
+.why p.latest { color: var(--ink); }
+.empty { color: var(--n9); }
+
+@keyframes flow { to { stroke-dashoffset: -14; } }
+@media (max-width: 900px) { .cols { display: none; } }
