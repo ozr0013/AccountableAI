@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useFeed } from "@/components/Feed";
 import { Loading, PageTop } from "@/components/ui";
+import { balances } from "@/lib/balances";
 import { money } from "@/lib/format";
 
 /** Oakline's homes: what was spent on each, and what's still open there. */
@@ -18,8 +19,8 @@ export default function Properties() {
     <div className="sim-stats">
       <div><span>Homes</span><strong>{homes.length}</strong><small>{cities.length} cities</small></div>
       <div><span>With repairs this year</span><strong>{homes.filter((h) => h.invoices).length}</strong><small>{homes.reduce((s, h) => s + h.invoices, 0)} invoices</small></div>
-      <div><span>Paid to vendors</span><strong>{money(sum("paid"), false)}</strong><small>across all homes</small></div>
-      <div><span>Still owed</span><strong>{money(sum("owed"))}</strong><small>{homes.filter((h) => h.attention).length} homes need attention</small></div>
+      <div><span>Paid to vendors</span><strong>{money(sum("paid"))}</strong><small>across all homes</small></div>
+      <div><span>Open vendor balance</span><strong>{money(sum("owed"))}</strong><small>Keyway still owes {money(balances(state).keyway)} of it · {homes.filter((h) => h.attention).length} homes need attention</small></div>
     </div>
     <div className="table-scroll lr-box" style={{ marginTop: 16 }}>
       <table className="table lr-table">

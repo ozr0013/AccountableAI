@@ -36,10 +36,6 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/invoices", label: "Invoices", icon: ListIcon },
     { href: "/properties", label: "Properties", icon: Building },
   ];
-  const tools = [
-    { href: "/console", label: "Judge Console", icon: Gavel },
-    { href: "/ask", label: "Ask about Keyway", icon: Spark },
-  ];
   const active = (href: string) => (href === "/" ? path === "/" : path.startsWith(href));
 
   return (
@@ -63,12 +59,7 @@ export function Shell({ children }: { children: ReactNode }) {
               <Link href="/proof"><Spark /> Proof & evals</Link>
               <Link href="/guardrails"><Shield /> Guardrails</Link>
             </Disclosure>
-            <div className="nav-group micro faint" style={{ marginTop: 14, marginBottom: 4 }}>Demo tools</div>
-            {tools.map(({ href, label, icon: I }) => (
-              <Link key={href} href={href} aria-current={active(href) ? "page" : undefined}>
-                <I /> {label}
-              </Link>
-            ))}
+            <Link href="/console" aria-current={active("/console") ? "page" : undefined}><Gavel /> Judge Console</Link>
           </nav>
           <DemoBar />
           <div className="side-foot">

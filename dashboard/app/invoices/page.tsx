@@ -41,9 +41,9 @@ export default function Invoices() {
     <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor invoice Keyway was funded for, across Oakline's homes."} />
     <div className="sim-stats">
       <div><span>Invoices</span><strong>{rows.length}</strong><small>{state.items.length} in total</small></div>
-      <div><span>Billed</span><strong>{money(total("amount"), false)}</strong><small>by vendors</small></div>
-      <div><span>Paid to vendors</span><strong>{money(total("paid"), false)}</strong><small>bank or vendor proof</small></div>
-      <div><span>Open vendor balance</span><strong>{money(total("owed"))}</strong><small>{filter === "all" && !home && !q ? `Keyway still owes ${money(balances(state).keyway, false)} of it` : `${rows.filter((i) => i.attention).length} need attention`}</small></div>
+      <div><span>Billed</span><strong>{money(total("amount"))}</strong><small>by vendors</small></div>
+      <div><span>Paid to vendors</span><strong>{money(total("paid"))}</strong><small>bank or vendor proof</small></div>
+      <div><span>Open vendor balance</span><strong>{money(total("owed"))}</strong><small>{filter === "all" && !home && !q ? `Keyway still owes ${money(balances(state).keyway)} of it` : `${rows.filter((i) => i.attention).length} need attention`}</small></div>
     </div>
     <div className="inv-bar">
       <div className="inv-filters" role="group" aria-label="Show">
