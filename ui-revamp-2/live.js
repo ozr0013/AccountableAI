@@ -144,7 +144,14 @@ setInterval(() => {
   const next = flow.queue.shift();
   if (!next) return;
   flow.lines[next.key].push(next.line);
-  paint(next.key);
+  // append just this line, so the lines already shown stay put (redrawing the card would replay
+  // every line's fade-in and they'd keep vanishing while the agent streams)
+  const box = state.page === 'judgment' && document.querySelector(`#flow-${next.key} .flow-think`);
+  if (!box) return paint(next.key);
+  box.querySelector(':scope > .muted')?.remove();
+  const caret = box.querySelector('.flow-caret');
+  caret ? caret.insertAdjacentHTML('beforebegin', lineHtml(next.line)) : box.insertAdjacentHTML('beforeend', lineHtml(next.line));
+  box.scrollTop = box.scrollHeight;
 }, 170);
 
 async function runAgent(key) {
