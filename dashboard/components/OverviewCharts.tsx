@@ -194,7 +194,7 @@ export function OutstandingChart({ items }: { items: Item[] }) {
   return (
     <figure className="ov-chart">
       <figcaption>
-        <div><b>Past due, by vendor type</b><span>{total ? `${money(total)} Keyway Management is late paying` : "Nothing past due"}</span></div>
+        <div><b>Past due, by vendor type</b><span>{total ? `${money(total)} Keyway Management total` : "Nothing past due"}</span></div>
       </figcaption>
       <div className="ov-plot" ref={box} onMouseLeave={() => setTip(null)}>
         <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Past due by vendor type: ${rows.map((r) => `${r.name} ${money(r.late)}`).join("; ")}`}>
