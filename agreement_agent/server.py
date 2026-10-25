@@ -8,16 +8,18 @@ is saved to agreement_agent/profile-token.json (gitignored), separately from any
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import ssl
 import sys
 import threading
 import time
 from datetime import date
 from pathlib import Path
-from urllib.request import Request as UrlRequest, urlopen
 from urllib.parse import quote
-import json
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -57,6 +59,15 @@ def _flow():
                                          autogenerate_code_verifier=True)
 
 
+def _tls() -> ssl.SSLContext:
+    """certifi's roots: python.org's macOS Python ships without any, so urlopen can't verify Google."""
+    try:
+        import certifi
+        return ssl.create_default_context(cafile=certifi.where())
+    except ImportError:
+        return ssl.create_default_context()
+
+
 def _account() -> dict:
     """Who is signed in. This uses OpenID profile data only, never the Gmail API."""
     if not TOKEN.exists():
@@ -77,7 +88,7 @@ def _account() -> dict:
             return {"signed_in": False, "error": "Your Google connection expired. Sign in again."}
         request = UrlRequest("https://openidconnect.googleapis.com/v1/userinfo",
                              headers={"Authorization": f"Bearer {creds.token}"})
-        with urlopen(request, timeout=4) as response:  # nosec B310: fixed Google OpenID endpoint
+        with urlopen(request, timeout=4, context=_tls()) as response:  # nosec B310: fixed Google OpenID endpoint
             identity = json.loads(response.read().decode("utf-8"))
         return {
             "signed_in": True,
