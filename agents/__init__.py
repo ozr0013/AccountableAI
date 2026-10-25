@@ -1,7 +1,8 @@
 """Judgment agents. contracts.registry loads build() when AGENTS=real.
 
-Kanishka's agents (agreement, trail, cause, chaser, case) and the anomaly detector sit behind one facade implementing
-contracts.steps.Agents. Methods whose agent isn't built yet delegate to the stand-in.
+Three agents read human text with a model: agreement, chaser (replies) and anomaly (free-text
+statements). Trail, cause and case are deterministic code steps the chaser relies on; no model.
+All sit behind one facade implementing contracts.steps.Agents.
 Keep this module import-light: agents.verifier / agents.briefing import it as their parent.
 """
 
@@ -27,15 +28,9 @@ class RealAgents:
 
         from .agreement import AgreementAgent
         from .anomaly import AnomalyAgent
-        from .case import CaseAgent
-        from .cause import CauseAgent
         from .chaser import ChaserAgent
-        from .trail import TrailAgent
         self._stand_in = FakeAgents()
         self.agreement = AgreementAgent(llm)
-        self.trail = TrailAgent(llm)
-        self.cause = CauseAgent(llm)
-        self.case = CaseAgent(llm)
         self.chaser = ChaserAgent(llm, names) if names else ChaserAgent(llm)
         self.anomaly = AnomalyAgent(llm)
 
@@ -47,11 +42,13 @@ class RealAgents:
         return self.agreement.extract_terms(agreement)
 
     def build_trail(self, line: LedgerLine, docs: list[Document]) -> PaymentTrail:
-        return self.trail.build_trail(line, docs)
+        from .trail import build_trail
+        return build_trail(line, docs)
 
     def classify_cause(self, line: LedgerLine, trail: PaymentTrail,
                        terms: AgreementTerms) -> CauseFinding:
-        return self.cause.classify_cause(line, trail, terms)
+        from .cause import classify
+        return classify(line, trail, terms)
 
     def draft_chase(self, manager_id: str, alerts: list[Alert],
                     prior: list[ChaseMessage]) -> ChaseMessage:
@@ -61,7 +58,8 @@ class RealAgents:
         return self.chaser.read_reply(reply_text, manager_id, docs)
 
     def build_case(self, manager_id: str, alerts: list[Alert]) -> Case:
-        return self.case.build_case(manager_id, alerts)
+        from .case import build_case
+        return build_case(manager_id, alerts)
 
     def detect_anomalies(self, statement: Document, ledger: list[LedgerLine]) -> AnomalyReport:
         return self.anomaly.detect_anomalies(statement, ledger)

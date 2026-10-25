@@ -1,5 +1,5 @@
-"""Kanishka: case agent."""
+"""Kanishka: case. Deterministic: the hold is the sum still owed on open unexplained items."""
 
-from .agent import CaseAgent
+from .rules import build_case
 
-__all__ = ["CaseAgent"]
+__all__ = ["build_case"]

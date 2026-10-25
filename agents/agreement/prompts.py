@@ -10,4 +10,6 @@ Return:
 
 For every term give the clause number exactly as written (e.g. "7.2") and the quote: the \
 sentence from that clause copied character for character. Do not paraphrase quotes and do not \
-invent terms the agreement doesn't state."""
+invent terms the agreement doesn't state: with no holdback clause, holdback_pct and \
+holdback_condition are null. If two clauses set \
+the same term differently, use the one that governs vendor payments and quote it."""

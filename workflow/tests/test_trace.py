@@ -5,11 +5,11 @@ from datetime import UTC, datetime
 import pytest
 
 from agents import RealAgents
-from agents.cause.agent import CauseAnswer
+from agents.chaser.agent import ReplyReading
 from agents.testing import ScriptedLLM, invoice, world_rails
-from agents.trail import TrailAgent
+from agents.trail import build_trail
 from contracts.fakes import FakeAgents
-from contracts.models import Cause, Event
+from contracts.models import Event
 from rails.console import JudgeConsole
 from workflow.memrails import MemoryRails
 from workflow.runner import RunResult
@@ -27,7 +27,7 @@ TRIGGER = Event(id="ev-test", type="scan_requested", manager_id="keyway",
 
 def _cause_inputs(inv="INV-KW-0301"):
     line, docs = invoice(inv, "keyway")
-    return line, TrailAgent(None).build_trail(line, docs), terms_for(world_rails(), FakeAgents(), "keyway")
+    return line, build_trail(line, docs), terms_for(world_rails(), FakeAgents(), "keyway")
 
 
 def _record_one(llm, inv="INV-KW-0301"):
@@ -48,25 +48,40 @@ def test_rules_decision_shows_facts_rule_and_result():
     assert rec.day.isoformat() == "2026-04-22" and rec.trigger == "ev-test"
 
 
+# Trail, cause and case are code only; the model-backed reading of a manager's reply shows how
+# a model decision is recorded.
+PAID_REPLY = "this one was paid last week"
+
+
+def _record_reply(llm):
+    _, docs = invoice("INV-KW-0901", "keyway")
+    tracer, got = Tracer(None), []
+    tracer.subscribe(got.append)
+    with tracer.run(TRIGGER):
+        TracedAgents(RealAgents(llm), tracer).read_reply(PAID_REPLY, "keyway", docs)
+    [rec] = got
+    return rec
+
+
 def test_claude_thinking_and_usage_are_recorded():
-    answer = CauseAnswer(cause=Cause.unexplained, confidence=0.9,
-                         explanation="Funded on Mar 5, still unpaid; bank and vendor agree.",
-                         citations=[{"source_id": "doc-funding-kw-0305"}])
-    rec = _record_one(ScriptedLLM(answer, thinking="Bank shows no payment; vendor says past due; "
-                                                   "no hold or paperwork reason."))
+    answer = ReplyReading(claims_paid=True, invoice_ids=["INV-KW-0901"], proof_source_ids=[],
+                          summary="Says it was paid; no record shows it.")
+    rec = _record_reply(ScriptedLLM(answer, thinking="The reply claims payment; no bank record "
+                                                     "or vendor confirmation shows it."))
+    assert rec.agent == "chaser" and rec.invoice_id == "INV-KW-0901"
     assert rec.mode == "llm" and rec.model == "scripted" and rec.tokens_in == 100
     [thinking] = [s for s in rec.steps if s.kind == "thinking"]
-    assert "vendor says past due" in thinking.text
+    assert "no bank record" in thinking.text
     assert any(s.kind == "guard" and s.text.startswith("Guards passed") for s in rec.steps)
 
 
 def test_rejected_claude_answer_shows_the_guard_and_the_fallback():
-    bad = CauseAnswer(cause=Cause.owner_side, confidence=0.9, explanation="Oakline's fault.",
-                      citations=[{"source_id": "doc-funding-kw-0305"}])
-    rec = _record_one(ScriptedLLM(bad, bad, thinking="Maybe the owner?"))
-    assert rec.mode == "fallback" and rec.answer == {"cause": "unexplained"}
+    bad = ReplyReading(claims_paid=True, invoice_ids=["INV-KW-0901"],
+                       proof_source_ids=["doc-reply-kw-0901"], summary="Manager says paid.")
+    rec = _record_reply(ScriptedLLM(bad, bad, thinking="The reply itself is proof?"))
+    assert rec.mode == "fallback" and rec.answer["proof"] == []
     guards = [s.text for s in rec.steps if s.kind == "guard"]
-    assert len(guards) == 2 and all("cannot be owner_side" in g for g in guards)
+    assert len(guards) == 2 and all("not a bank record" in g for g in guards)
     assert [s.kind for s in rec.steps][-2:] == ["fallback", "result"]
 
 
@@ -151,25 +166,25 @@ def test_claude_thinking_streams_piece_by_piece_before_the_decision():
     from agents.llm import AnthropicLLM
     llm = AnthropicLLM.__new__(AnthropicLLM)
     llm.model, llm.last = "claude-sonnet-5-5", {}
-    answer = ('{"cause": "unexplained", "confidence": 0.86, "explanation": "Funded Mar 5, '
-              'unpaid; the bank and the vendor both say so.", "citations": '
-              '[{"source_id": "doc-funding-kw-0305", "locator": null}]}')
-    llm.chat = _FakeStreamingChat(["Checking the bank record… ", "no payment to Rio Grande. ",
-                                   "Vendor says past due; no hold or W-9 issue."], answer)
+    answer = ('{"claims_paid": true, "invoice_ids": ["INV-KW-0901"], "proof_source_ids": [], '
+              '"summary": "Says it was paid; no record shows it."}')
+    llm.chat = _FakeStreamingChat(["Checking the bank record… ", "no payment to Brightside. ",
+                                   "No vendor confirmation either."], answer)
+    _, docs = invoice("INV-KW-0901", "keyway")
     tracer, live, decisions = Tracer(None), [], []
     tracer.subscribe_live(live.append)
     tracer.subscribe(decisions.append)
     with tracer.run(TRIGGER):
-        TracedAgents(RealAgents(llm), tracer).classify_cause(*_cause_inputs())
+        TracedAgents(RealAgents(llm), tracer).read_reply(PAID_REPLY, "keyway", docs)
     assert llm.chat.bound["output_config"]["format"]["type"] == "json_schema"
     kinds = [m["type"] for m in live]
     assert kinds == ["agent_started", "thinking", "thinking", "thinking"]
-    assert live[0]["agent"] == "cause" and live[0]["invoice_id"] == "INV-KW-0301"
+    assert live[0]["agent"] == "chaser"
     assert "".join(m["text"] for m in live[1:]).startswith("Checking the bank record… no payment")
     [rec] = decisions
     assert rec.mode == "llm" and rec.model == "claude-sonnet-5-5" and rec.tokens_in == 900
     [thinking] = [s for s in rec.steps if s.kind == "thinking"]
-    assert "Vendor says past due" in thinking.text
+    assert "No vendor confirmation" in thinking.text
 
 
 def test_workflow_announces_each_step_as_it_finishes(world):
