@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Aura } from "./Aura";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
-import { Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
+import { Building, Gavel, Home, Inbox, ListIcon, Shield, Spark } from "./Icons";
 import { DemoBar } from "./DemoBar";
 import { Disclosure } from "./Disclosure";
 import { ResponsesPanel } from "./Responses";
@@ -24,7 +24,6 @@ export function Shell({ children }: { children: ReactNode }) {
       .catch(() => undefined);
     return () => { current = false; };
   }, []);
-  const pending = state?.cases.filter((c) => c.status === "pending").length ?? 0;
   const open = state?.items.filter((i) => i.attention).length ?? 0;
   const controllerName = account?.name || account?.given_name;
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
@@ -32,7 +31,10 @@ export function Shell({ children }: { children: ReactNode }) {
     { href: "/overview", label: "Overview", icon: Home },
     { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/simulation", label: "Simulated flow", icon: Spark },
-    { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
+    // the number is what still needs someone; it goes when everything is cleared
+    { href: "/cases", label: "Review queue", icon: Inbox, count: open, hot: true },
+    { href: "/invoices", label: "Invoices", icon: ListIcon },
+    { href: "/properties", label: "Properties", icon: Building },
   ];
   const tools = [
     { href: "/console", label: "Judge Console", icon: Gavel },
@@ -48,17 +50,14 @@ export function Shell({ children }: { children: ReactNode }) {
             <Wordmark />
           </Link>
           <nav className="nav" aria-label="Main">
-            {nav.map(({ href, label, icon: I, count }) => (
-              <Link key={href} href={href} aria-current={active(href) ? "page" : undefined}>
+            {nav.map(({ href, label, icon: I, count, hot }) => (
+              <Link key={href} href={href} className={hot && count ? "attention" : undefined}
+                aria-current={active(href) || (href === "/cases" && active("/items")) ? "page" : undefined}
+                aria-label={count ? `${label}, ${count} need attention` : undefined}>
                 <I /> {label}
                 {count ? <span className="count">{count}</span> : null}
               </Link>
             ))}
-            {/* inside the review queue: what still needs someone, highlighted while anything does */}
-            <Link href="/items" className={`nav-sub${open ? " attention" : ""}`} aria-current={active("/items") ? "page" : undefined}>
-              <ListIcon /> Needs attention
-              {open ? <span className="count">{open}</span> : null}
-            </Link>
             <Disclosure className="nav-disclosure" title="Behind the scenes" hint="Agents and safeguards">
               <Link href="/agents"><Spark /> Agents</Link>
               <Link href="/proof"><Spark /> Proof & evals</Link>

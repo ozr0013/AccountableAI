@@ -39,7 +39,7 @@ export default function Overview() {
       </div>
 
       <section className="focus-panel">
-        <div className="focus-heading"><div><span className="label muted">/ Start here</span><h2>Needs a <em>closer look.</em></h2></div><Link href="/items" className="pill">All open items ↗</Link></div>
+        <div className="focus-heading"><div><span className="label muted">/ Start here</span><h2>Needs a <em>closer look.</em></h2></div><Link href="/cases" className="pill">Review queue ↗</Link></div>
         <div className="focus-list">
           {priorities.length === 0 && <p className="body muted">No open alerts. You’re caught up.</p>}
           {priorities.map(a => {

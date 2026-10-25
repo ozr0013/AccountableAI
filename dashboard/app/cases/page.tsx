@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Disclosure } from "@/components/Disclosure";
 import { useState } from "react";
 import { useFeed } from "@/components/Feed";
+import { NeedsAttention } from "@/components/NeedsAttention";
 import { Badge, Cites, Loading, PageTop, SectionTitle } from "@/components/ui";
 import { ALERT, day, money, named, SOURCE } from "@/lib/format";
 import type { Case } from "@/lib/types";
@@ -96,7 +97,7 @@ function CaseCard({ c }: { c: Case }) {
 
 export default function Cases() {
   const { state } = useFeed();
-  if (!state) return <><PageTop title="Case queue" /><Loading /></>;
+  if (!state) return <><PageTop title="Review queue" /><Loading /></>;
   const order = { pending: 0, approved: 1, declined: 1, superseded: 2 } as const;
   const cases = state.cases.slice().sort((a, b) => order[a.status] - order[b.status] || (a.kind === "funding" ? -1 : 1));
   const blocked = state.guardrails.filter((g) => !g.allowed);
@@ -106,7 +107,9 @@ export default function Cases() {
 
   return (
     <>
-      <PageTop title="Case queue" sub="Agents propose holds with an evidence pack. You decide. Nothing here moves money." />
+      <PageTop title="Review queue" sub="What still needs someone, and the holds waiting for your decision. Nothing here moves money." />
+      <NeedsAttention state={state} />
+      <h2 className="lr-h">Waiting for your decision</h2>
       <div className="case-layout">
         <div className="stack" style={{ gap: 16 }}>
           {cases.filter(c => c.status === "pending").map(c => <CaseCard key={c.approval_id} c={c} />)}

@@ -16,6 +16,12 @@ export type Item = {
   cause_text?: string; cause_confidence?: number; cause_citations?: Citation[];
   trail?: { conflict: boolean; winning_claim: string; reasoning: string; winning: string[]; entries: TrailEntry[] };
   attention: boolean; paid_late: boolean;
+  property_id?: string | null; property?: string | null;
+};
+
+export type Property = {
+  id: string; address: string; city: string; state: string; zip: string; beds: number;
+  invoices: number; amount: number; funded: number; paid: number; owed: number; attention: number; last_invoice: string | null;
 };
 
 export type Alert = {
@@ -68,6 +74,7 @@ export type State = {
   late_months: Record<string, boolean>;
   terms: Record<string, number | string>;
   items: Item[];
+  properties?: Property[];
   alerts: Alert[];
   cases: Case[];
   chases: Chase[];

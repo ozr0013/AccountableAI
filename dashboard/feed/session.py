@@ -119,6 +119,19 @@ def _responses(events: list[Event], trace: list[str], names: dict,
     return out
 
 
+def _properties(homes: dict, items: list[dict]) -> list[dict]:
+    """Oakline's homes with what was spent on each and what's still open there."""
+    out = []
+    for pid, h in homes.items():
+        mine = [i for i in items if i.get("property_id") == pid]
+        out.append({**{k: h.get(k) for k in ("id", "address", "city", "state", "zip", "beds")},
+                    "invoices": len(mine), "amount": round(sum(i["amount"] for i in mine), 2),
+                    "funded": round(sum(i["funded"] for i in mine), 2), "paid": round(sum(i["paid"] for i in mine), 2),
+                    "owed": round(sum(i["owed"] for i in mine), 2), "attention": sum(1 for i in mine if i["attention"]),
+                    "last_invoice": max((i["received"] for i in mine if i["received"]), default=None)})
+    return sorted(out, key=lambda p: (-p["attention"], -p["owed"], p["id"]))
+
+
 def _write_note(e: Event, open_before: set[str]) -> dict | None:
     """One event-log write in plain words, or None for internal bookkeeping."""
     p = e.payload or {}
@@ -473,6 +486,9 @@ class DemoSession:
         vendors = {e.payload["id"]: e.payload for e in events
                    if e.type == "entity_registered" and e.payload.get("kind") == "vendor"}
         docs = {d.id: d for d in r.documents(MANAGER)}
+        homes = {e.payload["id"]: e.payload for e in events
+                 if e.type == "entity_registered" and e.payload.get("kind") == "property"}
+        home_of = {i: pid for pid, h in homes.items() for i in h.get("invoices", [])}
         from workflow import Deps
         # Rendering a read model must never invoke paid agents.
         steps = Steps(Deps(r, self.rules_agents, self.rules_verifier, self.approvals))
@@ -497,6 +513,8 @@ class DemoSession:
                 "due": _iso(line.due_date), "status": line.status.value,
                 "duplicate_of": line.duplicate_of, "alerts": open_by_item.get(line.invoice_id, []),
                 "state": "settled", "cause": None, "days_late": 0,
+                "property_id": home_of.get(line.invoice_id),
+                "property": (lambda h: f"{h['address']}, {h['city']}" if h else None)(homes.get(home_of.get(line.invoice_id))),
             }
             if relevant:
                 a = steps._assess_one(line, now, explain=line.invoice_id in open_by_item)
@@ -578,6 +596,7 @@ class DemoSession:
             "late_months": r.late_months(MANAGER),
             "terms": terms,
             "items": items,
+            "properties": _properties(homes, items),
             "alerts": sorted(alerts, key=lambda a: (not a["open"], -a["amount"], a["id"])),
             "cases": cases,
             "chases": chases,
