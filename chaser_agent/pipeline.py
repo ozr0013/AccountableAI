@@ -86,6 +86,19 @@ def _record_chase(mirror, today):
     return record
 
 
+def model_waits(mirror, invoice_id: str, today: date) -> int:
+    """Days in a row, up to yesterday, on which Claude chose to wait although it could act."""
+    n = 0
+    for t in reversed(tasks(mirror, invoice_id=invoice_id, agent="chaser")):
+        if t["as_of"] >= today.isoformat() or t["status"] != "done":
+            continue
+        o = t["outcome"]
+        if o.get("decision") != "wait" or o.get("decided_by"):
+            break               # it acted, or the schedule (not Claude) waited
+        n += 1
+    return n
+
+
 def run_chaser(task, rails, mirror, today, client=None) -> dict:
     from . import api as service
     from . import llm_chaser
@@ -95,7 +108,8 @@ def run_chaser(task, rails, mirror, today, client=None) -> dict:
         return enqueue(mirror, agent, invoice_id, reason, payload, today, "chaser_agent")
 
     tools = llm_chaser.ChaserTools(rails, mirror, task["invoice_id"], today, history_rows,
-                                   handoff, _record_chase(mirror, today), MANAGER)
+                                   handoff, _record_chase(mirror, today), MANAGER,
+                                   model_waits=model_waits(mirror, task["invoice_id"], today))
     if tools.allowed() == ["wait"]:
         # Nothing to decide today (not due, waiting on approval or delivery, no agreement):
         # the schedule waits without a model call, and says why.
@@ -218,7 +232,8 @@ def _deadline(line, rules: list[dict]) -> str | None:
     if term is None or line.invoice_received is None:
         return None
     params = json.loads(term["params"]) if isinstance(term["params"], str) else term["params"]
-    return str(daily.add_days(line.invoice_received, int(params["days"]), params.get("basis", "calendar")))
+    return str(daily.funded_deadline(
+        daily.add_days(line.invoice_received, int(params["days"]), params.get("basis", "calendar")), line))
 
 
 def _statement_claims(rails, invoice_id: str) -> list[dict]:
@@ -266,8 +281,8 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
         own = by_vendor.get(daily.norm_name(vendor))
         rules = daily.rules_for(by_vendor, vendor, manager)
         term = next((r for r in rules if r["rule_type"] == "pay_within_days" and r["status"] == "active"), None)
-        due = (daily.add_days(line.invoice_received, int(term["params"]["days"]),
-                              term["params"].get("basis", "calendar"))
+        due = (daily.funded_deadline(daily.add_days(line.invoice_received, int(term["params"]["days"]),
+                                                    term["params"].get("basis", "calendar")), line)
                if term and line.invoice_received else None)
         paid_on = line.paid_on if line.paid_on and line.paid_on <= today else None
         paid = line.paid_amount if paid_on else 0.0

@@ -54,7 +54,7 @@ def _schema(**props):
 
 class ChaserTools:
     def __init__(self, rails, mirror, invoice_id: str, today: date, history_rows: list[dict],
-                 enqueue, record, manager_id: str = "keyway"):
+                 enqueue, record, manager_id: str = "keyway", model_waits: int = 0):
         from workflow.names import names_from
         self.rails, self.mirror, self.invoice_id, self.today = rails, mirror, invoice_id, today
         self.history_rows, self.enqueue, self.record = history_rows, enqueue, record
@@ -71,11 +71,16 @@ class ChaserTools:
                                   self.history, today, payment_seen=bool(self.bank_rows),
                                   paid_source=self.paid_source) if self.line else None)
         self.evidence_ids: set[str] = set()
+        self.model_waits = model_waits      # days in a row Claude waited while it could act
 
     def allowed(self) -> list[str]:
         a = self.code.action if self.code else "skip"
-        return {"handoff_anomaly": ["handoff_to_anomaly"], "reminder": ["send_reminder", "wait"],
-                "escalate": ["escalate", "wait"]}.get(a, ["wait"])
+        allowed = {"handoff_anomaly": ["handoff_to_anomaly"], "reminder": ["send_reminder", "wait"],
+                   "escalate": ["escalate", "wait"]}.get(a, ["wait"])
+        if len(allowed) > 1 and self.model_waits >= daily.MAX_MODEL_WAITS:
+            # Waiting is a judgment call, not a way to stall: after the limit the step is due.
+            allowed = [x for x in allowed if x != "wait"]
+        return allowed
 
     # -- read ---------------------------------------------------------------------------
     def get_invoice_context(self) -> dict:
@@ -101,6 +106,7 @@ class ChaserTools:
                        "level": c.level if c else None, "due_date": c.due_date if c else None,
                        "days_overdue": c.days_overdue if c else 0,
                        "amount_owed": c.amount_owed if c else None,
+                       "days_you_waited": self.model_waits, "max_waits": daily.MAX_MODEL_WAITS,
                        "why": c.reason if c else "no ledger line"},
         }
 
@@ -190,8 +196,16 @@ class ChaserTools:
     def escalate(self, rationale: str) -> dict:
         if err := self._guard("escalate"):
             return err
-        return {"recorded": self._record(rationale), "status": self.code.status,
-                "notice": self.code.message}
+        aid = self._record(rationale)
+        # The chaser proposes the hold; only the controller can approve it (segregation of duties).
+        owed = self.code.amount_owed
+        hold = replace(self.code, action="hold_funding", level="hold_funding", status="needs_controller",
+                       message=f"Hold ${owed:,.2f} from Oakline's next funding to Keyway until "
+                               f"{self.invoice_id} is paid. Proposed by the chaser agent.", attempt=0)
+        if not any(h["action_id"] == hold.action_id() for h in self.history):
+            self.record(hold, f"Hold proposed after escalation: {rationale}")
+        return {"recorded": aid, "status": self.code.status, "notice": self.code.message,
+                "hold_proposed": hold.action_id(), "hold_status": "needs_controller"}
 
     def handoff_to_anomaly(self, rationale: str) -> dict:
         if err := self._guard("handoff_to_anomaly"):
@@ -203,6 +217,8 @@ class ChaserTools:
         return {"recorded": aid, "anomaly_task": task}
 
     def wait(self, rationale: str, until: str | None = None) -> dict:
+        if err := self._guard("wait"):
+            return err
         if until:
             try:
                 if date.fromisoformat(until) <= self.today:

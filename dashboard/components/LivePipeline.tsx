@@ -41,7 +41,7 @@ const STATE: Record<string, string> = { overdue: "Overdue", not_due: "Not due", 
   awaiting_funding: "Awaiting funding", misdirected: "Paid to wrong vendor",
   paid_late: "Paid late", partial: "Partly paid", not_funded: "Not funded", no_deadline: "No deadline" };
 const FLAG: Record<string, string> = { statement_claims_unbacked: "statement claims a payment the bank does not show",
-  vendor_reports_unpaid: "vendor reports it was not paid", reply_without_proof: "Keyway says paid without proof",
+  vendor_reports_unpaid: "vendor reports it was not paid", delivery_failed: "an email could not be confirmed as sent", reply_without_proof: "Keyway says paid without proof",
   payment_to_other_vendor: "payment went to a different vendor", other_contradiction: "sources disagree" };
 const RANK: Record<string, number> = { overdue: 0, misdirected: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4,
   awaiting_funding: 5, no_deadline: 6, paid_on_time: 7 };
@@ -104,8 +104,13 @@ function describe(t: Task, flow: Flow): { label: string; tone: "" | "hold" | "qu
     return { label: `${level} reminder sent`, tone: n === 3 ? "hold" : "",
       line: `${late} days past the ${day(flow.deadline)} deadline. Email ${n} of 3, sent automatically.` };
   }
-  if (o.decision === "escalate") return { label: "Raised to Oakline", tone: "hold",
-    line: "No proof of payment after three reminders. Owner and Keyway notified; a hold needs the controller." };
+  if (o.decision === "escalate") {
+    const hold = flow.chaser_actions.find(a => a.action === "hold_funding");
+    const state = hold?.status === "approved" ? "the controller approved the funding hold"
+      : hold?.status === "rejected" ? "the controller declined the funding hold" : "a funding hold awaits the controller";
+    return { label: "Raised to Oakline", tone: "hold",
+      line: `No proof of payment after three reminders. Owner and Keyway notified; ${state}.` };
+  }
   if (o.decision === "handoff_to_anomaly") return { label: "Handed to Anomaly agent", tone: "",
     line: "Bank payment found. Anomaly agent checks amount, payee and timing." };
   return { label: o.decision || t.status, tone: "", line: plain(o.error) };
@@ -358,7 +363,8 @@ export function LivePipeline() {
 
       {pending && <div className={s.approval}>
         <span className="micro">Approval required{!playing && " · paused"}</span>
-        <span>{(pending.level || pending.action).replace("_", " ")} reminder to Keyway · {pending.invoice_id}</span>
+        <span>{pending.action === "hold_funding" ? `${pending.message || "Funding hold proposed"}`
+          : `${(pending.level || pending.action).replace("_", " ")} reminder to Keyway · ${pending.invoice_id}`}</span>
         <span className={s.grow} />
         <button className="btn ghost" onClick={() => decide(pending.action_id, false)} disabled={!!busy}>Reject</button>
         <button className="btn" onClick={() => decide(pending.action_id, true)} disabled={!!busy}>Approve</button>

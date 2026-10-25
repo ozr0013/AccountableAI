@@ -123,6 +123,34 @@ def transport_subject(row) -> str:
     return _subject(row)
 
 
+def _flag_failed_delivery(demo, mirror, today: date, errors: list[dict]) -> list[str]:
+    """A message that could not be confirmed as sent is never retried automatically (it might
+    have gone out), so the ladder would wait on it forever. Put it in front of the controller."""
+    from . import api, connected, daily
+    if not errors:
+        return []
+    where = {o["id"]: (c, o) for c in connected.cases(demo, pipeline.MANAGER) for o in c["outbox"]}
+    known = {h["action_id"] for h in api.history(mirror)}
+    flagged = []
+    for err in errors:
+        hit = where.get(err.get("outbox_id"))
+        if hit is None:
+            continue
+        case, row = hit
+        flag = daily.Decision(
+            invoice_id=case["invoice_id"], vendor_name=case.get("vendor") or "", action="flag",
+            level="delivery_failed", status="needs_controller", attempt=0,
+            reason=f"The {row['kind'].replace('_', ' ')} for {case['invoice_id']} could not be confirmed "
+                   f"as sent ({err['error']}); it is not retried automatically. Check the mailbox and "
+                   f"record the delivery, or resend by hand.",
+            message=row["body"][:600])
+        if flag.action_id() in known:
+            continue
+        pipeline._record_chase(mirror, today)(flag, flag.reason)
+        flagged.append(flag.action_id())
+    return flagged
+
+
 def _deliver(demo, mirror, today: date) -> list[str]:
     import os
 
@@ -135,6 +163,7 @@ def _deliver(demo, mirror, today: date) -> list[str]:
             runtime.emit({"type": "email_sent", "day": today.isoformat(), **item})
         for err in sent["errors"]:
             runtime.emit({"type": "email_failed", "day": today.isoformat(), **err})
+        _flag_failed_delivery(demo, mirror, today, sent["errors"])
         return sent["delivered"]
     delivered = []
     for case in connected.cases(demo, pipeline.MANAGER):

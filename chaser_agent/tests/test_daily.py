@@ -147,3 +147,13 @@ def test_a_vendor_confirmation_is_named_as_the_source():
     d = decide(_line(paid=1240.0), "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22),
                paid_source="vendor confirmation")
     assert d.reason.startswith("vendor confirmation shows")
+
+
+def test_a_late_wire_from_oakline_moves_the_deadline():
+    from chaser_agent.daily import FUNDING_GRACE_DAYS
+    line = _line().model_copy(update={"funded_on": date(2026, 4, 10)})   # agreement date: Apr 2
+    d = decide(line, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 11))
+    assert d.action == "not_due" and d.due_date == str(date(2026, 4, 10).replace(day=10 + FUNDING_GRACE_DAYS))
+    assert "after the agreement date" in d.reason
+    on_time = _line().model_copy(update={"funded_on": date(2026, 3, 5)})
+    assert decide(on_time, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 11)).due_date == "2026-04-02"

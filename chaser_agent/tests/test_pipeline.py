@@ -221,3 +221,44 @@ def test_the_prompt_describes_the_live_sending_rules(monkeypatch):
     assert "polite, firm, escalation reminders go out automatically" in llm_chaser.system_prompt()
     monkeypatch.setattr(daily, "AUTO_LEVELS", {"polite"})
     assert "firm, escalation reminders wait for controller approval" in llm_chaser.system_prompt()
+
+
+def test_claude_cannot_keep_waiting_when_the_schedule_says_act(world):
+    rails, mirror = world
+    from chaser_agent import daily
+    for day in ("2026-04-20", "2026-04-21"):
+        mirror.tasks[f"chaser:{INV}:{day}"] = {"task_id": f"chaser:{INV}:{day}", "agent": "chaser",
+            "invoice_id": INV, "status": "done", "as_of": day, "created_at": day, "payload": "{}",
+            "trace": "{}", "outcome": json.dumps({"decision": "wait", "rationale": "waiting"})}
+    assert pipeline.model_waits(mirror, INV, date(2026, 4, 22)) == daily.MAX_MODEL_WAITS
+    from chaser_agent import llm_chaser
+    tools = llm_chaser.ChaserTools(rails, mirror, INV, date(2026, 4, 22), [], lambda *a: "t",
+                                   lambda d, r: None, model_waits=2)
+    assert tools.allowed() == ["send_reminder"] and "error" in tools.wait("still thinking it over")
+
+
+def test_escalation_proposes_a_hold_only_the_controller_can_approve(world):
+    rails, mirror = world
+    from chaser_agent import llm_chaser
+    tools, recorded = _tools(rails, mirror, date(2026, 5, 20))
+    tools.code = tools.code.__class__(**{**tools.code.__dict__, "action": "escalate", "status": "queued",
+                                         "message": "notice", "amount_owed": 1240.0})
+    out = tools.escalate("Three reminders delivered, still no bank record; escalating.")
+    assert out["hold_status"] == "needs_controller"
+    hold = [d for d, _ in recorded if d.action == "hold_funding"][0]
+    assert hold.status == "needs_controller" and "$1,240.00" in hold.message
+
+
+def test_a_failed_send_is_flagged_to_the_controller(world, monkeypatch):
+    rails, mirror = world
+    from chaser_agent import connected, demo
+    case = {"invoice_id": INV, "vendor": "Rio Grande Plumbing",
+            "outbox": [{"id": "out-1", "kind": "chase_reminder", "body": "Hello Keyway"}]}
+    monkeypatch.setattr(connected, "cases", lambda *a, **k: [case])
+    flagged = demo._flag_failed_delivery(rails, mirror, date(2026, 4, 22),
+                                         [{"outbox_id": "out-1", "error": "SMTPException"}])
+    assert flagged == [f"{INV}:flag:delivery_failed:0"]
+    [row] = [a for a in mirror.actions.values() if a["action"] == "flag"]
+    assert row["status"] == "needs_controller" and "not retried" in row["reason"]
+    assert demo._flag_failed_delivery(rails, mirror, date(2026, 4, 23),
+                                      [{"outbox_id": "out-1", "error": "SMTPException"}]) == []

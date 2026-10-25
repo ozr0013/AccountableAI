@@ -41,6 +41,11 @@ AUTO_ESCALATE = os.getenv("CHASER_AUTO_ESCALATE", "on").lower() == "on"
 # What a management agreement contributes for vendors without their own: when to pay, how often
 # to remind. Its payee and account rules describe paying the manager, not the vendor.
 MANAGEMENT_TERMS = ("pay_within_days", "reminder_cadence")
+# Keyway pays "using funds provided by Owner": when Oakline wires late, Keyway gets this many days
+# from the wire before the invoice counts as overdue.
+FUNDING_GRACE_DAYS = int(os.getenv("CHASER_FUNDING_GRACE_DAYS", "3"))
+# How many days in a row Claude may choose to wait while the schedule says to act.
+MAX_MODEL_WAITS = int(os.getenv("CHASER_MAX_MODEL_WAITS", "2"))
 DELIVERED = {"queued", "approved"}
 
 
@@ -115,6 +120,13 @@ def _cadence(rules: list[dict]) -> tuple[int, str]:
     return days, f"agreement: {rule.get('source_quote') or rule['check']}"
 
 
+def funded_deadline(due: date, line) -> date:
+    """The agreement deadline, moved out when Oakline's own funding arrived too late for it."""
+    if line.funded_on and line.funded_on + timedelta(days=FUNDING_GRACE_DAYS) > due:
+        return line.funded_on + timedelta(days=FUNDING_GRACE_DAYS)
+    return due
+
+
 def bank_rows_by_invoice(rails, manager_id: str = "keyway", today: date | None = None) -> dict[str, list[dict]]:
     """Every bank payment row filed so far, by invoice: what Keyway's bank says it paid, to whom."""
     out: dict[str, list[dict]] = {}
@@ -175,7 +187,8 @@ def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history
                 and rule['params'].get('per') == 'fixed'
                 and round(float(rule['params']['amount']) * 100) != round(line.amount * 100)):
             return Decision(**base, action='hold', reason='Invoice amount differs from the agreement; controller review required.')
-    due = add_days(start, int(p["days"]), p.get("basis", "calendar"))
+    agreed = add_days(start, int(p["days"]), p.get("basis", "calendar"))
+    due = funded_deadline(agreed, line)
     cite = {"rule_id": term["rule_id"], "rule_quote": term.get("source_quote"),
             "due_date": due.isoformat()}
     owed = round(line.amount - line.paid_amount, 2)
@@ -194,10 +207,12 @@ def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history
     if seen and owed <= 0:
         return Decision(**base, **cite, action="skip", reason="paid in full; anomaly review done")
     # Unpaid, or a balance still owed after a short or misdirected payment: keep chasing it.
+    late_wire = (f"; Oakline funded on {line.funded_on}, after the agreement date {agreed}, so "
+                 f"Keyway has {FUNDING_GRACE_DAYS} days from the wire") if due != agreed else ""
     if today <= due:
         return Decision(**base, **cite, action="not_due", amount_owed=owed,
                         reason=f"due {due} ({(due - today).days} days left) under "
-                               f"'{term['check']}'")
+                               f"'{term['check']}'{late_wire}")
     if not line.funded_amount:
         return Decision(**base, **cite, action="skip",
                         reason="Oakline has not funded this invoice; nothing to chase")

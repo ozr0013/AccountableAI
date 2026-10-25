@@ -34,8 +34,13 @@ of the controller. Flag each contradiction once; do not flag a mere late payment
 | Overdue, a reminder draft is still awaiting approval or delivery | `wait` one day; mention what it waits on |
 | Overdue, the last reminder shows `delivery: delivered` and policy allows `send_reminder` | `send_reminder` (the next level) |
 | Overdue and `policy.allowed` includes `send_reminder` | `send_reminder` at the level policy gives |
-| All three reminder levels delivered and still unpaid | `escalate` (owner + management notified, hold proposed, controller decides) |
+| All three reminder levels delivered and still unpaid | `escalate` (owner + management notified; a funding hold is proposed and only the controller can approve it) |
 | Agreement missing, unconfirmed or rejected | `wait` and say a controller must confirm the agreement |
+
+## Waiting
+`wait` when policy also allows acting is a judgment call: say what you are waiting for. After
+`policy.max_waits` days in a row (`policy.days_you_waited`) waiting is no longer offered and the
+scheduled step is due.
 
 ## Reading the history
 `status` is the chaser's own record (`queued` = handed to the outbox, `needs_approval` = waiting

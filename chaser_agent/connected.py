@@ -17,7 +17,7 @@ from agents.anomaly import AnomalyAgent
 from contracts.models import Event, SourceKind
 from workflow.names import names_from
 
-from .daily import _rules_by_vendor, add_days, norm_name, rules_for
+from .daily import _rules_by_vendor, add_days, funded_deadline, norm_name, rules_for
 
 
 class _ReconcileSnapshot:
@@ -276,7 +276,9 @@ def _project(rails, line, rules, actions, today):
     elif basis_from != "invoice receipt":
         start = None
     due = (
-        add_days(start, int(term["params"]["days"]), term["params"].get("basis", "calendar"))
+        funded_deadline(
+            add_days(start, int(term["params"]["days"]), term["params"].get("basis", "calendar")),
+            line)
         if start
         else None
     )
