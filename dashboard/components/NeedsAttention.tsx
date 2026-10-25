@@ -33,6 +33,7 @@ export function NeedsAttention({ state }: { state: State }) {
   const rows = open.map((i) => ({ i, ...triage(i, state.items) }));
   const total = open.reduce((s, i) => s + i.owed, 0);
   const bal = balances(state);
+  const other = Math.round((bal.open - bal.keyway - bal.unfunded - bal.retained - bal.duplicate) * 100) / 100;
   const sum = (g: Group) => rows.filter((r) => r.group === g).reduce((s, r) => s + r.i.owed, 0);
   const pattern = state.alerts.find((a) => a.open && a.kind === "recurring_pattern");
 
@@ -57,6 +58,7 @@ export function NeedsAttention({ state }: { state: State }) {
         {bal.unfunded > 0 && <span>+ <b>{money(bal.unfunded)}</b> not yet funded by you</span>}
         {bal.retained > 0 && <span>+ <b>{money(bal.retained)}</b> retained under the agreement</span>}
         {bal.duplicate > 0 && <span>+ <b>{money(bal.duplicate)}</b> billed twice</span>}
+        {other !== 0 && <span>{other > 0 ? "+" : "−"} <b>{money(Math.abs(other))}</b> not matched to the above</span>}
         <span>= <b>{money(bal.open)}</b> open</span>
       </p>
       <div className="na-bar" role="img" aria-label={GROUPS.map((g) => `${g.title} ${money(sum(g.id))}`).join(", ")}>

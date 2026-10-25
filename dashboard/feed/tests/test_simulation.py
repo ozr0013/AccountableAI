@@ -49,7 +49,9 @@ def _figures_agree(state):
     open_ = round(sum(i["owed"] for i in items if i["owed"] > 0), 2)
     parts = round(r["owed"] + r["unfunded"] + r["held"] + r["duplicate_funded"], 2)
     unexplained = round(sum(i["owed"] for i in items if i["cause"] == "unexplained" and i["owed"] > 0), 2)
-    return open_ == parts and state["headline"]["unexplained"] == unexplained, (open_, parts, unexplained)
+    funded = round(r["paid"] + r["held"] + r["duplicate_funded"] + r["owed"], 2)  # the Overview strip
+    return (open_ == parts and state["headline"]["unexplained"] == unexplained and funded == r["funded"],
+            (open_, parts, unexplained, funded, r["funded"]))
 
 
 def test_open_balance_reconciles_at_the_start_and_after_every_step(frames):
