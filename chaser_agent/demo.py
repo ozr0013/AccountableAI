@@ -91,7 +91,10 @@ def feed(demo, mirror) -> dict:
     global _FEED
     if _FEED is None:
         from . import demo_feed
-        _FEED = demo_feed.build(demo_feed.vendors(demo, mirror), START, END, pipeline.MANAGER)
+        # Built from the original books, never the demo copy: the copy already holds earlier
+        # days' paperwork, which would change the vendors' usual amounts and so the whole month.
+        from rails.real import RealRails
+        _FEED = demo_feed.build(demo_feed.vendors(RealRails(), mirror), START, END, pipeline.MANAGER)
         global FATES
         FATES = dict(demo_feed.build.fates)
     return _FEED
