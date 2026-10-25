@@ -10,9 +10,10 @@ A standalone HTML, CSS, and JavaScript payment dashboard recreated from the five
 - The Keyway invoices from `GET /api/ui/invoices` replace the demo invoices, so every page shows the
   real workflow: properties from the invoice addresses, statuses, and the invoices a person should
   review (open alerts).
-- **Agents**, the first page, runs the three agents one after another (agreement, chaser, anomaly
-  detector) and streams each agent's reasoning into its card as it decides (`/api/loop/*`,
-  `/api/stream`). The backend emails the middleman's reminders and statement note.
+- **Judgment › Agent Workflow** (the page the app opens on) runs the three agents one after another
+  (agreement, chaser, anomaly detector) and streams each agent's reasoning into its card as it
+  decides (`/api/loop/*`, `/api/stream`). The backend emails the middleman's reminders and
+  statement note. Every other page is `app.js` as designed.
 
 Opened any other way (the `python3 -m http.server` steps below), it talks to http://127.0.0.1:8765,
 and falls back to the demo data when the backend isn't running.

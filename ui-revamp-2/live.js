@@ -2,10 +2,11 @@
 //
 //  1. Data: the Keyway invoices from GET /api/ui/invoices replace the demo invoices, so every
 //     page (portfolio, properties, invoices, judgment) shows the real workflow's state.
-//  2. Agents: a new first page runs the three agents one after another (agreement, chaser,
-//     anomaly detector) through POST /api/loop/*, and shows each agent's reasoning as it decides,
-//     from the /api/stream event stream. Reminders and the statement note are emailed by the
-//     backend; each email shows up in the card that sent it.
+//  2. Agent workflow: the Judgment page (her "Agent Workflow" screen) runs the three agents one
+//     after another (agreement, chaser, anomaly detector) through POST /api/loop/*, and shows each
+//     agent's reasoning as it decides, from the /api/stream event stream. Reminders and the
+//     statement note are emailed by the backend; each email shows up in the card that sent it.
+//     Every other page is app.js as designed.
 //
 // Served by the backend at its own address, so the API is same-origin. Opened another way
 // (python -m http.server), it talks to http://127.0.0.1:8765.
@@ -43,7 +44,7 @@ days = function (i) {
     ? Math.max(0, Math.floor((new Date(LIVE.asOf + 'T12:00:00') - new Date(i.due + 'T12:00:00')) / 86400000)) : 0;
 };
 
-// -- 2. the agents page --------------------------------------------------------------------------
+// -- 2. the agent workflow (the Judgment page) ----------------------------------------------------
 const AGENTS = [
   { key: 'agreement', n: '1', name: 'Agreement agent', when: "An agreement arrives in the owner's Gmail",
     listens: d => d.agent === 'agreement_check' },
@@ -106,17 +107,16 @@ function cardHtml(a, i) {
 function agentsPage() {
   const mode = !LIVE.tried ? 'Connecting…' : !LIVE.on ? 'Backend not connected'
     : LIVE.agents === 'live' ? 'Claude agents' : 'Rules agents · $0';
-  return `<div class="pagehead"><div><div class="crumb">Workflow</div><h1>Agents</h1>
-      <p class="muted">Owner pays the middleman, the middleman pays the vendor. Three agents check every step.</p></div>
-      <div class="actions"><span class="pill">${mode}</span>
-      <button class="primary" onclick="runLoop()" ${flow.running || !LIVE.on ? 'disabled' : ''}>${flow.running ? 'Running…' : flow.out.anomaly ? 'Run again' : 'Run the loop'}</button></div></div>
+  const run = `<span class="pill">${mode}</span><button class="primary" onclick="runLoop()" ${flow.running || !LIVE.on ? 'disabled' : ''}>${flow.running ? 'Running…' : flow.out.anomaly ? 'Run again' : 'Run the loop'}</button>`;
+  return header('Judgment &nbsp;›', 'Agent Workflow', run)
+    + `<p class="muted flow-intro">Owner pays the middleman, the middleman pays the vendor. Three agents check every step.</p>
     ${LIVE.tried && !LIVE.on ? '<section class="card"><p>The agents need the live backend: <code>python dashboard/feed/serve.py</code></p></section>' : ''}
     ${flow.error ? `<section class="card flow-error">${esc(flow.error)}</section>` : ''}
     <div class="flow">${AGENTS.map(cardHtml).join('')}</div>
     <p class="muted">Reminders and the statement note are emailed to the middleman from the owner's Gmail, using approved templates only. Nothing moves money.</p>`;
 }
 function paint(key) {
-  if (state.page !== 'agents') return;
+  if (state.page !== 'judgment') return;
   if (!key) { $('#main').innerHTML = agentsPage(); return; }
   const a = AGENTS.find(x => x.key === key), el = document.getElementById(`flow-${key}`);
   if (!el) { $('#main').innerHTML = agentsPage(); return; }
@@ -187,24 +187,8 @@ window.runLoop = async function () {
   flow.running = false; paint();
 };
 
-// the agents page goes first in the navigation; app.js keeps every other page
-const _nav = nav;
-nav = function () {
-  _nav();
-  const sb = $('#sidebar');
-  const btn = `<button class="nav ${state.page === 'agents' ? 'active' : ''}" onclick="go('agents')" title="Agents"><span class="sym">✦</span><span class="text">Agents</span>${LIVE.on ? '<span class="badge live">live</span>' : ''}</button>`;
-  const label = sb.querySelector('.navlabel');
-  if (label) label.insertAdjacentHTML('afterend', btn); else sb.insertAdjacentHTML('afterbegin', btn);
-};
-const _render = render;
-render = function () {
-  if (state.page !== 'agents') return _render();
-  nav();
-  $('#bell i').style.display = needs().length ? 'block' : 'none';
-  $('#main').innerHTML = agentsPage();
-};
-window.addEventListener('hashchange', () => { if (location.hash === '#agents' && state.page !== 'agents') go('agents'); });
-
-if (location.hash === '#agents' || !location.hash) go('agents');   // the agents are the main screen
+// her Judgment page ("Agent Workflow") becomes the live three-agent workflow; nothing else changes
+judgment = agentsPage;
+if (location.hash === '#agents' || !location.hash) go('judgment');   // the agent workflow opens first
 loadLive();
 listen();
