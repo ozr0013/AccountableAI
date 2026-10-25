@@ -138,7 +138,7 @@
    Each page header sits on a rule with "+" marks where it meets the frame. */
 .shell.theme-aura { padding-inline: 20px; }
 .theme-aura .side { padding: 20px 0 16px; border-left: 1px solid var(--line); }
-.theme-aura .side > :not(.brand) { margin-inline: 16px; }
+.theme-aura .side > :not(.brand):not(.side-brand) { margin-inline: 16px; }
 .theme-aura .brand { flex: none; height: 58px; padding: 0 22px; gap: 10px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .theme-aura .main { min-height: 100vh; padding-top: 20px; border-right: 1px solid var(--line); }
 .theme-aura .main > .wrap { max-width: none; }
@@ -593,18 +593,17 @@
 /* The layout grid gives space released by the sidebar directly to the page. */
 .shell.theme-aura { grid-template-columns: var(--sidebar) minmax(0, 1fr); transition: grid-template-columns .2s ease; }
 .theme-aura .side { min-width: 0; }
-.theme-aura .side > .sidebar-toggle { display: flex; align-items: center; justify-content: flex-start; gap: 10px; min-height: 32px; flex: none; padding: 0 10px; border: 1px solid var(--line); background: #fff; color: var(--n9); font: inherit; font-size: 12px; }
+.theme-aura .side-brand { display: flex; align-items: center; gap: 4px; height: 58px; flex: none; padding-right: 6px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.theme-aura .side-brand .brand { flex: 1; min-width: 0; height: auto; padding: 0 0 0 22px; border: 0; }
+.theme-aura .sidebar-toggle { display: grid; place-items: center; width: 28px; height: 32px; flex: none; padding: 0; border: 0; background: transparent; color: var(--n9); }
 .theme-aura .sidebar-toggle:hover { background: var(--o-wash); color: var(--o-ink); }
 .sidebar-toggle svg { width: 16px; height: 16px; flex: none; }
-.brand-full { display: flex; }
-.brand-compact { display: none; width: 24px; height: 24px; }
-.sidebar-collapsed .sidebar-toggle svg { transform: rotate(180deg); }
+.theme-aura.sidebar-collapsed .side-brand { justify-content: center; gap: 0; padding: 0; }
+.theme-aura.sidebar-collapsed .brand { display: none; }
 @media (min-width: 761px) {
   .shell.theme-aura.sidebar-collapsed { --sidebar: 72px; }
-  .theme-aura.sidebar-collapsed .side > :not(.brand) { margin-inline: 8px; }
-  .theme-aura.sidebar-collapsed :is(.sidebar-label, .who-text, .brand-full) { display: none; }
-  .theme-aura.sidebar-collapsed .brand { padding-inline: 0; justify-content: center; }
-  .theme-aura.sidebar-collapsed .brand-compact { display: block; }
+  .theme-aura.sidebar-collapsed .side > :not(.brand):not(.side-brand) { margin-inline: 8px; }
+  .theme-aura.sidebar-collapsed :is(.sidebar-label, .who-text) { display: none; }
   .theme-aura.sidebar-collapsed :is(.sidebar-toggle, .nav > a, .who, .ask-pill) { justify-content: center; padding-inline: 0; }
   .theme-aura.sidebar-collapsed .nav > a { height: 44px; }
   .theme-aura.sidebar-collapsed .nav .count { position: absolute; right: 0; top: 1px; min-width: 14px; height: 14px; padding-inline: 2px; font-size: 9px; }
@@ -613,5 +612,7 @@
 }
 @media (max-width: 760px) {
   .shell.theme-aura { grid-template-columns: minmax(0, 1fr); }
+  .theme-aura .side-brand { height: 52px; }
+  .theme-aura .side-brand .brand { padding-left: 14px; }
   .theme-aura.sidebar-collapsed :is(.nav, .side-foot) { display: none; }
 }

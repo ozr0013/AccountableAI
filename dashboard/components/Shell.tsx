@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { useFeed } from "./Feed";
 import { Wordmark } from "./Wordmark";
-import { Building, Gavel, Home, Inbox, ListIcon, Mark, Spark } from "./Icons";
+import { Building, Gavel, Home, Inbox, ListIcon, Spark } from "./Icons";
 import { ResponsesPanel } from "./Responses";
 import { DocProvider } from "./ui";
 
@@ -50,17 +50,17 @@ export function Shell({ children }: { children: ReactNode }) {
     <DocProvider>
       <div className={`shell theme-aura${collapsed ? " sidebar-collapsed" : ""}`}>
         <aside className="side" data-lenis-prevent>
-          <Link href="/" className="brand" aria-label="Accountable.AI home">
-            <span className="brand-full"><Wordmark /></span>
-            <Mark className="brand-compact" />
-          </Link>
-          <button className="sidebar-toggle" type="button" onClick={toggleSidebar}
-            aria-expanded={!collapsed} aria-controls="sidebar-navigation sidebar-account"
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10 4 6 8l4 4" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
-            <span className="sidebar-label">{collapsed ? "Expand sidebar" : "Collapse sidebar"}</span>
-          </button>
+          <div className="side-brand">
+            <Link href="/" className="brand" aria-label="Accountable.AI home">
+              <Wordmark />
+            </Link>
+            <button className="sidebar-toggle" type="button" onClick={toggleSidebar}
+              aria-expanded={!collapsed} aria-controls="sidebar-navigation sidebar-account"
+              aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              title={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 4h10M3 8h10M3 12h10" fill="none" stroke="currentColor" strokeWidth="1.5" /></svg>
+            </button>
+          </div>
           <nav className="nav" id="sidebar-navigation" aria-label="Main">
             {nav.map(({ href, label, icon: I, count, hot }) => (
               <Link key={href} href={href} className={hot && count ? "attention" : undefined}
