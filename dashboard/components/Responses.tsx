@@ -29,7 +29,7 @@ export function ResponseList({ responses, dense }: { responses: Response[]; dens
           <Badge kind={kindOf(r)} />
           <div className="arow-main">
             <span className="micro warn-ink">{r.agent}</span>
-            <span className="body" style={{ fontSize: dense ? 12.5 : 13, color: "var(--ink)", whiteSpace: "normal" }}>
+            <span className="body" style={{ fontSize: dense ? "calc(12.5px * var(--dashboard-type-scale, 1))" : "calc(13px * var(--dashboard-type-scale, 1))", color: "var(--ink)", whiteSpace: "normal" }}>
               {r.what}
               {r.invoice_id && !r.what.includes(r.invoice_id) && <Link className="cite" style={{ marginLeft: 6 }} href={`/items/${r.invoice_id}`}>{r.invoice_id}</Link>}
             </span>
@@ -45,7 +45,7 @@ export function ResultHead({ res }: { res: Extract<ActionResult, { ok: true }> }
   return (
     <div className="stack" style={{ gap: 8 }}>
       <span className="label muted">/ {({ fact: "Judge fact", reply: "Keyway Management replied", decision: "Controller decision", clock: "Clock" } as Record<string, string>)[res.kind] ?? res.kind}</span>
-      <p className="body" style={{ margin: 0, color: "var(--ink)", fontSize: 15, lineHeight: "22px" }}>{res.summary}</p>
+      <p className="body" style={{ margin: 0, color: "var(--ink)", fontSize: "calc(15px * var(--dashboard-type-scale, 1))", lineHeight: "22px" }}>{res.summary}</p>
       <div className="row" style={{ flexWrap: "wrap", gap: 6 }}>
         <span className="tag neutral">{res.diff.rechecked.length} rechecked</span>
         <span className="tag">{res.diff.changed.length} changed</span>

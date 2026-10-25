@@ -9,8 +9,8 @@ const CHAPTERS = [
     body: "Every month you send money to the company that manages your homes, so it can pay the plumbers, cleaners and electricians who do the work." },
   { tag: "TRUST", title: "They’re meant to pay your vendors.",
     body: "That’s the deal: the money reaches the people who did the job, in full and on time. You rarely get to see whether it did." },
-  { tag: "STATEMENT", title: "The statement says it’s all paid.",
-    body: "Once a month a tidy statement arrives, every line marked paid. Until now, that was the whole picture." },
+  { tag: "STATEMENT", title: "The statement says the payment is overdue.",
+    body: "This creates confusion among owners." },
   { tag: "GAP", title: "Some vendors are still waiting.",
     body: "A plumber’s past-due notice. No payment in the bank. Three invoices, $3,140, with no proof they were ever paid." },
   { tag: "FOLLOW UP", title: "We ask. Politely, then firmly.",
@@ -76,7 +76,7 @@ export function Story() {
             ))}
             <div className={`stage-statement${at(2)}${step >= 3 ? " doubted" : ""}`}>
               <span className="stage-label">Monthly statement</span>
-              {VENDORS.map((v) => <span key={v.name} className="row"><span>{v.name}</span><i>Paid</i></span>)}
+              {VENDORS.map((v) => <span key={v.name} className="row"><span>{v.name}</span><i>Overdue</i></span>)}
             </div>
             <div className={`stage-bubble${step === 4 ? " in" : ""}`}>“We paid it.”<small>No receipt yet</small></div>
             <div className={`stage-hold${at(3)}${step >= 6 ? " decide" : ""}`}>

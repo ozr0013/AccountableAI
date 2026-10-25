@@ -28,7 +28,7 @@ export default function Ask() {
       <PageTop title="Ask about Keyway Management" sub="Answers from the record, every claim cited." />
       <div className="card" style={{ padding: 24 }}>
         <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }}>
-          <input className="input" style={{ height: 52, fontSize: 18 }} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Question about Keyway Management" />
+          <input className="input" style={{ height: 52, fontSize: "calc(18px * var(--dashboard-type-scale, 1))" }} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Question about Keyway Management" />
           <button className="btn" style={{ height: 52, padding: "0 24px" }} disabled={busy}>{busy ? "Reading the record" : "Ask"}</button>
         </form>
         <div className="row" style={{ marginTop: 12, flexWrap: "wrap" }}>
@@ -43,7 +43,7 @@ export default function Ask() {
           <div>
             <SectionTitle right={String(b.meta?.mode ?? "code") + " briefing"}>Answer</SectionTitle>
             <div className="card" style={{ padding: 28 }}>
-              <p className="lead" style={{ margin: 0, color: "var(--ink)", fontSize: 20, lineHeight: "30px" }}>{named(b.answer, names)}</p>
+              <p className="lead" style={{ margin: 0, color: "var(--ink)", fontSize: "calc(20px * var(--dashboard-type-scale, 1))", lineHeight: "30px" }}>{named(b.answer, names)}</p>
             </div>
             <SectionTitle right={`${b.claims.length}`}>Claims and sources</SectionTitle>
             <div className="stack" style={{ gap: 0 }}>

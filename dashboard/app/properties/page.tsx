@@ -29,7 +29,7 @@ export default function Properties() {
         <thead><tr><th>Home</th><th>City</th><th className="r">Beds</th><th className="r">Invoices</th><th className="r">Paid</th><th className="r">Outstanding</th><th className="r">Not funded</th><th>Last invoice</th><th>Open</th></tr></thead>
         <tbody>{homes.map((h) => (
           <tr key={h.id} className={h.attention ? "u-alert" : ""}>
-            <td><Link href={`/invoices?property=${h.id}`}>{h.address}</Link><div className="mono" style={{ fontSize: 11, color: "var(--n9)" }}>{h.id}</div></td>
+            <td><Link href={`/invoices?property=${h.id}`}>{h.address}</Link><div className="mono" style={{ fontSize: "calc(11px * var(--dashboard-type-scale, 1))", color: "var(--n9)" }}>{h.id}</div></td>
             <td>{h.city}, {h.state} {h.zip}</td><td className="r num">{h.beds}</td><td className="r num">{h.invoices}</td>
             <td className="r num">{money(byHome.get(h.id)!.paid)}</td>
             <td className={`r num${byHome.get(h.id)!.late ? " late-ink" : ""}`}>{byHome.get(h.id)!.left ? money(byHome.get(h.id)!.left) : "—"}</td>
