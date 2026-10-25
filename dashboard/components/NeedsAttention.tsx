@@ -31,7 +31,7 @@ function triage(i: Item, items: Item[]): { group: Group; why: string } {
 export function NeedsAttention({ state }: { state: State }) {
   const open = state.items.filter((i) => i.attention);
   const rows = open.map((i) => ({ i, ...triage(i, state.items) }));
-  // unpaid on a bill = left to pay by Keyway + not yet funded by Oakline (lib/balances.ts)
+  // unpaid on a bill = outstanding with Keyway + not yet funded by Oakline (lib/balances.ts)
   const unpaid = (i: Item) => leftToPay(i) + notFunded(i);
   const total = open.reduce((s, i) => s + unpaid(i), 0);
   const t = totals(state.items);
@@ -55,7 +55,7 @@ export function NeedsAttention({ state }: { state: State }) {
         <Link href="/invoices" className="pill">Every invoice ↗</Link>
       </div>
       <p className="na-recon">
-        <span><b>{money(t.left)}</b> left to pay by Keyway</span>
+        <span><b>{money(t.left)}</b> outstanding with Keyway</span>
         <span>+ <b>{money(t.notFunded)}</b> not yet funded by you</span>
         <span>= <b>{money(t.left + t.notFunded)}</b> unpaid to vendors</span>
       </p>

@@ -14,7 +14,7 @@ import type { Item } from "@/lib/types";
 const FILTERS: { id: string; label: string; keep: (i: Item) => boolean }[] = [
   { id: "all", label: "All", keep: () => true },
   { id: "attention", label: "Needs attention", keep: (i) => i.attention },
-  { id: "left", label: "Left to pay", keep: (i) => leftToPay(i) > 0 },
+  { id: "left", label: "Outstanding", keep: (i) => leftToPay(i) > 0 },
   { id: "late", label: "Past due", keep: lateToPay },
   { id: "unfunded", label: "Not yet funded", keep: (i) => notFunded(i) > 0 },
   { id: "paid", label: "Paid", keep: (i) => i.paid > 0 },
@@ -49,11 +49,11 @@ export default function Invoices() {
   );
 
   return <>
-    <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor bill: billed = paid + left to pay + not yet funded."} />
+    <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor bill: billed = paid + outstanding + not yet funded."} />
     <div className="ov-boxes inv-boxes">
-      {box("all", `Billed · ${rows.length} bill${rows.length === 1 ? "" : "s"}`, t.billed)}
-      {box("paid", "Paid to vendors", t.paid, "paid")}
-      {box("left", "Left to pay by Keyway", t.left)}
+      {box("all", `Billed by vendors · ${rows.length} bill${rows.length === 1 ? "" : "s"}`, t.billed)}
+      {box("paid", "Paid", t.paid, "paid")}
+      {box("left", "Outstanding", t.left)}
       {box("unfunded", "Not yet funded by Oakline", t.notFunded)}
     </div>
     <div className="inv-bar">
@@ -65,7 +65,7 @@ export default function Invoices() {
     </div>
     <div className="table-scroll lr-box">
       <table className="table lr-table">
-        <thead><tr><th>Invoice</th><th>Home</th><th>Vendor</th><th className="r">Billed</th><th className="r">Paid</th><th className="r">Left to pay</th><th className="r">Not funded</th><th>Received</th><th>Due</th><th>Status</th></tr></thead>
+        <thead><tr><th>Invoice</th><th>Home</th><th>Vendor</th><th className="r">Billed</th><th className="r">Paid</th><th className="r">Outstanding</th><th className="r">Not funded</th><th>Received</th><th>Due</th><th>Status</th></tr></thead>
         <tbody>{rows.map((i) => (
           <tr key={i.id} className={i.attention ? "u-alert" : ""}>
             <td className="mono"><Link href={`/items/${i.id}`}>{i.id}</Link></td>

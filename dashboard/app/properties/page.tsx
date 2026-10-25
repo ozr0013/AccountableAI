@@ -20,13 +20,13 @@ export default function Properties() {
     <PageTop title="Properties" sub={`${homes.length} homes Keyway manages for Oakline in ${cities.join(" · ")}`} />
     <div className="ov-boxes">
       <Link href="/invoices"><span>Homes · {homes.filter((h) => h.invoices).length} with repairs</span><strong>{homes.length}</strong></Link>
-      <Link href="/invoices?show=paid" className="paid"><span>Paid to vendors</span><strong>{money(all.paid)}</strong></Link>
-      <Link href="/invoices?show=left"><span>Left to pay by Keyway</span><strong>{money(all.left)}</strong></Link>
+      <Link href="/invoices?show=paid" className="paid"><span>Paid</span><strong>{money(all.paid)}</strong></Link>
+      <Link href="/invoices?show=left"><span>Outstanding</span><strong>{money(all.left)}</strong></Link>
       <Link href="/invoices?show=unfunded"><span>Not yet funded by Oakline</span><strong>{money(all.notFunded)}</strong></Link>
     </div>
     <div className="table-scroll lr-box" style={{ marginTop: 16 }}>
       <table className="table lr-table">
-        <thead><tr><th>Home</th><th>City</th><th className="r">Beds</th><th className="r">Invoices</th><th className="r">Paid</th><th className="r">Left to pay</th><th className="r">Not funded</th><th>Last invoice</th><th>Open</th></tr></thead>
+        <thead><tr><th>Home</th><th>City</th><th className="r">Beds</th><th className="r">Invoices</th><th className="r">Paid</th><th className="r">Outstanding</th><th className="r">Not funded</th><th>Last invoice</th><th>Open</th></tr></thead>
         <tbody>{homes.map((h) => (
           <tr key={h.id} className={h.attention ? "u-alert" : ""}>
             <td><Link href={`/invoices?property=${h.id}`}>{h.address}</Link><div className="mono" style={{ fontSize: 11, color: "var(--n9)" }}>{h.id}</div></td>

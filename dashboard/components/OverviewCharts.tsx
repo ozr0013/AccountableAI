@@ -107,13 +107,13 @@ export function FundingChart({ items }: { items: Item[] }) {
   return (
     <figure className="ov-chart">
       <figcaption>
-        <div><b>Paid by Oakline to Keyway</b><span>{money(total)} across {rows.length} {grain === "week" ? "weeks" : grain === "month" ? "months" : "quarters"}</span></div>
+        <div><b>Total invoiced</b><span>{money(total)} across {rows.length} {grain === "week" ? "weeks" : grain === "month" ? "months" : "quarters"}</span></div>
         <div className="ov-seg" role="tablist" aria-label="Group by">
           {(["week", "month", "quarter"] as Grain[]).map((g) => <button key={g} role="tab" aria-selected={grain === g} className={grain === g ? "on" : ""} onClick={() => { setGrain(g); setHover(null); setTip(null); }}>{g === "week" ? "Weekly" : g === "month" ? "Monthly" : "Quarterly"}</button>)}
         </div>
       </figcaption>
       <div className="ov-plot" ref={box} onMouseLeave={() => { setTip(null); setHover(null); }}>
-        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Funding to Keyway by ${grain}: ${rows.map((r) => `${r.label} ${money(r.sum)}`).join(", ")}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Total invoiced by ${grain}: ${rows.map((r) => `${r.label} ${money(r.sum)}`).join(", ")}`}>
           {ticks.map((t) => <g key={t}><line x1={L} x2={W - R} y1={y(t)} y2={y(t)} className="ov-grid" /><text x={L - 8} y={y(t) + 4} textAnchor="end" className="ov-tick">{short(t)}</text></g>)}
           <line x1={L} x2={W - R} y1={H - B} y2={H - B} className="ov-axis" />
           <path d={area} fill={BLUE} opacity={0.1} />
@@ -123,12 +123,16 @@ export function FundingChart({ items }: { items: Item[] }) {
             {(rows.length <= 16 || i === hover) && <circle cx={px(i)} cy={y(r.sum)} r={i === hover ? 5 : 4} fill={BLUE} stroke="#fff" strokeWidth={2} />}
             {i % every === 0 && <text x={px(i)} y={H - 8} textAnchor={i === 0 && rows.length > 1 ? "start" : "middle"} className="ov-tick">{r.label}</text>}
           </g>)}
-          {rows.length > 0 && hover == null && <text x={px(rows.length - 1)} y={y(rows[rows.length - 1].sum) - 12} textAnchor="end" className="ov-val">{short(rows[rows.length - 1].sum)}</text>}
+          {rows.length > 0 && hover == null && (() => {
+            // the end value sits on the side away from the line coming into it
+            const k = rows.length - 1, falling = k > 0 && rows[k - 1].sum > rows[k].sum;
+            return <text x={px(k) - 8} y={y(rows[k].sum) + (falling ? 18 : -10)} textAnchor="end" className="ov-val">{short(rows[k].sum)}</text>;
+          })()}
           <rect x={L} y={T} width={Math.max(W - L - R, 1)} height={H - T - B} fill="transparent" onPointerMove={near} onPointerDown={near} />
         </svg>
         {tip && <div className="ov-tip" style={{ left: `${tip.x}%`, top: `${tip.y}%` }}><b>{tip.title}</b>{tip.lines.map((l) => <span key={l}>{l}</span>)}</div>}
       </div>
-      <div className="sr-only"><table><caption>Paid by Oakline to Keyway, by {grain}</caption><tbody>{rows.map((r) => <tr key={r.start}><th>{r.label}</th><td>{money(r.sum)}</td><td>{r.n}</td></tr>)}</tbody></table></div>
+      <div className="sr-only"><table><caption>Total invoiced, by {grain}</caption><tbody>{rows.map((r) => <tr key={r.start}><th>{r.label}</th><td>{money(r.sum)}</td><td>{r.n}</td></tr>)}</tbody></table></div>
     </figure>
   );
 }

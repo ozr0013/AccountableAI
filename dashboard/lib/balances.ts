@@ -3,10 +3,11 @@ import type { Item } from "./types";
 /** The money rules every page uses, so a change anywhere moves every figure together.
  *
  *  Each vendor bill splits three ways, which always add up to what the vendor billed:
- *     billed = paid to vendors + left to pay (by Keyway) + not yet funded (by Oakline)
- *  and Oakline's money to Keyway:
- *     paid by Oakline = paid to vendors + left to pay
- *  Past due is the part of "left to pay" whose due date has passed.
+ *     billed = paid to vendors + outstanding (with Keyway) + not yet funded (by Oakline)
+ *  and Oakline's money to Keyway ("total invoiced" on Overview):
+ *     total invoiced = paid + outstanding
+ *  Past due is the part of outstanding whose due date has passed.
+ *  (In code, outstanding is `leftToPay`.)
  *  The feed's test (dashboard/feed/tests/test_simulation.py) checks these after every action. */
 
 /** Oakline's money still with Keyway on this bill. */

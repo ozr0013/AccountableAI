@@ -26,8 +26,8 @@ const EMAILS = [
 ];
 // the same figures, by the same rules, as Overview's boxes (session.py books, lib/balances.ts)
 const FIGS: { k: keyof Books; label: string; money: boolean }[] = [
-  { k: "paid", label: "Paid to vendors", money: true },
-  { k: "left", label: "Left to pay", money: true },
+  { k: "paid", label: "Paid", money: true },
+  { k: "left", label: "Outstanding", money: true },
   { k: "late", label: "Past due", money: true },
   { k: "attention", label: "Review queue", money: false },
 ];

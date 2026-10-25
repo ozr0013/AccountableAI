@@ -14,7 +14,7 @@ export default function Keyway() {
   const h = state.headline;
   const explained = Math.max(0, r.owed - h.unexplained);
   const parts = [
-    { k: "Paid to vendors", v: r.paid, c: "var(--g-ink)", note: "bank record or vendor confirmation" },
+    { k: "Paid", v: r.paid, c: "var(--g-ink)", note: "bank record or vendor confirmation" },
     { k: "Authorized holds", v: r.held, c: "#8e9fa8", note: "10% until inspection · clause 7.4" },
     { k: "Owed, explained", v: explained, c: "var(--n7)", note: "paperwork, bank-detail check, not due" },
     { k: "Owed, unexplained", v: h.unexplained, c: "var(--o)", note: "alert on Keyway" },
