@@ -29,13 +29,29 @@ const VENDORS = [
 
 export function Story() {
   const [step, setStep] = useState(0);
+  const canvas = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
   const refs = useRef<(HTMLElement | null)[]>([]);
   useEffect(() => {
-    const io = new IntersectionObserver((entries) => {
-      for (const e of entries) if (e.isIntersecting) setStep(Number((e.target as HTMLElement).dataset.step));
-    }, { rootMargin: "-45% 0px -45% 0px" });
-    refs.current.forEach((el) => el && io.observe(el));
-    return () => io.disconnect();
+    if (!canvas.current) return;
+    const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 600));
+    observer.observe(canvas.current);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    const stacked = window.matchMedia("(max-width: 1000px)");
+    let io: IntersectionObserver;
+    const observe = () => {
+      io?.disconnect();
+      io = new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) setStep(Number((e.target as HTMLElement).dataset.step));
+      // On small screens, read the chapter below the sticky diagram.
+      }, { rootMargin: stacked.matches ? "-65% 0px -15% 0px" : "-45% 0px -45% 0px" });
+      refs.current.forEach((el) => el && io.observe(el));
+    };
+    observe();
+    stacked.addEventListener("change", observe);
+    return () => { io.disconnect(); stacked.removeEventListener("change", observe); };
   }, []);
   const at = (n: number) => (step >= n ? " in" : "");
   const vendorState = (i: number) => (step >= 5 && i === 2 ? "clear" : step >= 3 ? "late" : step >= 1 ? "owed" : "");
@@ -61,28 +77,30 @@ export function Story() {
           ))}
         </div>
         <div className="story-stage" aria-hidden="true">
-          <div className="stage-canvas" data-step={step}>
-            <svg className="stage-lines" viewBox="0 0 560 500">
-              <path className={`ln fund${at(0)}`} d="M 120 250 H 210" />
-              <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 H 390 V 126 H 430" />
-              <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 H 430" />
-              <path className={`ln pay${at(1)}${step >= 5 ? " clear" : step >= 3 ? " broken" : ""}`} d="M 350 250 H 390 V 374 H 430" />
-            </svg>
-            <span className={`pkt${step === 0 || step === 6 ? " in" : ""}`} />
-            <div className="stage-node you in"><b>You</b><small>Oakline Homes</small></div>
-            <div className={`stage-node mid in${step === 4 ? " ping" : ""}`}><b>Property manager</b><small>Keyway Management</small></div>
-            {VENDORS.map((v, i) => (
-              <div key={v.name} className={`stage-node vendor v${i} ${vendorState(i)}`}><b>{v.name}</b><small>{vendorNote(i)}</small></div>
-            ))}
-            <div className={`stage-statement${at(2)}${step >= 3 ? " doubted" : ""}`}>
-              <span className="stage-label">Monthly statement</span>
-              {VENDORS.map((v) => <span key={v.name} className="row"><span>{v.name}</span><i>Overdue</i></span>)}
-            </div>
-            <div className={`stage-bubble${step === 4 ? " in" : ""}`}>“We paid it.”<small>No receipt yet</small></div>
-            <div className={`stage-hold${at(3)}${step >= 6 ? " decide" : ""}`}>
-              <span><span className="stage-label">Recommended hold</span><b key={step >= 5 ? "after" : "before"}>{step >= 5 ? "$2,240" : "$3,140"}</b></span>
-              <small>of the next $18,400</small>
-              <span className="stage-choice"><i>Approve</i><i>Decline</i></span>
+          <div className="stage-canvas" data-step={step} ref={canvas}>
+            <div className="stage-scene" style={{ transform: `scale(${scale})` }}>
+              <svg className="stage-lines" viewBox="0 0 560 500">
+                <path className={`ln fund${at(0)}`} d="M 120 250 H 210" />
+                <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 H 390 V 126 H 430" />
+                <path className={`ln pay${at(1)}${step >= 3 ? " broken" : ""}`} d="M 350 250 H 430" />
+                <path className={`ln pay${at(1)}${step >= 5 ? " clear" : step >= 3 ? " broken" : ""}`} d="M 350 250 H 390 V 374 H 430" />
+              </svg>
+              <span className={`pkt${step === 0 || step === 6 ? " in" : ""}`} />
+              <div className="stage-node you in"><b>You</b><small>Oakline Homes</small></div>
+              <div className={`stage-node mid in${step === 4 ? " ping" : ""}`}><b>Property manager</b><small>Keyway Management</small></div>
+              {VENDORS.map((v, i) => (
+                <div key={v.name} className={`stage-node vendor v${i} ${vendorState(i)}`}><b>{v.name}</b><small>{vendorNote(i)}</small></div>
+              ))}
+              <div className={`stage-statement${at(2)}${step >= 3 ? " doubted" : ""}`}>
+                <span className="stage-label">Monthly statement</span>
+                {VENDORS.map((v) => <span key={v.name} className="row"><span>{v.name}</span><i>Overdue</i></span>)}
+              </div>
+              <div className={`stage-bubble${step === 4 ? " in" : ""}`}>“We paid it.”<small>No receipt yet</small></div>
+              <div className={`stage-hold${at(3)}${step >= 6 ? " decide" : ""}`}>
+                <span><span className="stage-label">Recommended hold</span><b key={step >= 5 ? "after" : "before"}>{step >= 5 ? "$2,240" : "$3,140"}</b></span>
+                <small>of the next $18,400</small>
+                <span className="stage-choice"><i>Approve</i><i>Decline</i></span>
+              </div>
             </div>
           </div>
         </div>
