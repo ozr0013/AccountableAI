@@ -76,7 +76,6 @@ export default function Home() {
   const [corrected, setCorrected] = useState(false);
   return (
     <div className="home-page">
-      <Aura variant="hero" />
       <header className="home-nav">
         <Link href="/" className="home-logo nav-cell" aria-label="Accountable.AI home"><Wordmark /><span className="home-beta">/ CAL HACKS</span></Link>
         <nav aria-label="Product" className="nav-links"><a href="#story">The story</a><a href="#how-it-works">How it works</a><a href="#proof">The proof</a><a href="#control">Your control</a></nav>
@@ -94,7 +93,11 @@ export default function Home() {
               <a href="#story" className="home-text-link">See the story <span aria-hidden="true">↓</span></a>
             </div>
           </div>
-          <HeroSnapshot />
+          <div className="hero-visual">
+            <Aura variant="hero" />
+            <HeroSnapshot />
+            <p className="hero-caption"><span /> Every number leads back to evidence.</p>
+          </div>
         </section>
 
         <Story />

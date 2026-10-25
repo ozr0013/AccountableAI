@@ -32,7 +32,16 @@ export function Aura({ variant = "page" }: { variant?: "hero" | "page" }) {
       <div className="aura-p aura-p2"><div className="aura-blob aura-b2" /></div>
       <div className="aura-p aura-p3"><div className="aura-blob aura-b3" /></div>
       <div className="aura-p aura-p4"><div className="aura-blob aura-b4" /></div>
-      <svg className="aura-lines" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
+      {variant === "hero" ? <svg className="aura-lines aura-hero-lines" viewBox="0 0 800 800">
+        <line x1="40" y1="400" x2="760" y2="400" className="aura-faint" />
+        <line x1="400" y1="40" x2="400" y2="760" className="aura-faint" />
+        <circle cx="400" cy="400" r="180" />
+        <circle cx="400" cy="400" r="280" />
+        <circle className="aura-dash" cx="400" cy="400" r="360" />
+        <path className="aura-tick" d="M 394 120 h 12 M 394 680 h 12 M 120 394 v 12 M 680 394 v 12" />
+        <g className="aura-orbit"><circle cx="400" cy="120" r="4" className="aura-dot" /></g>
+        <g className="aura-orbit aura-orbit-slow"><circle cx="400" cy="40" r="3" className="aura-dot" /></g>
+      </svg> : <svg className="aura-lines" viewBox="0 0 1200 800" preserveAspectRatio="xMidYMid slice">
         <line x1="0" y1="320" x2="1200" y2="320" />
         <line x1="860" y1="0" x2="860" y2="800" />
         <line x1="380" y1="800" x2="1180" y2="0" />
@@ -46,7 +55,7 @@ export function Aura({ variant = "page" }: { variant?: "hero" | "page" }) {
         <path className="aura-tick" d="M 590 314 v 12 M 1130 314 v 12 M 854 50 h 12 M 854 590 h 12" />
         <g className="aura-orbit"><circle cx="860" cy="50" r="4" className="aura-dot" /></g>
         <g className="aura-orbit aura-orbit-slow"><circle cx="860" cy="-70" r="3" className="aura-dot" /></g>
-      </svg>
+      </svg>}
     </div>
   );
 }
