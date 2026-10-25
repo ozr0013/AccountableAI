@@ -37,7 +37,7 @@ export default function ItemPage() {
       <div className="grid invoice-facts">
         {facts.map(([k, v, s]) => (
           <div key={k} className="card" style={{ padding: 16 }}>
-            <p className="card-label" style={{ fontSize: 13 }}>{k}</p>
+            <p className="card-label" style={{ fontSize: "calc(13px * var(--dashboard-type-scale, 1))" }}>{k}</p>
             <div className="display h3 num" style={{ color: k === "Still owed" && onManager(it) ? "var(--o)" : undefined }}>{v}</div>
             <div className="micro muted" style={{ marginTop: 6 }}>{s}</div>
           </div>

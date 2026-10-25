@@ -66,7 +66,7 @@ export default function Agents() {
                 <Disclosure title="Recent work" meta={done.length}>
                   {done.slice(0, 4).map((a) => (
                     <div key={a.id} className="between" style={{ gap: 12, padding: "6px 0", alignItems: "flex-start" }}>
-                      <span className="body" style={{ fontSize: 12.5, color: "var(--ink)" }}>{named(a.what, state.meta.names)}</span>
+                      <span className="body" style={{ fontSize: "calc(12.5px * var(--dashboard-type-scale, 1))", color: "var(--ink)" }}>{named(a.what, state.meta.names)}</span>
                       <span className="micro faint" style={{ flex: "none" }}>{day(a.at)}</span>
                     </div>
                   ))}

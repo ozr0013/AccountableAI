@@ -159,7 +159,7 @@ export default function Cases() {
               {audit.map((a) => (
                 <div key={a.id} style={{ padding: "10px 0", borderBottom: ".5px solid var(--n5)" }}>
                   <div className="between"><span className="micro warn-ink">{a.actor.replace("_", " ")}</span><span className="micro faint">{day(a.at)}</span></div>
-                  <div className="body" style={{ fontSize: 13, marginTop: 2 }}>{named(a.what, state.meta.names)}</div>
+                  <div className="body" style={{ fontSize: "calc(13px * var(--dashboard-type-scale, 1))", marginTop: 2 }}>{named(a.what, state.meta.names)}</div>
                 </div>
               ))}
             </div>

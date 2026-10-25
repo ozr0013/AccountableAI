@@ -28,10 +28,10 @@ export default function Guardrails() {
             {state.guardrails.map((g) => (
               <tr key={g.label}>
                 <td className="vendor"><span className="row"><Badge kind={g.allowed ? "done" : "no"} />{g.label}</span></td>
-                <td className="mono muted" style={{ fontSize: 12 }}>{g.action}</td>
-                <td className="mono muted" style={{ fontSize: 12 }}>{g.actor}</td>
+                <td className="mono muted" style={{ fontSize: "calc(12px * var(--dashboard-type-scale, 1))" }}>{g.action}</td>
+                <td className="mono muted" style={{ fontSize: "calc(12px * var(--dashboard-type-scale, 1))" }}>{g.actor}</td>
                 <td>{g.allowed ? <span className="tag ok">Allowed</span> : <span className="tag wine">Refused</span>}</td>
-                <td className="body" style={{ fontSize: 13 }}>{g.reason}</td>
+                <td className="body" style={{ fontSize: "calc(13px * var(--dashboard-type-scale, 1))" }}>{g.reason}</td>
               </tr>
             ))}
           </tbody>

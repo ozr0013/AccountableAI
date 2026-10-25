@@ -72,7 +72,7 @@ export function DocProvider({ children }: { children: ReactNode }) {
                 <h2 className="display h4 mono" style={{ fontFamily: "var(--mono)", letterSpacing: 0 }}>{doc.id}</h2>
                 <div className="doc" style={{ whiteSpace: "pre-wrap" }}>{doc.text}</div>
                 {Object.keys(doc.data).length > 0 && (
-                  <pre className="doc mono" style={{ fontSize: 11, lineHeight: "16px", overflow: "auto", margin: 0 }}>
+                  <pre className="doc mono" style={{ fontSize: "calc(11px * var(--dashboard-type-scale, 1))", lineHeight: "16px", overflow: "auto", margin: 0 }}>
                     {JSON.stringify(doc.data, null, 2)}
                   </pre>
                 )}
