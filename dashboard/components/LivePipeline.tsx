@@ -341,6 +341,7 @@ export function LivePipeline() {
     });
     on("day_done", () => refresh());
     on("email_sent", m => log("system", "email", `${m.invoice_id} · ${m.subject}${m.simulated ? " (simulated)" : ""}`));
+    on("lesson_saved", m => log(String(m.agent || "agent"), "memory", `learned about ${m.subject}: ${String(m.lesson || "").slice(0, 120)}`));
     on("flag_raised", m => log(String(m.agent || "chaser"), "flag", `${m.invoice_id} · ${FLAG[String(m.kind)] || m.kind} · cites ${(m.evidence as string[] || []).join(", ")}`));
     on("email_failed", m => log("system", "refused", `email not sent: ${m.error}`));
     return () => es.close();

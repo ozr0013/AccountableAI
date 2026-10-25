@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 
-from . import daily
+from . import daily, memory
 from .patterns import describe, vendor_patterns
 from .runtime import Tool, Trace, load_skill, run_agent
 
@@ -102,6 +102,11 @@ class ChaserTools:
                                 for h in self.history if h["action"] == "reply_read"],
             "vendor_history": describe(pattern),
             "manager_statements": self.statement_claims(),
+            # Memory: what you decided on this invoice on earlier days, and what any agent has
+            # learned about this vendor or the manager.
+            "your_previous_runs": memory.previous_runs(self.mirror, "chaser", self.invoice_id, self.today),
+            "lessons": memory.lessons(self.mirror, memory.book_of(self.rails),
+                                      [self.vendor, self.name(self.manager_id)]),
             "policy": {"allowed": self.allowed(), "schedule_says": c.action if c else None,
                        "level": c.level if c else None, "due_date": c.due_date if c else None,
                        "days_overdue": c.days_overdue if c else 0,
@@ -162,9 +167,12 @@ class ChaserTools:
             return {"error": f"kind must be one of {list(FLAG_KINDS)}"}
         if not self.evidence_ids:
             self.get_evidence()
-        missing = [e for e in evidence_ids if e not in self.evidence_ids]
+        from . import books
+        unseen = [e for e in evidence_ids if e not in self.evidence_ids]
+        missing = sorted(set(unseen) - books.known(self.rails, "documents", "document_id", unseen))
         if not evidence_ids or missing:
-            return {"error": f"cite documents from get_evidence; unknown: {missing or 'none given'}"}
+            return {"error": f"cite documents that exist in the books (from get_evidence or query_books); "
+                             f"unknown: {missing or 'none given'}"}
         flag = replace(self.code, action="flag", level=kind, status="needs_controller",
                        message=rationale, attempt=0)
         if any(h["action_id"] == flag.action_id() for h in self.history):
@@ -231,6 +239,7 @@ class ChaserTools:
         from . import books
         return [
             books.tool_for(self.rails),
+            memory.tool_for(self.mirror, self.rails, "chaser", self.today),
             Tool("get_invoice_context", "Everything about this invoice: ledger line, agreement "
                  "rules with quotes, chaser history and controller decisions, manager replies, "
                  "vendor payment history, and `policy` (what the approved schedule allows today).",

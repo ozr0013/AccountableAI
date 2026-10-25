@@ -241,3 +241,144 @@ def demo_decide(action_id: str, approve: bool, note: str = "") -> dict:
     mirror.call("decide_chase", [action_id, "approved" if approve else "rejected", "controller",
                                  {"some": note or ("approved" if approve else "rejected")}])
     return next(h for h in service.history(mirror) if h["action_id"] == action_id)
+
+
+# -- Judge Console on the real agents ---------------------------------------------------------
+from pydantic import BaseModel  # noqa: E402
+
+from . import console  # noqa: E402
+
+
+class _Upload(BaseModel):
+    name: str
+    data: str                                     # base64
+
+
+def _console_run(path, label) -> dict:
+    """Work one console input in the background; the page follows /pipeline/stream."""
+    # A run says it is done just before it lets go of the lock: wait a moment rather than refuse.
+    if not _demo_lock.acquire(timeout=5):
+        raise HTTPException(409, "the agents are busy with another run; try again in a moment")
+    console._state.update(busy=True, last={"status": "running", "label": label})
+
+    def work():
+        try:
+            console._state["last"] = {"status": "done", **console.run_file(path, label)}
+        except Exception as exc:  # noqa: BLE001 - reported to the page
+            from .runtime import emit
+            err = f"{type(exc).__name__}: {exc}"[:400]
+            console._state["last"] = {"status": "failed", "label": label, "error": err}
+            emit({"type": "console_done", "ok": False, "error": err})
+        finally:
+            console._state["busy"] = False
+            _demo_lock.release()
+    threading.Thread(target=work, daemon=True).start()
+    return {"accepted": label, "status": "running"}
+
+
+@router.get("/console/samples")
+def console_samples() -> list[dict]:
+    return console.samples()
+
+
+@router.post("/console/samples/{name}", status_code=202)
+def console_sample(name: str) -> dict:
+    """Send one of the console's sample files to the agents."""
+    _needs_claude()
+    try:
+        path = console.sample_path(name)
+    except KeyError as exc:
+        raise HTTPException(404, f"no sample called {name!r}") from exc
+    return _console_run(path, name)
+
+
+@router.post("/console/upload", status_code=202)
+def console_upload(body: _Upload) -> dict:
+    """A file the judge brings (PDF, .eml, bank CSV, up to 2 MB), read by the same reader."""
+    import base64
+    import binascii
+    import re
+    import tempfile
+    from pathlib import Path
+    _needs_claude()
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", Path(body.name).name)[:80] or "upload"
+    if Path(safe).suffix.lower() not in (".pdf", ".eml", ".csv"):
+        raise HTTPException(415, "The reader takes PDF, email (.eml) or bank CSV files")
+    try:
+        data = base64.b64decode(body.data, validate=True)
+    except (binascii.Error, ValueError):
+        raise HTTPException(400, "not base64") from None
+    if not data or len(data) > console.MAX_BYTES:
+        raise HTTPException(413, "Files up to 2 MB")
+    path = Path(tempfile.mkdtemp(prefix="console-")) / safe
+    path.write_bytes(data)
+    return _console_run(path, safe)
+
+
+def _console_job(label, fn) -> dict:
+    """Run any console input in the background (the page follows /pipeline/stream)."""
+    # A run says it is done just before it lets go of the lock: wait a moment rather than refuse.
+    if not _demo_lock.acquire(timeout=5):
+        raise HTTPException(409, "the agents are busy with another run; try again in a moment")
+    console._state.update(busy=True, last={"status": "running", "label": label})
+
+    def work():
+        try:
+            console._state["last"] = {"status": "done", **fn()}
+        except Exception as exc:  # noqa: BLE001 - reported to the page
+            from .runtime import emit
+            err = f"{type(exc).__name__}: {exc}"[:400]
+            console._state["last"] = {"status": "failed", "label": label, "error": err}
+            emit({"type": "console_done", "ok": False, "error": err})
+        finally:
+            console._state["busy"] = False
+            _demo_lock.release()
+    threading.Thread(target=work, daemon=True).start()
+    return {"accepted": label, "status": "running"}
+
+
+class _Email(BaseModel):
+    sender: str                                   # "keyway" or a vendor id
+    subject: str = ""
+    body: str
+
+
+class _Fact(BaseModel):
+    text: str
+
+
+class _Advance(BaseModel):
+    days: int = 1
+
+
+@router.get("/console/vendors")
+def console_vendors() -> list[dict]:
+    return [{"id": v.id, "name": v.name} for v in console._vendors()]
+
+
+@router.post("/console/email", status_code=202)
+def console_email(body: _Email) -> dict:
+    """An email written in the console, as Keyway or a vendor, read like any inbox file."""
+    _needs_claude()
+    if not body.body.strip():
+        raise HTTPException(422, "Write the email first")
+    return _console_job("Email", lambda: console.write_email(body.sender, body.subject, body.body))
+
+
+@router.post("/console/fact", status_code=202)
+def console_fact(body: _Fact) -> dict:
+    """A fact in plain words: a lead for the investigator to verify against the books."""
+    _needs_claude()
+    return _console_job(f"Fact: {body.text[:60]}", lambda: console.tell_fact(body.text))
+
+
+@router.post("/console/advance", status_code=202)
+def console_advance(body: _Advance) -> dict:
+    """Let time pass: the real daily run for each day."""
+    _needs_claude()
+    return _console_job(f"+{body.days} days", lambda: console.advance(body.days))
+
+
+@router.get("/console/last")
+def console_last() -> dict:
+    return {"busy": console._state["busy"], "last": console._state["last"]}

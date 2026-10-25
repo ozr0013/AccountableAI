@@ -56,7 +56,7 @@ def rails():
 
 def _forget():
     global _RAILS
-    if _RAILS is not None:
+    if _RAILS is not None and _RAILS.store.conn is not None:
         try:
             _RAILS.store.conn.close()
         except Exception:  # noqa: BLE001 - closing a dead connection
@@ -70,19 +70,25 @@ def _stamp(day: date) -> datetime:
 
 def reset(mirror) -> dict:
     """Fresh copy of the books at the start date; clears the queue and the chaser's records."""
-    from rails.db import connect
-    from rails.real import RealRails
-    _forget()
-    conn = connect()
-    conn.execute(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE')
-    conn.close()
+    from rails.real import RealRails, books_backend
+
     from . import books
-    books.forget(SCHEMA)                  # its views went with the schema
-    demo = rails()
-    for event in RealRails().store.events():
-        demo.append_event(event)
+    _forget()
+    books.forget(SCHEMA)
+    if books_backend() == "spacetime":
+        demo = rails()
+        demo.store.copy_from("public")    # one SpacetimeDB transaction, same order as the original
+    else:
+        from rails.db import connect
+        conn = connect()
+        conn.execute(f'DROP SCHEMA IF EXISTS "{SCHEMA}" CASCADE')
+        conn.close()
+        demo = rails()
+        for event in RealRails().store.events():
+            demo.append_event(event)
     mirror.call("clear_tasks", [])
     mirror.call("clear_chaser", [])
+    mirror.call("clear_lessons", [SCHEMA])        # the demo's memory starts empty too
     _arrive(demo, mirror, START)          # the first morning's paperwork
     return state(demo)
 

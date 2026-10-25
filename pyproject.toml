@@ -28,6 +28,7 @@ dependencies = [
     "pytesseract>=0.3",        # agents.extract: OCR when the tesseract binary is installed
     "pypdf>=5.0",              # agreement_agent: read agreement and invoice PDFs
     "python-multipart>=0.0.9", # agreement_agent.api: file uploads
+    "duckdb>=1.1",             # chaser_agent.books: the agents' read-only SQL over the books
 ]
 
 [project.optional-dependencies]

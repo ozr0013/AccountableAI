@@ -141,8 +141,11 @@ def mirror_new(store, event) -> None:
         return
     try:
         _MIRROR = _MIRROR or SpacetimeMirror()
-        row = store.conn.execute("SELECT seq FROM events WHERE id=%s", (event.id,)).fetchone()
-        _MIRROR.publish(row[0], event)
+        if store.conn is None:              # the books already live in SpacetimeDB
+            seq = store.seq_of(event.id)
+        else:
+            seq = store.conn.execute("SELECT seq FROM events WHERE id=%s", (event.id,)).fetchone()[0]
+        _MIRROR.publish(seq, event)
     except Exception as exc:  # noqa: BLE001 - the mirror must never break the source of truth
         log.warning("spacetime mirror skipped %s: %s", event.id, exc)
 

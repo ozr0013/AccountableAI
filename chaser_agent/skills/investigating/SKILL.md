@@ -19,6 +19,13 @@ controller (`flag_for_controller`) and hand invoices to the chaser (`hand_to_cha
    payment; the anomaly agent already reviews those.
 5. Finish with `finish_sweep`: what you checked, what you found, what you handed on.
 
+## Memory
+Your task message carries your memory: your last sweeps (`your_previous_sweeps`), the flags you
+raised that the controller has not decided yet (`your_open_flags`), and the lessons on file.
+Start from them: check what is new since your last sweep (`documents.filed_at`), follow up on
+open leads, and do not re-flag what is already open. Record a pattern across invoices or vendors
+with `remember_lesson` (with the documents) so tomorrow's sweep starts from it.
+
 ## What to look for (examples, not a script)
 - **Unreferenced payment**: a bank row with no invoice number (or only a memo) whose vendor and
   amount match an open invoice. The invoice is probably paid; the chaser must not keep chasing

@@ -167,6 +167,56 @@ const spacetimedb = schema({
       factKey: t.string().index('btree'),
     }
   ),
+  // The books themselves: the append-only event log, one row per (book, event). A book is a
+  // separate ledger: 'public' for the real books, 'demo_live' for the demo's copy. SpacetimeDB is
+  // the system of record; seq is assigned here, in commit order, per book.
+  bookEvent: table(
+    { name: 'book_event', public: true },
+    {
+      key: t.string().primaryKey(),
+      book: t.string().index('btree'),
+      seq: t.i64().index('btree'),
+      eventId: t.string(),
+      kind: t.string(),
+      managerId: t.option(t.string()),
+      invoiceId: t.option(t.string()),
+      validFrom: t.string(),
+      learnedAt: t.string(),
+      supersedes: t.option(t.string()),
+      payload: t.string(),
+      source: t.option(t.string()),
+      contentHash: t.string(),
+    }
+  ),
+  bookCounter: table(
+    { name: 'book_counter', public: true },
+    { book: t.string().primaryKey(), seq: t.i64() }
+  ),
+  // What the agents learned: a pattern about a vendor or the manager, with the documents that
+  // prove it. Every later run on that subject gets it in its context. Per book, like the log.
+  agentLesson: table(
+    { name: 'agent_lesson', public: true },
+    {
+      key: t.string().primaryKey(),
+      book: t.string().index('btree'),
+      subject: t.string().index('btree'),
+      lesson: t.string(),
+      evidence: t.string(),
+      byAgent: t.string(),
+      asOf: t.string(),
+      createdAt: t.timestamp(),
+    }
+  ),
+  // Explicit dependency links a workflow records on top of the ones derived from the events.
+  bookDependency: table(
+    { name: 'book_dependency', public: true },
+    {
+      key: t.string().primaryKey(),
+      book: t.string().index('btree'),
+      itemId: t.string(),
+      factKey: t.string(),
+    }
+  ),
 });
 export default spacetimedb;
 
@@ -446,4 +496,127 @@ export const updateTask = spacetimedb.reducer(
 export const clearTasks = spacetimedb.reducer(ctx => {
   requireWriter(ctx);
   for (const row of [...ctx.db.agentTask.iter()]) ctx.db.agentTask.taskId.delete(row.taskId);
+});
+
+
+// Append one event to a book. Re-sending the identical event is a no-op; re-using an id for
+// different content is refused, so history can never be rewritten.
+export const appendBookEvent = spacetimedb.reducer(
+  {
+    book: t.string(),
+    eventId: t.string(),
+    kind: t.string(),
+    managerId: t.option(t.string()),
+    invoiceId: t.option(t.string()),
+    validFrom: t.string(),
+    learnedAt: t.string(),
+    supersedes: t.option(t.string()),
+    payload: t.string(),
+    source: t.option(t.string()),
+    contentHash: t.string(),
+  },
+  (ctx, args) => {
+    requireWriter(ctx);
+    const key = `${args.book}|${args.eventId}`;
+    const existing = ctx.db.bookEvent.key.find(key);
+    if (existing) {
+      if (existing.contentHash !== args.contentHash) {
+        throw new SenderError(`conflict: event ${args.eventId} already exists with different content`);
+      }
+      return;
+    }
+    const counter = ctx.db.bookCounter.book.find(args.book);
+    const seq = (counter ? counter.seq : 0n) + 1n;
+    if (counter) {
+      ctx.db.bookCounter.book.update({ book: args.book, seq });
+    } else {
+      ctx.db.bookCounter.insert({ book: args.book, seq });
+    }
+    ctx.db.bookEvent.insert({
+      ...args,
+      key,
+      seq,
+      managerId: args.managerId ?? undefined,
+      invoiceId: args.invoiceId ?? undefined,
+      supersedes: args.supersedes ?? undefined,
+      source: args.source ?? undefined,
+    });
+  }
+);
+
+// Drop a whole book (the demo's copy on reset). The real books are never cleared by the app.
+export const clearBook = spacetimedb.reducer({ book: t.string() }, (ctx, { book }) => {
+  requireWriter(ctx);
+  if (book === 'public') {
+    throw new SenderError('the real books cannot be cleared');
+  }
+  for (const row of [...ctx.db.bookEvent.iter()]) {
+    if (row.book === book) ctx.db.bookEvent.key.delete(row.key);
+  }
+  for (const row of [...ctx.db.bookDependency.iter()]) {
+    if (row.book === book) ctx.db.bookDependency.key.delete(row.key);
+  }
+  ctx.db.bookCounter.book.delete(book);
+});
+
+export const putBookDependency = spacetimedb.reducer(
+  { book: t.string(), itemId: t.string(), factKey: t.string() },
+  (ctx, { book, itemId, factKey }) => {
+    requireWriter(ctx);
+    const key = `${book}|${itemId}|${factKey}`;
+    if (!ctx.db.bookDependency.key.find(key)) {
+      ctx.db.bookDependency.insert({ key, book, itemId, factKey });
+    }
+  }
+);
+
+// Replace a book with a copy of another, in one transaction (the demo's reset copies the real
+// books). Sequence numbers are kept, so the copy has the same order as the original.
+export const copyBook = spacetimedb.reducer(
+  { fromBook: t.string(), toBook: t.string() },
+  (ctx, { fromBook, toBook }) => {
+    requireWriter(ctx);
+    if (toBook === 'public' || toBook === fromBook) {
+      throw new SenderError('cannot copy over the real books or onto itself');
+    }
+    for (const row of [...ctx.db.bookEvent.iter()]) {
+      if (row.book === toBook) ctx.db.bookEvent.key.delete(row.key);
+    }
+    for (const row of [...ctx.db.bookDependency.iter()]) {
+      if (row.book === toBook) ctx.db.bookDependency.key.delete(row.key);
+    }
+    let last = 0n;
+    for (const row of [...ctx.db.bookEvent.iter()]) {
+      if (row.book !== fromBook) continue;
+      ctx.db.bookEvent.insert({ ...row, book: toBook, key: `${toBook}|${row.eventId}` });
+      if (row.seq > last) last = row.seq;
+    }
+    ctx.db.bookCounter.book.delete(toBook);
+    ctx.db.bookCounter.insert({ book: toBook, seq: last });
+  }
+);
+
+
+// An agent records a lesson. The same key again (same subject and wording) is ignored.
+export const rememberLesson = spacetimedb.reducer(
+  { key: t.string(), book: t.string(), subject: t.string(), lesson: t.string(), evidence: t.string(),
+    byAgent: t.string(), asOf: t.string() },
+  (ctx, args) => {
+    requireWriter(ctx);
+    if (ctx.db.agentLesson.key.find(args.key)) return;
+    ctx.db.agentLesson.insert({ ...args, createdAt: ctx.timestamp });
+  }
+);
+
+// The controller removes a lesson, or a demo reset clears a whole book's lessons.
+export const forgetLesson = spacetimedb.reducer({ key: t.string() }, (ctx, { key }) => {
+  requireWriter(ctx);
+  ctx.db.agentLesson.key.delete(key);
+});
+
+export const clearLessons = spacetimedb.reducer({ book: t.string() }, (ctx, { book }) => {
+  requireWriter(ctx);
+  for (const row of [...ctx.db.agentLesson.iter()]) {
+    if (row.book === book) ctx.db.agentLesson.key.delete(row.key);
+  }
 });

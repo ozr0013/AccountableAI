@@ -17,6 +17,11 @@ right, and tell the controller exactly what is wrong if it is not.
    payment whose balance may sit in a bank row without an invoice number, a payment to another
    vendor that may belong to one of that vendor's invoices. Cite the rows you found.
 
+## Memory
+`get_payment_case` includes your earlier verdicts on this invoice (`your_previous_runs`) and the
+lessons about the vendor and Keyway. If you reviewed this invoice before, say what is new. Record
+a pattern worth knowing next time with `remember_lesson`, citing the documents.
+
 ## The checks (already computed in `findings`; you interpret them)
 | Code | Means |
 |---|---|

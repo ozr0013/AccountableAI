@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from datetime import date
 
-from . import books, daily
+from . import books, daily, memory
 from .runtime import Tool, Trace, emit, load_skill, run_agent
 
 SYSTEM = ("You are the investigator agent for Oakline Homes. Oakline funds a management company "
@@ -34,16 +34,11 @@ class InvestigatorTools:
         self.rails, self.mirror, self.today = rails, mirror, today
         self.record, self.enqueue, self.manager_id = record, enqueue, manager_id
         self.name = names_from(rails)
-        self.schema = books.schema_of(rails)
         self.flags: list[str] = []
         self.handed: list[str] = []
 
     def _known(self, table: str, column: str, values: list[str]) -> set[str]:
-        if self.schema is None or not values:
-            return set()
-        quoted = ", ".join("'" + v.replace("'", "''") + "'" for v in values)
-        out = books.run(self.schema, f"SELECT {column} FROM {table} WHERE {column} IN ({quoted})")
-        return {r[0] for r in out["rows"]}
+        return books.known(self.rails, table, column, values)
 
     def _line(self, invoice_id: str):
         return next((l for l in self.rails.ledger(self.manager_id) if l.invoice_id == invoice_id), None)
@@ -86,6 +81,7 @@ class InvestigatorTools:
     def tools(self) -> list[Tool]:
         return [
             books.tool_for(self.rails),
+            memory.tool_for(self.mirror, self.rails, "investigator", self.today),
             Tool("flag_for_controller", "Open a controller review on one invoice. Cite document ids "
                  "you found with query_books; uncited or repeated flags are refused.",
                  {"type": "object", "additionalProperties": False,
@@ -109,10 +105,29 @@ class InvestigatorTools:
         ]
 
 
-def run(tools: InvestigatorTools, client=None) -> Trace:
-    task = (f"Task: today is {tools.today.isoformat()}. Sweep Keyway's books for problems no single "
-            "invoice shows. Investigate with query_books, flag or hand on what you prove, then "
-            "finish_sweep.")
+def briefing(tools: InvestigatorTools) -> str:
+    """The investigator's memory: its last sweeps, its flags still open, and the lessons on file.
+    Continue from here; do not redo work already done unless new documents arrived."""
+    import json
+    mem = {"your_previous_sweeps": memory.previous_runs(tools.mirror, "investigator", "portfolio",
+                                                        tools.today, n=memory.SWEEPS_RECALLED),
+           "your_open_flags": memory.open_flags(tools.mirror),
+           "lessons": memory.lessons(tools.mirror, memory.book_of(tools.rails))}
+    return ("Your memory (from earlier days; the books are the truth if they disagree):\n"
+            + json.dumps(mem, default=str)[:6000])
+
+
+def run(tools: InvestigatorTools, client=None, lead: str | None = None) -> Trace:
+    if lead:
+        # Someone told us something: a lead to verify against the books, never a fact by itself.
+        task = (f"Task: today is {tools.today.isoformat()}. {lead}\nVerify it against the books with "
+                "query_books: say whether the documents support it, contradict it, or are silent. Flag "
+                "or hand on only what the documents prove, then finish_sweep with your conclusion.\n"
+                + briefing(tools))
+    else:
+        task = (f"Task: today is {tools.today.isoformat()}. Sweep Keyway's books for problems no single "
+                "invoice shows. Investigate with query_books, flag or hand on what you prove, then "
+                "finish_sweep.\n" + briefing(tools))
     # INVESTIGATOR_EFFORT=low makes each daily sweep quicker, for a time-boxed showing.
     return run_agent("investigator", SYSTEM, load_skill("investigating"), tools.tools(), task,
                      client, effort=os.getenv("INVESTIGATOR_EFFORT", "medium"), max_turns=MAX_TURNS)

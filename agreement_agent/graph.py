@@ -55,6 +55,9 @@ Mention any disagreement in your final sentence; it never changes a quoted field
 reply with one sentence summarizing the document."""
 
 
+_BOOKS = None                   # the books query_books reads, opened on first use
+
+
 def _books_guide() -> str:
     from chaser_agent import books
     return books.GUIDE
@@ -148,12 +151,15 @@ class Tools:
         return "noted"
 
     def query_books(self, purpose: str, sql: str) -> dict:
-        """Read-only SQL over the books (AGENT_BOOKS_SCHEMA, default the live books)."""
+        """Read-only SQL over the books (AGENT_BOOKS_SCHEMA names the book, default the real one)."""
         import os
 
         from chaser_agent import books
+        from rails.real import RealRails
         self._log(f"queried the books: {purpose}")
-        return books.tool_result(os.getenv("AGENT_BOOKS_SCHEMA", "public"), sql, purpose)
+        global _BOOKS
+        _BOOKS = _BOOKS or RealRails(os.getenv("AGENT_BOOKS_SCHEMA") or None)
+        return books.tool_result(_BOOKS, sql, purpose)
 
     # langchain tool schemas, for the model
     def as_langchain(self):

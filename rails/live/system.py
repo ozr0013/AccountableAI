@@ -38,7 +38,9 @@ class LiveSystem:
         self.rails = rails or RealRails()
         self.approvals = approvals or RailsApprovals(self.rails, clock=self._stamp)
         agents, verifier = agents or registry.agents(), verifier or registry.verifier()
-        self.cache = AnswerCache(self.rails.store.conn) if reuse_answers else None
+        # The answer cache is a PostgreSQL table; with the books in SpacetimeDB there is none.
+        conn = getattr(self.rails.store, "conn", None)
+        self.cache = AnswerCache(conn) if reuse_answers and conn is not None else None
         if self.cache:
             agents, verifier = CachedAgents(agents, self.cache), CachedVerifier(verifier, self.cache)
         self.deps = Deps(self.rails, agents, verifier, self.approvals)

@@ -94,12 +94,27 @@ def _mirror():
     return SpacetimeMirror()
 
 
+import threading as _threading
+
+_COORDINATOR = _threading.Lock()
+
+
 @contextmanager
-def coordinator_lock(mirror):
+def coordinator_lock(mirror):  # noqa: C901 - two backends
     """Use the same cross-service lock as approvals and evidence mutations."""
     from rails.live.spacetime import SpacetimeMirror
+    from rails.real import books_backend
     if not isinstance(mirror, SpacetimeMirror):
         yield
+        return
+    if books_backend() == "spacetime":
+        # No PostgreSQL: SpacetimeDB reducers are transactions; serialize within this process.
+        if not _COORDINATOR.acquire(blocking=False):
+            raise RuntimeError('Coordinator busy; retry agreement mutation.')
+        try:
+            yield
+        finally:
+            _COORDINATOR.release()
         return
     from rails.db import connect
     with connect() as conn:

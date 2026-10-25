@@ -29,10 +29,21 @@ def _recipe(meta: dict) -> str:
     return ", ".join(f"{k}={meta[k]}" for k in keys if k in meta)
 
 
+def books_backend() -> str:
+    """Where the books live: 'spacetime' (BOOKS=spacetime, the system of record in SpacetimeDB)
+    or 'postgres' (the original event store)."""
+    return os.getenv("BOOKS", "postgres").lower()
+
+
 class RealRails:
     def __init__(self, schema: str | None = None):
-        self.store = EventStore(conn=connect(schema))
-        self.deps = DependencyIndex(conn=self.store.conn)
+        if books_backend() == "spacetime":
+            from .events.spacetime_store import SpacetimeDependencyIndex, SpacetimeEventStore
+            self.store = SpacetimeEventStore(book=schema or "public")
+            self.deps = SpacetimeDependencyIndex(self.store)
+        else:
+            self.store = EventStore(conn=connect(schema))
+            self.deps = DependencyIndex(conn=self.store.conn)
 
     # -- time -----------------------------------------------------------------------------
     def now(self) -> date:
@@ -108,10 +119,13 @@ class RealRails:
             from .deps.neo4j_mirror import Neo4jMirror
             m = Neo4jMirror()
             try:
-                c = self.store.conn
-                m.sync(self.store.events(current_only=True),
-                       c.execute("SELECT item_id, fact_key FROM dependencies").fetchall(),
-                       c.execute("SELECT event_id, fact_key FROM event_facts").fetchall())
+                if self.store.conn is None:
+                    deps, facts = self.deps.dependency_rows(), self.deps.fact_rows()
+                else:
+                    c = self.store.conn
+                    deps = c.execute("SELECT item_id, fact_key FROM dependencies").fetchall()
+                    facts = c.execute("SELECT event_id, fact_key FROM event_facts").fetchall()
+                m.sync(self.store.events(current_only=True), deps, facts)
             finally:
                 m.close()
             return True
@@ -127,7 +141,7 @@ class RealRails:
         existing = self.store.get("ev-world-meta")
         if incoming and existing and existing.payload != incoming.payload:
             raise WorldMismatch(
-                f"Postgres already holds a different world ({_recipe(existing.payload)}); this "
+                f"The books already hold a different world ({_recipe(existing.payload)}); this "
                 f"one is ({_recipe(incoming.payload)}). Reset it with `python -m rails.load "
                 f"--fresh` plus the same --scenarios/--clean, or run without RAILS=real.")
         new = sum(self.store.append(e) for e in events)

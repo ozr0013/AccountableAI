@@ -95,6 +95,22 @@ that way. An agent that reads text follows this shape (see `agents/chaser`, `age
 - Gmail is read-only, and a scan reads one sent-on day only. Never widen a scan of a real inbox.
 - Fictional companies only in data.
 
+## Where the data lives
+
+With `BOOKS=spacetime` SpacetimeDB is the only database (module `spacetime/spacetimedb`,
+database `accountableai`):
+- **The books**: table `book_event`, the append-only event log, one row per (book, event).
+  `public` is the real books, `demo_live` the demo's copy. The `append_book_event` reducer
+  assigns the order and refuses an id re-used for different content; the real books can never
+  be cleared. `rails/events/spacetime_store.py` reads them for every `RealRails`.
+- **The agents' state**: agreements and rules, the task queue with traces, chaser actions and
+  the controller's decisions.
+- **The agents' SQL** (`query_books`) runs on an in-process DuckDB snapshot of the books, since
+  SpacetimeDB's SQL has no GROUP BY, SUM, subqueries or ORDER BY. No file or network access.
+
+Without `BOOKS` (the default) the books stay in PostgreSQL as before. Copy them across, and prove
+the copy identical to the cent, with `python -m rails.live.move_books` (safe to re-run).
+
 ## Running things
 
 ```bash
