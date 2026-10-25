@@ -34,7 +34,7 @@ export function ReplyBox() {
     <div className="card block-shadow" style={{ padding: 0 }}>
       <div className="dots-panel" style={{ borderRadius: "8px 8px 0 0", padding: 20, borderBottom: "1px solid var(--n11)" }}>
         <div className="between" style={{ marginBottom: 12 }}>
-          <span className="label">/ Reply as Keyway</span>
+          <span className="label">/ Reply as Keyway Management</span>
           <span className="micro muted">the judge plays the middleman</span>
         </div>
         {open.length === 0 ? (
@@ -48,7 +48,7 @@ export function ReplyBox() {
                 </button>
               ))}
             </div>
-            <textarea className="input" rows={2} value={text} onChange={(e) => setText(e.target.value)} aria-label="Keyway's reply" />
+            <textarea className="input" rows={2} value={text} onChange={(e) => setText(e.target.value)} aria-label="Keyway Management's reply" />
             <div className="between" style={{ flexWrap: "wrap", gap: 10 }}>
               <div className="seg" role="group" aria-label="Attachment">
                 {PROOF.map((p) => <button key={p.id} aria-pressed={proof === p.id} onClick={() => setProof(p.id)}>{p.label}</button>)}

@@ -7,7 +7,7 @@ import { Badge, Loading, PageTop, SectionTitle } from "@/components/ui";
 const RULES = [
   ["Never move money", "There is no payment function anywhere. pay, wire, transfer and release exist only to be refused."],
   ["Agents recommend, people hold", "The case agent proposes a hold; only the controller places it, and never the proposer."],
-  ["Approved templates only", "Reminders to Keyway use controller-approved templates on an approved schedule. Anything else needs approval of that exact draft."],
+  ["Approved templates only", "Reminders to Keyway Management use controller-approved templates on an approved schedule. Anything else needs approval of that exact draft."],
   ["Never alert without a cited record", "Every claim cites the funding record, the vendor's evidence and the agreement clause. The verifier blocks uncited claims."],
   ["Never accuse", "Wording tops out at “unexplained”. Accusatory terms are blocked in alerts and outbound mail."],
   ["Bank-detail changes are held", "Vendor bank changes wait for identity verification and a controller who didn't request them."],

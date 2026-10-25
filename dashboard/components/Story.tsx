@@ -70,7 +70,7 @@ export function Story() {
             </svg>
             <span className={`pkt${step === 0 || step === 6 ? " in" : ""}`} />
             <div className="stage-node you in"><b>You</b><small>Oakline Homes</small></div>
-            <div className={`stage-node mid in${step === 4 ? " ping" : ""}`}><b>Property manager</b><small>Keyway</small></div>
+            <div className={`stage-node mid in${step === 4 ? " ping" : ""}`}><b>Property manager</b><small>Keyway Management</small></div>
             {VENDORS.map((v, i) => (
               <div key={v.name} className={`stage-node vendor v${i} ${vendorState(i)}`}><b>{v.name}</b><small>{vendorNote(i)}</small></div>
             ))}

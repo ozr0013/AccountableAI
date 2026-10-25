@@ -70,7 +70,7 @@ def _claims_paid(text: str) -> bool:
 AGENT_NAME = {"verifier": "Verifier", "recheck": "Recheck", "chaser": "Chaser agent",
               "case_agent": "Case agent", "agreement_agent": "Agreement agent",
               "workflow": "Workflow", "controller": "Controller", "judge": "Judge",
-              "keyway": "Keyway", "trail": "Payment-trail agent", "cause": "Delay-cause agent",
+              "keyway": "Keyway Management", "trail": "Payment-trail agent", "cause": "Delay-cause agent",
               "policy": "Policy gate", "pattern": "Pattern check", "anomaly": "Anomaly detector"}
 
 
@@ -157,7 +157,7 @@ def _write_note(e: Event, open_before: set[str]) -> dict | None:
     if e.type == "document_ingested":
         text = f"Stored {str(p.get('id', '')).removeprefix('raw:inbox/')} ({str(p.get('kind', '')).replace('_', ' ')})"
     elif e.type == "chase_reply":
-        text = "Stored Keyway's reply"
+        text = "Stored Keyway Management's reply"
     elif e.type == "fact_corrected":
         text = "Stored a corrected fact"
     elif e.type == "world_meta":
@@ -171,7 +171,7 @@ def _write_note(e: Event, open_before: set[str]) -> dict | None:
         text = f"Alert withdrawn: {p.get('reason', '')}"
     elif e.type == "chase_sent":
         c = p.get("chase", {})
-        text = f"Reminder to Keyway, {c.get('level', '')} ({', '.join(c.get('invoice_ids', []))}) · recorded, not emailed"
+        text = f"Reminder to Keyway Management, {c.get('level', '')} ({', '.join(c.get('invoice_ids', []))}) · recorded, not emailed"
     elif e.type == "reply_read":
         text = f"Reply read: {p.get('verdict', '')}"
     elif e.type == "case_proposed":
@@ -466,7 +466,7 @@ class DemoSession:
         if proof not in ("none", "bank", "vendor"):
             return {"ok": False, "error": "proof must be none, bank, or vendor"}
         if not text:
-            return {"ok": False, "error": "write Keyway's reply first"}
+            return {"ok": False, "error": "write Keyway Management's reply first"}
         try:
             jc.invoice(invoice_id)
         except ConsoleError as e:
@@ -487,7 +487,7 @@ class DemoSession:
         self.rails.append_event(ev)
         events.append(ev)
         attached = {"bank": " with a bank record attached", "vendor": " with the vendor's confirmation attached"}
-        return self._act("reply", f"Keyway replied on {invoice_id}{attached.get(proof, ', no attachment')}: “{text}”",
+        return self._act("reply", f"Keyway Management replied on {invoice_id}{attached.get(proof, ', no attachment')}: “{text}”",
                          events, [invoice_id], before, appended=True, reader=reader)
 
     def write_email(self, sender: str, subject: str, body: str) -> dict:
@@ -566,7 +566,7 @@ class DemoSession:
         if case["kind"] == "funding":
             hold = case["proposed_hold"] if approve else 0.0
             release = round((case["funding_amount"] or FUNDING) - hold, 2)
-            summary = (f"Funding instruction recorded: send ${release:,.2f} to Keyway now"
+            summary = (f"Funding instruction recorded: send ${release:,.2f} to Keyway Management now"
                        + (f", hold ${hold:,.2f} until payment proof." if hold else " (hold declined)."))
             payload = {"approval_id": approval_id, "release": release, "hold": hold,
                        "approved": approve, "by": by, "note": "a recorded instruction for a person; no money moved"}
@@ -768,7 +768,7 @@ class DemoSession:
         """Live calls to the rails policy gate: what an agent is not allowed to do."""
         body = (chases[-1]["body"] if chases else "Please pay the vendor today.")
         tries = [
-            ("Chaser sends a free-form email to Keyway", "send_outbound", "chaser",
+            ("Chaser sends a free-form email to Keyway Management", "send_outbound", "chaser",
              {"to": "ap@keyway.example", "body": body.replace("friendly reminder", "final notice"),
               "proposed_by": "chaser"}),
             ("Case agent pays Rio Grande Plumbing", "pay_vendor", "case_agent", {}),
@@ -883,7 +883,7 @@ def _audit(events: list[Event]) -> list[dict]:
         elif e.type == "reply_read":
             what = p.get("verdict") or "reply read"
         elif e.type == "funding_instruction":
-            what = (f"funding instruction: send ${p['release']:,.2f} to Keyway"
+            what = (f"funding instruction: send ${p['release']:,.2f} to Keyway Management"
                     + (f", hold ${p['hold']:,.2f}" if p["hold"] else "") + " (no money moved)")
         elif e.type == "bank_change_decided":
             what = ("bank-detail change approved" if p["allowed"] else f"bank-detail change still held: {p['reason']}")

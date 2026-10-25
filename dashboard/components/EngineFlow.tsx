@@ -36,7 +36,7 @@ export const BOXES: { id: BoxId; x: number; y: number; title: string; tone: stri
   { id: "verifier", x: 770, y: 75, title: "Verifier", tone: "check" },
   { id: "gate", x: 770, y: 165, title: "Policy gate", tone: "check" },
   { id: "owner", x: 920, y: 30, title: "Owner alert", tone: "out" },
-  { id: "email", x: 920, y: 120, title: "Keyway email", tone: "out" },
+  { id: "email", x: 920, y: 120, title: "Keyway Management\nemail", tone: "out" },
   { id: "controller", x: 920, y: 210, title: "Controller queue", tone: "out" },
 ];
 // Straight segments, right angles.
@@ -61,7 +61,9 @@ export function EngineFlow({ lit, active, label }: { lit: Set<string>; active: S
       {BOXES.map((b) => (
         <g key={b.id} className={`sm-box t-${b.tone}${cls(b.id)}`} transform={`translate(${b.x} ${b.y})`}>
           <rect width={W} height={H} />
-          <text x={W / 2} y={H / 2 + 4.5} textAnchor="middle">{b.title}</text>
+          {b.title.includes("\n")
+            ? <text x={W / 2} y={H / 2 - 2} textAnchor="middle" className="sm-two">{b.title.split("\n").map((t, k) => <tspan key={k} x={W / 2} dy={k ? 13 : 0}>{t}</tspan>)}</text>
+            : <text x={W / 2} y={H / 2 + 4.5} textAnchor="middle">{b.title}</text>}
         </g>
       ))}
     </svg>
@@ -84,8 +86,8 @@ const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 /** What the route did, named from the step that followed it. */
 function routeName(next: string | undefined, nth: number): string | null {
   if (!next || next === "finish") return null;
-  if (next === "read_reply") return "Keyway's reply → the chaser reads it";
-  if (next === "detect_anomalies") return "A Keyway statement → the anomaly detector";
+  if (next === "read_reply") return "Keyway Management's reply → the chaser reads it";
+  if (next === "detect_anomalies") return "A Keyway Management statement → the anomaly detector";
   if (next === "extract_terms") return "An agreement → the agreement agent";
   return nth === 0 ? "New evidence → recheck the invoices it touches" : "Daily scan → the chaser rechecks every late invoice";
 }
@@ -143,7 +145,7 @@ export function plan(r: Ok): Card[] {
         i = j - 1;
         cards.push({ key: key(), who: "Chaser · payment trail + cause", tone: "agent", status: "done",
           title: rows.length === 1 ? `${rows[0].id}: ${rows[0].text}` : `Rechecked ${plural(rows.length, "invoice")} against the bank, the vendor and the agreement`,
-          meta: "source-trust rules: bank > vendor > Keyway's word", rows: rows.length > 1 ? rows : undefined,
+          meta: "source-trust rules: bank > vendor > Keyway Management's word", rows: rows.length > 1 ? rows : undefined,
           lines: rows.length === 1 ? rows[0].lines : undefined,
           light: ["router>chaser", "chaser"], ms: rows.length > 1 ? 900 + 140 * Math.min(rows.length, 8) : 1300 });
         lastAgentBox = "chaser";
@@ -181,7 +183,7 @@ export function plan(r: Ok): Card[] {
       let j = i;
       for (; j < t.length && t[j].type === "policy"; j++) group.push(t[j] as Gate);
       i = j - 1;
-      const said = (g: Gate) => ({ send_chase: "Send Keyway a reminder", propose_hold: "Propose a funding hold" }[g.action] ?? g.action.replace(/_/g, " "));
+      const said = (g: Gate) => ({ send_chase: "Send Keyway Management a reminder", propose_hold: "Propose a funding hold" }[g.action] ?? g.action.replace(/_/g, " "));
       const refused = group.filter((g) => !g.ok);
       cards.push({ key: key(), who: "Policy gate", tone: "gate", status: refused.length === group.length ? "blocked" : "allowed",
         title: group.length === 1 ? `${said(group[0])}: ${group[0].ok ? "allowed" : `refused, ${group[0].why}`}` : `${plural(group.length, "action")} checked: ${group.length - refused.length} allowed, ${refused.length} refused`,
@@ -200,7 +202,7 @@ export function plan(r: Ok): Card[] {
       light: ["verifier>owner", "owner"], stage: "owner", ms: 1100 });
   }
   const sent = notes.filter((w) => w.type === "chase_sent");
-  if (sent.length) cards.push({ key: key(), who: "Keyway email", tone: "out", status: "done",
+  if (sent.length) cards.push({ key: key(), who: "Keyway Management email", tone: "out", status: "done",
     title: `${plural(sent.length, "reminder")} to Keyway Property Management · recorded, not emailed`,
     rows: sent.map((w, k) => ({ id: `${k + 1}`, text: clean(w.text.replace(/ · recorded, not emailed$/, "")), open: false })),
     light: ["gate>email", "email"], stage: "email", ms: 1100 });

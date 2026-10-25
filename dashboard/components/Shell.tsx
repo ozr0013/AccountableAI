@@ -67,7 +67,7 @@ export function Shell({ children }: { children: ReactNode }) {
                 <small>{state?.meta.parent ?? "Oakline Homes"}</small>
               </span>
             </Link>
-            <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway</Link>
+            <Link href="/ask" className="ask-pill"><Spark style={{ width: 13, height: 13 }} /> Ask about Keyway Management</Link>
           </div>
         </aside>
         <main className="main">

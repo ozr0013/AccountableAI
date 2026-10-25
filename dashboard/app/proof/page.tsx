@@ -98,7 +98,7 @@ export default function Proof() {
       <section className="proof-panel">
         <SectionTitle right="planted bad drafts">The verifier earns its place</SectionTitle>
         <div className="proof-adversarial">{ADVERSARIAL.map(([name, score, note], i) => <article key={name} className={i === 2 ? "winner" : ""}><span className="label">{name}</span><strong>{score}</strong><p>{note}</p></article>)}</div>
-        <p className="proof-caption">Bad drafts include accusations, invented quotes, fake sources, unsupported citations, claims contradicted by bank/vendor proof, and attempts to blame Keyway for authorized or owner-side delays.</p>
+        <p className="proof-caption">Bad drafts include accusations, invented quotes, fake sources, unsupported citations, claims contradicted by bank/vendor proof, and attempts to blame Keyway Management for authorized or owner-side delays.</p>
       </section>
     </Disclosure>
 

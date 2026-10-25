@@ -14,7 +14,7 @@ export default function ItemPage() {
   const { state } = useFeed();
   if (!state) return <><PageTop title={id} /><Loading /></>;
   const it = state.items.find((i) => i.id === id);
-  if (!it) return <><PageTop title={id} /><div className="notice err">No invoice {id} for Keyway.</div></>;
+  if (!it) return <><PageTop title={id} /><div className="notice err">No invoice {id} for Keyway Management.</div></>;
   const names = state.meta.names;
   const alerts = state.alerts.filter((a) => a.invoice_ids.includes(it.id) && a.kind !== "recurring_pattern");
   const docs = Object.values(state.documents).filter((d) => d.data?.invoice_id === it.id || it.trail?.entries.some((e) => e.source_id === d.id));
@@ -81,7 +81,7 @@ export default function ItemPage() {
                 <p className="body" style={{ margin: 0 }}>{named(it.cause_text, names)}</p>
                 <div>{it.cause_citations && <Cites cites={it.cause_citations} />}</div>
                 <div className="micro" style={{ color: onManager(it) ? "var(--o)" : "var(--g-ink)" }}>
-                  {onManager(it) ? "Unexplained: alert on Keyway, chaser follows up" : "Not Keyway's fault: no alert on the manager"}
+                  {onManager(it) ? "Unexplained: alert on Keyway Management, chaser follows up" : "Not Keyway Management's fault: no alert on the manager"}
                 </div>
               </div>
             ) : (
@@ -92,7 +92,7 @@ export default function ItemPage() {
         <div>
           <SectionTitle>Alerts on this item</SectionTitle>
           <div className="stack" style={{ gap: 12 }}>
-            {alerts.length === 0 && <div className="card body muted">No alert. The evidence supports Keyway on this one.</div>}
+            {alerts.length === 0 && <div className="card body muted">No alert. The evidence supports Keyway Management on this one.</div>}
             {alerts.map((a) => (
               <div key={a.id} className="card">
                 <div className="between" style={{ marginBottom: 10 }}>

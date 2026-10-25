@@ -13,7 +13,7 @@ const Arrow = () => <span aria-hidden="true">↗</span>;
 type SnapshotRow = { label: string; value: number; note: string; progress: string; tone: string };
 
 const fallbackSnapshot: SnapshotRow[] = [
-  { label: "Funded", value: 243710, note: "to Keyway", progress: "100%", tone: "funded" },
+  { label: "Funded", value: 243710, note: "to Keyway Management", progress: "100%", tone: "funded" },
   { label: "Reconciled", value: 234600, note: "bank or vendor proof", progress: "96.3%", tone: "reconciled" },
   { label: "Proof needed", value: 3140, note: "3 invoices need a receipt", progress: "1.3%", tone: "proof" },
 ];
@@ -24,7 +24,7 @@ function makeSnapshot(feed: { headline?: { funded?: number; paid?: number; unexp
   const proof = Number(feed.headline?.unexplained) || fallbackSnapshot[2].value;
   const proofCount = feed.headline?.unexplained_items?.length ?? 3;
   return [
-    { label: "Funded", value: funded, note: "to Keyway", progress: "100%", tone: "funded" },
+    { label: "Funded", value: funded, note: "to Keyway Management", progress: "100%", tone: "funded" },
     { label: "Reconciled", value: paid, note: "bank or vendor proof", progress: `${((paid / funded) * 100).toFixed(1)}%`, tone: "reconciled" },
     { label: "Proof needed", value: proof, note: `${proofCount} invoice${proofCount === 1 ? "" : "s"} need a receipt`, progress: `${Math.max(1, (proof / funded) * 100).toFixed(1)}%`, tone: "proof" },
   ];
@@ -106,7 +106,7 @@ export default function Home() {
         </section>
 
         <section className="home-proof ruled" id="proof" aria-labelledby="proof-title">
-          <div className="proof-copy"><span className="home-eyebrow">/ LESS GUESSWORK. MORE RECEIPTS.</span><h2 id="proof-title">The answer changes.<em>The evidence says why.</em></h2><p>In our fictional demo, Oakline funds Keyway to pay its vendors. Three invoices appear overdue. But one new fact changes the picture.</p><p>Correct the electrician’s invoice date and watch the proposed hold update. The plumber and cleaner stay open—because their payment proof is still missing.</p><Link href="/console" className="home-text-link">Try your own fact in the Judge Console <Arrow /></Link></div>
+          <div className="proof-copy"><span className="home-eyebrow">/ LESS GUESSWORK. MORE RECEIPTS.</span><h2 id="proof-title">The answer changes.<em>The evidence says why.</em></h2><p>In our fictional demo, Oakline funds Keyway Management to pay its vendors. Three invoices appear overdue. But one new fact changes the picture.</p><p>Correct the electrician’s invoice date and watch the proposed hold update. The plumber and cleaner stay open—because their payment proof is still missing.</p><Link href="/console" className="home-text-link">Try your own fact in the Judge Console <Arrow /></Link></div>
           <div className="proof-demo">
             <div className="proof-demo-head"><span className="home-eyebrow">OAKLINE → KEYWAY</span><span className="sample-label">Illustrative demo</span></div>
             <div className="proof-amount"><span>Recommended hold</span><strong aria-live="polite">{corrected ? "$2,240" : "$3,140"}</strong><span>of the next $18,400 in funding</span></div>

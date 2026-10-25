@@ -16,25 +16,23 @@ export default function Overview() {
   const items = state.items;
   const open = state.alerts.filter((a) => a.open && a.kind !== "recurring_pattern")
     .sort((a, b) => Number(b.kind === "unexplained_unpaid") - Number(a.kind === "unexplained_unpaid") || b.amount - a.amount);
-  const pending = state.cases.find((c) => c.status === "pending" && c.kind === "funding");
 
   return (
     <>
-      <PageTop title="Overview" sub="Where Oakline's money to Keyway stands today." />
+      <PageTop title="Overview" sub="Where Oakline's money to Keyway Management stands today." />
 
       {open.length > 0 && (
         <section className="ov-alerts" aria-label="Needs a closer look">
           <div className="ov-alerts-head">
-            <span className="label">/ Needs a closer look · {open.length}</span>
-            {pending && <Link href="/cases" className="ov-hold">Recommended hold <b>{money(state.headline.proposed_hold, false)}</b> of the next funding · your decision ↗</Link>}
+            <span className="label">Alert</span>
             <Link href="/cases" className="pill">Review queue ↗</Link>
           </div>
           <div className="ov-alerts-row">
             {open.slice(0, SHOWN).map((a) => {
               const item = items.find((i) => i.id === a.invoice_ids[0]);
               return <Link key={a.id} href={`/items/${a.invoice_ids[0]}`} className="ov-alert">
-                <Badge kind={a.kind === "unexplained_unpaid" ? "flag" : "idle"} />
-                <span className="ov-alert-txt"><b>{item?.vendor ?? "Keyway"}</b><small>{ALERT[a.kind] ?? a.kind.replace(/_/g, " ")}</small></span>
+                <span className="ov-dot" aria-hidden="true" />
+                <span className="ov-alert-txt"><b>{item?.vendor ?? "Keyway Management"}</b><small>{a.kind === "unexplained_unpaid" ? "Past due" : ALERT[a.kind] ?? a.kind.replace(/_/g, " ")}</small></span>
                 <strong>{money(a.amount, false)}</strong>
               </Link>;
             })}

@@ -46,11 +46,11 @@ export const ALERT: Record<string, string> = {
 export const SOURCE: Record<string, string> = {
   funding: "Oakline funding",
   vendor_invoice: "Vendor invoice",
-  manager_statement: "Keyway statement",
-  manager_bank: "Keyway bank",
+  manager_statement: "Keyway Management statement",
+  manager_bank: "Keyway Management bank",
   vendor_confirmation: "Vendor confirmation",
   vendor_notice: "Vendor notice",
-  manager_reply: "Keyway reply",
+  manager_reply: "Keyway Management reply",
   agreement: "Agreement",
   judge: "Judge fact",
   controller: "Controller",
@@ -62,5 +62,5 @@ export const ON_MANAGER = new Set(["unexplained"]);
 /** Replace raw vendor ids (v-summit) with names in agent-written text. */
 export function named(text: string | null | undefined, names: Record<string, string>): string {
   if (!text) return "";
-  return text.replace(/\bv-[a-z0-9-]+\b/g, (id) => names[id] ?? id).replace(/\bkeyway\b/g, "Keyway");
+  return text.replace(/\bv-[a-z0-9-]+\b/g, (id) => names[id] ?? id).replace(/\bkeyway\b/g, "Keyway Management");
 }

@@ -17,7 +17,7 @@ export default function Keyway() {
     { k: "Paid", v: r.paid, c: "var(--g-ink)", note: "bank record or vendor confirmation" },
     { k: "Authorized holds", v: r.held, c: "#8e9fa8", note: "10% until inspection · clause 7.4" },
     { k: "Owed, explained", v: explained, c: "var(--n7)", note: "paperwork, bank-detail check, not due" },
-    { k: "Owed, unexplained", v: h.unexplained, c: "var(--o)", note: "alert on Keyway" },
+    { k: "Owed, unexplained", v: h.unexplained, c: "var(--o)", note: "alert on Keyway Management" },
     { k: "Funded twice", v: r.duplicate_funded, c: "var(--wine)", note: "duplicate billing flagged" },
   ];
   const total = parts.reduce((s, p) => s + p.v, 0);
@@ -71,7 +71,7 @@ export default function Keyway() {
               );
             })}
           </div>
-          <p className="body muted" style={{ marginTop: 12 }}>Late in 3 of 4 months, measured against Keyway&apos;s own agreement, not other managers. Recommendation: stricter terms.</p>
+          <p className="body muted" style={{ marginTop: 12 }}>Late in 3 of 4 months, measured against Keyway Management&apos;s own agreement, not other managers. Recommendation: stricter terms.</p>
         </div>
         <div>
           <SectionTitle>Agreement terms (confirmed)</SectionTitle>
@@ -88,7 +88,7 @@ export default function Keyway() {
             ))}
             <div style={{ padding: "14px 0" }}>{agreement && <Cites cites={[agreement.id]} />}<span className="micro muted"> extracted by the agreement agent, confirmed by the controller</span></div>
           </div>
-          <SectionTitle>Aging of what Keyway owes</SectionTitle>
+          <SectionTitle>Aging of what Keyway Management owes</SectionTitle>
           <div className="grid g4" style={{ gap: 8 }}>
             {["current", "1-30", "31-60", "61-90"].map((b) => (
               <div key={b} className="card" style={{ padding: 14 }}>
@@ -102,22 +102,22 @@ export default function Keyway() {
 
       </Disclosure>
       <section style={{ marginTop: 24 }}>
-        <Disclosure title="Add a reply from Keyway" hint="Demo: test a payment claim, with or without proof"><ReplyBox /></Disclosure>
-        <Disclosure title="Conversation history" hint="Reminders and Keyway’s replies" meta={`${thread.length} messages`}>
+        <Disclosure title="Add a reply from Keyway Management" hint="Demo: test a payment claim, with or without proof"><ReplyBox /></Disclosure>
+        <Disclosure title="Conversation history" hint="Reminders and Keyway Management’s replies" meta={`${thread.length} messages`}>
         <div className="card" style={{ marginTop: 16 }}>
           <div className="thread">
             {thread.map((t) => t.out ? (
               <div key={t.c.id} className="msg out">
                 <div className="msg-meta">
                   <span className={`tag ${t.c.level === "polite" ? "neutral" : ""}`}>{t.c.level}</span>
-                  <span className="micro muted">Chaser → Keyway · {day(t.c.sent_at)} · {t.c.template_id} · {t.c.sent ? "sent" : `held: ${t.c.policy}`}</span>
+                  <span className="micro muted">Chaser → Keyway Management · {day(t.c.sent_at)} · {t.c.template_id} · {t.c.sent ? "sent" : `held: ${t.c.policy}`}</span>
                 </div>
                 {named(t.c.body, state.meta.names)}
               </div>
             ) : (
               <div key={t.r.id} className="msg in">
                 <div className="msg-meta">
-                  <span className="tag wine">Keyway reply{t.r.judge ? " · judge" : ""}</span>
+                  <span className="tag wine">Keyway Management reply{t.r.judge ? " · judge" : ""}</span>
                   <span className="micro muted">{day(t.r.on)} · {t.r.invoice_id}</span>
                 </div>
                 &ldquo;{t.r.text}&rdquo;

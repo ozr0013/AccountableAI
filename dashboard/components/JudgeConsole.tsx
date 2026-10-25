@@ -220,14 +220,14 @@ export function JudgeConsole() {
         {tab === "email" && <div className="jc-pane jc-email">
           <div className="jc-email-form">
             <label>From<select value={mail.sender} disabled={off} onChange={(e) => setMail({ ...mail, sender: e.target.value })}>
-              <option value="keyway">Keyway AP (the property manager)</option>
+              <option value="keyway">Keyway Management (the property manager)</option>
               {vendors.map(([id, n]) => <option key={id} value={id}>{n} (vendor)</option>)}
             </select></label>
             <label>Subject<input className="input" value={mail.subject} disabled={off} onChange={(e) => setMail({ ...mail, subject: e.target.value })} /></label>
             <label>Message<textarea className="input" rows={4} value={mail.body} disabled={off} onChange={(e) => setMail({ ...mail, body: e.target.value })} /></label>
             <div className="jc-go">
-              <button className="btn" disabled={off} onClick={() => void send(`Email from ${mail.sender === "keyway" ? "Keyway" : vendors.find(([id]) => id === mail.sender)?.[1] ?? mail.sender}`, () => write(mail.sender, mail.subject, mail.body))}>Send the email ↗</button>
-              {EMAILS.map((e, k) => <button key={k} className="jc-chip" disabled={off} onClick={() => setMail(e)}>{k === 0 ? "Keyway: “we paid”" : "Vendor: “we were paid”"}</button>)}
+              <button className="btn" disabled={off} onClick={() => void send(`Email from ${mail.sender === "keyway" ? "Keyway Management" : vendors.find(([id]) => id === mail.sender)?.[1] ?? mail.sender}`, () => write(mail.sender, mail.subject, mail.body))}>Send the email ↗</button>
+              {EMAILS.map((e, k) => <button key={k} className="jc-chip" disabled={off} onClick={() => setMail(e)}>{k === 0 ? "Keyway Management: “we paid”" : "Vendor: “we were paid”"}</button>)}
             </div>
           </div>
           <div className="jc-hint">

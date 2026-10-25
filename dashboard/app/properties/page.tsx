@@ -17,7 +17,7 @@ export default function Properties() {
   const byHome = new Map(homes.map((h) => [h.id, totals(state.items.filter((i) => i.property_id === h.id))]));
   const all = totals(state.items.filter((i) => i.property_id && byHome.has(i.property_id)));
   return <>
-    <PageTop title="Properties" sub={`${homes.length} homes Keyway manages for Oakline in ${cities.join(" · ")}`} />
+    <PageTop title="Properties" sub={`${homes.length} homes Keyway Management looks after for Oakline in ${cities.join(" · ")}`} />
     <div className="ov-boxes">
       <Link href="/invoices"><span>Homes · {homes.filter((h) => h.invoices).length} with repairs</span><strong>{homes.length}</strong></Link>
       <Link href="/invoices?show=paid" className="paid"><span>Paid</span><strong>{money(all.paid)}</strong></Link>

@@ -6,7 +6,7 @@ import { Cites, Loading, PageTop, SectionTitle } from "@/components/ui";
 import { named } from "@/lib/format";
 import type { Briefing } from "@/lib/types";
 
-const SUGGESTED = ["What's open with Keyway?", "Why are we holding money from Keyway?", "Is any of this not Keyway's fault?"];
+const SUGGESTED = ["What's open with Keyway Management?", "Why are we holding money from Keyway Management?", "Is any of this not Keyway Management's fault?"];
 
 export default function Ask() {
   const { state, brief, mode } = useFeed();
@@ -14,7 +14,7 @@ export default function Ask() {
   const [b, setB] = useState<Briefing | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  if (!state) return <><PageTop title="Ask about Keyway" /><Loading /></>;
+  if (!state) return <><PageTop title="Ask about Keyway Management" /><Loading /></>;
   const names = state.meta.names;
 
   const ask = async (question: string) => {
@@ -25,10 +25,10 @@ export default function Ask() {
 
   return (
     <>
-      <PageTop title="Ask about Keyway" sub="Answers from the record, every claim cited." />
+      <PageTop title="Ask about Keyway Management" sub="Answers from the record, every claim cited." />
       <div className="card" style={{ padding: 24 }}>
         <form className="row" style={{ gap: 8 }} onSubmit={(e) => { e.preventDefault(); if (q.trim()) ask(q); }}>
-          <input className="input" style={{ height: 52, fontSize: 18 }} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Question about Keyway" />
+          <input className="input" style={{ height: 52, fontSize: 18 }} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Question about Keyway Management" />
           <button className="btn" style={{ height: 52, padding: "0 24px" }} disabled={busy}>{busy ? "Reading the record" : "Ask"}</button>
         </form>
         <div className="row" style={{ marginTop: 12, flexWrap: "wrap" }}>

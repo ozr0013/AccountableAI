@@ -69,7 +69,7 @@ export function LiveRun() {
             <span className="mono">{dayLabel(d.date)}</span>
             <div>
               {d.alerts.map((a, i) => <p key={`a${i}`} className="w-alert_raised">Owner alerted: {a}</p>)}
-              {d.reminders.map((a, i) => <p key={`r${i}`} className="w-chase_sent">Reminder to Keyway, {a} · recorded, not emailed</p>)}
+              {d.reminders.map((a, i) => <p key={`r${i}`} className="w-chase_sent">Reminder to Keyway Management, {a} · recorded, not emailed</p>)}
               {d.withdrawn.map((a, i) => <p key={`w${i}`} className="w-alert_withdrawn">Alert withdrawn: {a}</p>)}
               {d.holds.map((a, i) => <p key={`h${i}`} className="w-case_proposed">{a}</p>)}
               {!(d.reminders.length || d.alerts.length || d.withdrawn.length || d.holds.length) && <p className="w-quiet">Scheduled check: nothing new</p>}

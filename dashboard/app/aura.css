@@ -513,9 +513,9 @@
 }
 
 /* Overview: alerts in one tight strip (only when there are any), four boxes, two charts */
-.ov-alerts { background: #fff; border: 1px dashed var(--box-line); border-left: 3px solid #e0894a; padding: 12px 16px; margin-bottom: 16px; }
+.ov-alerts { background: #fff; border: 1px dashed var(--box-line); border-left: 3px solid #d03b3b; padding: 12px 16px; margin-bottom: 16px; }
 .ov-alerts-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
-.ov-alerts-head .label { color: #9a4209; }
+.ov-alerts-head .label { color: #b42323; font-weight: 600; letter-spacing: .14em; }
 .ov-hold { font-size: 13px; color: var(--n10); }
 .ov-hold b { color: var(--ink); font-weight: 600; }
 .ov-alerts-head .pill { margin-left: auto; }
@@ -583,3 +583,6 @@
 .ov-range { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
 .ov-dates { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--n9); }
 .ov-dates input { height: 30px; padding: 0 8px; font: 12px var(--mono); color: var(--ink); border: 1px dashed var(--box-line); background: #fff; }
+.ov-dot { flex: none; width: 8px; height: 8px; background: #d03b3b; box-shadow: 0 0 0 3px #d03b3b26; }
+.sm-box text.sm-two { font-size: 11.5px; }
+.theme-aura .ask-pill { white-space: nowrap; font-size: 12px; }

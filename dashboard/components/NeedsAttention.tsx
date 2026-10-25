@@ -10,7 +10,7 @@ import type { Item, State } from "@/lib/types";
 
 type Group = "keyway" | "you" | "expected";
 const GROUPS: { id: Group; title: string; note: string }[] = [
-  { id: "keyway", title: "Keyway must show proof", note: "Funded and past due, with no bank record or vendor confirmation." },
+  { id: "keyway", title: "Keyway Management must show proof", note: "Funded and past due, with no bank record or vendor confirmation." },
   { id: "you", title: "Needs your decision", note: "Only you can approve these. Nothing is paid until you do." },
   { id: "expected", title: "Expected, no action needed", note: "Allowed by the agreement or waiting on the vendor." },
 ];
@@ -21,7 +21,7 @@ function triage(i: Item, items: Item[]): { group: Group; why: string } {
   if (i.alerts.some((a) => a.startsWith("al-bank_detail_change"))) return { group: "you", why: "Vendor asked to change bank details: verify before anyone pays" };
   if (i.cause === "owner_side") return { group: "you", why: "Over your approval limit: needs your approval and funding" };
   if (i.cause === "unexplained") return { group: "keyway", why: `No proof it was paid${i.days_late ? ` · ${i.days_late} days past due` : ""}` };
-  if (i.cause === "paperwork_pending") return { group: "expected", why: "Waiting for the vendor's W-9; Keyway can't pay until it arrives" };
+  if (i.cause === "paperwork_pending") return { group: "expected", why: "Waiting for the vendor's W-9; Keyway Management can't pay until it arrives" };
   if (i.cause === "authorized_hold") return { group: "expected", why: "Retained until the work passes inspection, as the agreement allows" };
   if (items.some((x) => x.duplicate_of === i.id)) return { group: "expected", why: "Paid; the original of the bill that was sent twice" };
   if (i.state === "not_due") return { group: "expected", why: "Not due yet" };
@@ -55,7 +55,7 @@ export function NeedsAttention({ state }: { state: State }) {
         <Link href="/invoices" className="pill">Every invoice ↗</Link>
       </div>
       <p className="na-recon">
-        <span><b>{money(t.left)}</b> outstanding with Keyway</span>
+        <span><b>{money(t.left)}</b> outstanding with Keyway Management</span>
         <span>+ <b>{money(t.notFunded)}</b> not yet funded by you</span>
         <span>= <b>{money(t.left + t.notFunded)}</b> unpaid to vendors</span>
       </p>
@@ -63,7 +63,7 @@ export function NeedsAttention({ state }: { state: State }) {
         {GROUPS.map((g) => sum(g.id) > 0 && <span key={g.id} className={`na-seg g-${g.id}`} style={{ flexGrow: sum(g.id) }} />)}
       </div>
       <div className="na-legend">
-        {GROUPS.map((g) => <span key={g.id} className={`g-${g.id}`}><i />{g.title.split(" ")[0] === "Keyway" ? "Keyway" : g.id === "you" ? "You" : "Expected"} <b>{money(sum(g.id))}</b></span>)}
+        {GROUPS.map((g) => <span key={g.id} className={`g-${g.id}`}><i />{g.id === "keyway" ? "Keyway Management" : g.id === "you" ? "You" : "Expected"} <b>{money(sum(g.id))}</b></span>)}
       </div>
 
       {GROUPS.map((g) => {
@@ -75,7 +75,7 @@ export function NeedsAttention({ state }: { state: State }) {
               <h3>{g.title}{g.id === "keyway" && <span className="na-act">Your response needed</span>}</h3>
               <span className="mono">{money(sum(g.id))} · {mine.length}</span>
             </div>
-            <p className="na-note">{g.note}{g.id === "keyway" && pattern ? ` ${pattern.headline.replace(/^keyway/i, "Keyway")}.` : ""}</p>
+            <p className="na-note">{g.note}{g.id === "keyway" && pattern ? ` ${pattern.headline.replace(/^keyway/i, "Keyway Management")}.` : ""}</p>
             {mine.map(({ i, why }) => (
               <Link key={i.id} href={`/items/${i.id}`} className="na-row">
                 <span className="na-who"><b>{i.vendor}</b><small>{i.property ?? i.id}</small></span>

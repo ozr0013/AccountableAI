@@ -9,10 +9,10 @@ import { CAUSE, day, named } from "@/lib/format";
 const ROSTER = [
   { id: "agreement_agent", name: "Agreement agent", role: "Reads the management agreement into terms with clause citations; a controller confirms them.", model: true },
   { id: "trail", name: "Payment-trail agent", role: "Builds one timeline per invoice from funding, statements, bank, vendor and replies; source-trust rules pick the winner.", model: true },
-  { id: "cause", name: "Delay-cause agent", role: "Gives every unpaid invoice one cause. Only “unexplained” lands on Keyway.", model: true },
+  { id: "cause", name: "Delay-cause agent", role: "Gives every unpaid invoice one cause. Only “unexplained” lands on Keyway Management.", model: true },
   { id: "verifier", name: "Verifier", role: "Tries to refute every alert from the evidence alone; blocks uncited claims and accusatory wording. Fails closed.", model: true },
-  { id: "chaser", name: "Chaser agent", role: "Reminds Keyway from approved templates on the approved schedule, and reads replies: “paid” counts only with bank or vendor proof.", model: true },
-  { id: "case_agent", name: "Case agent", role: "Builds the evidence pack and proposes a hold before Oakline funds Keyway again. Proposes only.", model: true },
+  { id: "chaser", name: "Chaser agent", role: "Reminds Keyway Management from approved templates on the approved schedule, and reads replies: “paid” counts only with bank or vendor proof.", model: true },
+  { id: "case_agent", name: "Case agent", role: "Builds the evidence pack and proposes a hold before Oakline funds Keyway Management again. Proposes only.", model: true },
   { id: "recheck", name: "Recheck", role: "When a fact changes, reruns only the items that depend on it and withdraws alerts that no longer hold, with the reason.", model: false },
   { id: "controller", name: "Controller", role: "The only one who approves holds and bank-detail changes. Every decision is in the log.", model: false },
 ];
