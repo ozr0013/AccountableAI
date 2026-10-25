@@ -192,6 +192,21 @@ const spacetimedb = schema({
     { name: 'book_counter', public: true },
     { book: t.string().primaryKey(), seq: t.i64() }
   ),
+  // What the agents learned: a pattern about a vendor or the manager, with the documents that
+  // prove it. Every later run on that subject gets it in its context. Per book, like the log.
+  agentLesson: table(
+    { name: 'agent_lesson', public: true },
+    {
+      key: t.string().primaryKey(),
+      book: t.string().index('btree'),
+      subject: t.string().index('btree'),
+      lesson: t.string(),
+      evidence: t.string(),
+      byAgent: t.string(),
+      asOf: t.string(),
+      createdAt: t.timestamp(),
+    }
+  ),
   // Explicit dependency links a workflow records on top of the ones derived from the events.
   bookDependency: table(
     { name: 'book_dependency', public: true },
@@ -580,3 +595,28 @@ export const copyBook = spacetimedb.reducer(
     ctx.db.bookCounter.insert({ book: toBook, seq: last });
   }
 );
+
+
+// An agent records a lesson. The same key again (same subject and wording) is ignored.
+export const rememberLesson = spacetimedb.reducer(
+  { key: t.string(), book: t.string(), subject: t.string(), lesson: t.string(), evidence: t.string(),
+    byAgent: t.string(), asOf: t.string() },
+  (ctx, args) => {
+    requireWriter(ctx);
+    if (ctx.db.agentLesson.key.find(args.key)) return;
+    ctx.db.agentLesson.insert({ ...args, createdAt: ctx.timestamp });
+  }
+);
+
+// The controller removes a lesson, or a demo reset clears a whole book's lessons.
+export const forgetLesson = spacetimedb.reducer({ key: t.string() }, (ctx, { key }) => {
+  requireWriter(ctx);
+  ctx.db.agentLesson.key.delete(key);
+});
+
+export const clearLessons = spacetimedb.reducer({ book: t.string() }, (ctx, { book }) => {
+  requireWriter(ctx);
+  for (const row of [...ctx.db.agentLesson.iter()]) {
+    if (row.book === book) ctx.db.agentLesson.key.delete(row.key);
+  }
+});

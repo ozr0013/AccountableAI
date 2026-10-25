@@ -88,6 +88,7 @@ def reset(mirror) -> dict:
             demo.append_event(event)
     mirror.call("clear_tasks", [])
     mirror.call("clear_chaser", [])
+    mirror.call("clear_lessons", [SCHEMA])        # the demo's memory starts empty too
     _arrive(demo, mirror, START)          # the first morning's paperwork
     return state(demo)
 

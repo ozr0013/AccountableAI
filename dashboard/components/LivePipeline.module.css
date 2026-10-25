@@ -261,3 +261,4 @@
 .table tbody tr:hover td { background: #f7f9ff; }
 .table tr.sel td { background: var(--coral-wash); }
 .table tr.workingRow td:first-child { box-shadow: inset 2px 0 0 var(--coral); }
+.event.memory span:nth-child(3) { color: var(--g-ink); }

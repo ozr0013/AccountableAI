@@ -8,9 +8,10 @@ closes the chaser's hand-off and the case goes to the controller.
 """
 from __future__ import annotations
 
-from chaser_agent import daily
+from chaser_agent import daily, memory
 from chaser_agent.patterns import describe, vendor_patterns
 from chaser_agent.runtime import Tool, Trace, load_skill, run_agent
+from workflow.names import names_from
 
 SYSTEM = """You are the anomaly agent for Oakline Homes, a property owner whose management \
 company (Keyway) pays vendors with money Oakline funds. The chaser agent handed you one invoice \
@@ -49,7 +50,12 @@ class AnomalyTools:
                 "closure_eligible": self.case.get("closure_eligible", False),
                 "ledger": line.model_dump(mode="json") if line else None,
                 "bank_payments": bank, "statements": statements,
-                "sources": self.case.get("source_ids", [])}
+                "sources": self.case.get("source_ids", []),
+                # Memory: your earlier verdicts on this invoice, and lessons about the vendor and
+                # the manager.
+                "your_previous_runs": memory.previous_runs(self.mirror, "anomaly", self.invoice_id, self.today),
+                "lessons": memory.lessons(self.mirror, memory.book_of(self.rails),
+                                          [self.case.get("vendor") or "", names_from(self.rails)(self.manager_id)])}
 
     def get_agreement_rules(self) -> dict:
         from workflow.names import names_from
@@ -94,6 +100,7 @@ class AnomalyTools:
         no_args = {"type": "object", "additionalProperties": False, "properties": {}}
         return [
             books.tool_for(self.rails),
+            memory.tool_for(self.mirror, self.rails, "anomaly", self.today),
             Tool("get_payment_case", "The handed-off payment: automatic check findings (codes and "
                  "messages), bank rows, statements, ledger line, closure eligibility.",
                  no_args, self.get_payment_case),
