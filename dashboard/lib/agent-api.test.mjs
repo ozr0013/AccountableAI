@@ -10,7 +10,7 @@ function capture(result = {}) {
   }});
   return { api, calls };
 }
-test('reads use independent same-origin services and never send controller credentials', async () => {
+test('reads use independent same-origin services and send no credentials', async () => {
   const {api,calls}=capture([]);
   await api.agreements(); await api.agreement('a/b'); await api.health('chaser');
   assert.deepEqual(calls.map(c=>c.url), ['/agreement-agent-api/agreements','/agreement-agent-api/agreements/a%2Fb','/chaser-agent-api/health']);
@@ -20,21 +20,20 @@ test('invoice filters, encoded action identifiers, date queries and decision bod
   const {api,calls}=capture();
   await api.invoices('unpaid','A & B'); await api.invoice('INV-AA-001');
   await api.preview('2026-10-24'); await api.run('2026-10-24');
-  await api.decide('INV-AA-001:reminder:firm:0',true,'checked','secret');
+  await api.decide('INV-AA-001:reminder:firm:0',true,'checked');
   assert.equal(calls[0].url,'/chaser-agent-api/chaser/invoices?status=unpaid&vendor=A+%26+B&limit=50');
   assert.equal(calls[1].url,'/chaser-agent-api/chaser/invoices/INV-AA-001');
   assert.equal(calls[2].url,'/chaser-agent-api/chaser/preview?as_of=2026-10-24');
   assert.equal(calls[2].method,'POST'); assert.equal(calls[3].url,'/chaser-agent-api/chaser/run?as_of=2026-10-24');
   assert.match(calls[4].url, /INV-AA-001%3Areminder%3Afirm%3A0\/decide$/);
-  assert.equal(new Headers(calls[4].headers).get('Authorization'),'Bearer secret');
+  assert(!new Headers(calls[4].headers).has('Authorization'));
   assert.deepEqual(JSON.parse(calls[4].body),{approve:true,note:'checked'});
 });
-test('controller confirmation and rejection require explicit tokens', async () => {
+test('controller confirmation and rejection send their terms and notes, no credentials', async () => {
   const {api,calls}=capture();
-  await assert.rejects(()=>api.confirm('doc',{},'',''), /controller token/i);
-  assert.equal(calls.length,0);
-  await api.confirm('doc',{payment_due:'30 days'},'reviewed','token');
-  await api.reject('doc','wrong agreement','token');
+  await api.confirm('doc',{payment_due:'30 days'},'reviewed');
+  await api.reject('doc','wrong agreement');
+  assert(calls.every(call=>!new Headers(call.headers).has('Authorization')));
   assert.deepEqual(JSON.parse(calls[0].body),{values:{payment_due:'30 days'},note:'reviewed'});
   assert.deepEqual(JSON.parse(calls[1].body),{note:'wrong agreement'});
 });
@@ -66,30 +65,25 @@ test('connected case reads and reconciliation use the workflow endpoints without
  assert.deepEqual(JSON.parse(calls[1].body),{});
  assert(calls.every(call=>!new Headers(call.headers).has('Authorization')));
 });
-test('structured evidence preserves invoice, payment and statement facts with a controller token', async () => {
+test('structured evidence preserves invoice, payment and statement facts', async () => {
  const {api,calls}=capture({document_id:'evidence-1',cases:[]});
  const body={kind:'manager_bank',invoice_id:'INV/001',amount:1000,on:'2026-05-08',payee:'Vendor A',account:'1234',routing:'5678',bank:'Test bank',reference:'BANK-44'};
- await assert.rejects(()=>api.evidence(body,' '), /controller token/i);
- assert.equal(calls.length,0);
- const result=await api.evidence(body,' controller ');
+ const result=await api.evidence(body);
  assert.equal(result.document_id,'evidence-1');
  assert.equal(calls[0].url,'/chaser-agent-api/workflow/evidence');
  assert.equal(calls[0].method,'POST');
- assert.equal(new Headers(calls[0].headers).get('Authorization'),'Bearer controller');
+ assert(!new Headers(calls[0].headers).has('Authorization'));
  assert.deepEqual(JSON.parse(calls[0].body),{kind:'manager_bank',invoice_id:'INV/001',amount:1000,on:'2026-05-08',payee:'Vendor A',account:'1234',routing:'5678',bank:'Test bank',reference:'BANK-44'});
 });
-test('delivery acknowledgment and case resolution require controller credentials and preserve their evidence notes', async () => {
+test('delivery acknowledgment and case resolution preserve their evidence notes', async () => {
  const {api,calls}=capture({status:'delivered'});
- await assert.rejects(()=>api.acknowledgeOutbox('outbox/id','email receipt',''), /controller token/i);
- await assert.rejects(()=>api.resolveCase('INV/001','Reviewed findings',''), /controller token/i);
- assert.equal(calls.length,0);
- await api.acknowledgeOutbox('outbox/id','external email receipt #42','token');
- await api.resolveCase('INV/001','Statement reconciled; late payment acknowledged','token');
+ await api.acknowledgeOutbox('outbox/id','external email receipt #42');
+ await api.resolveCase('INV/001','Statement reconciled; late payment acknowledged');
  assert.equal(calls[0].url,'/chaser-agent-api/workflow/outbox/outbox%2Fid/ack');
  assert.deepEqual(JSON.parse(calls[0].body),{reference:'external email receipt #42'});
  assert.equal(calls[1].url,'/chaser-agent-api/workflow/cases/INV%2F001/resolve');
  assert.deepEqual(JSON.parse(calls[1].body),{note:'Statement reconciled; late payment acknowledged'});
- assert(calls.every(call=>new Headers(call.headers).get('Authorization')==='Bearer token'));
+ assert(calls.every(call=>!new Headers(call.headers).has('Authorization')));
 });
 test('HTTP detail and non-JSON gateway errors remain visible', async () => {
  let api=createAgentApi({fetch:async()=>new Response(JSON.stringify({detail:'stale approval'}),{status:409})});

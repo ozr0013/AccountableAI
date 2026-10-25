@@ -41,7 +41,6 @@ def test_uploaded_agreement_controls_chasing_and_payment_handoff(monkeypatch):
     monkeypatch.setattr(agreements,'_mirror',lambda:mirror)
     monkeypatch.setattr(chaser,'_mirror',lambda:mirror)
     monkeypatch.setattr(chaser,'_rails',lambda:rails)
-    monkeypatch.setenv('CONTROLLER_API_TOKEN','workflow-test')
     a,c=TestClient(agreements.app),TestClient(chaser.app)
     sample=Path('agreement_agent/samples/rio_grande_services_agreement.pdf').read_bytes()
     upload=a.post('/review?model=false',files={'file':('rio.pdf',sample,'application/pdf')})
@@ -57,14 +56,12 @@ def test_uploaded_agreement_controls_chasing_and_payment_handoff(monkeypatch):
     assert polite['level']=='polite' and polite['status']=='queued'
     case=c.get('/workflow/cases').json()['cases'][0]
     outbox=next(o for o in case['outbox'] if o['kind']=='chase_reminder' and o['status']=='queued')
-    assert c.post(f"/workflow/outbox/{outbox['id']}/ack",json={'reference':'test-delivery'},headers={'Authorization':'Bearer workflow-test'}).status_code==200
+    assert c.post(f"/workflow/outbox/{outbox['id']}/ack",json={'reference':'test-delivery'}).status_code==200
     rails.now=lambda:date(2026,4,27)
     firm=c.post('/chaser/run?as_of=2026-04-27').json()['decisions'][0]
     assert firm['level']=='firm' and firm['status']=='needs_approval'
     route='/chaser/actions/'+firm['action_id']+'/decide'
-    assert c.post(route,json={'approve':True}).status_code==401
-    approved=c.post(route,json={'approve':True,'note':'Evidence reviewed'},
-                    headers={'Authorization':'Bearer workflow-test'})
+    approved=c.post(route,json={'approve':True,'note':'Evidence reviewed'})
     assert approved.status_code==200,approved.text
     assert approved.json()['status']=='approved'
     bank=Document(id='workflow-bank-proof',kind='manager_bank',manager_id='keyway',

@@ -14,8 +14,8 @@ The page reads the actual agreement and chaser services, using same-origin Next.
 Override destinations with `AGREEMENT_AGENT_URL` and `CHASER_AGENT_URL` when building Next.js.
 Google profile sign-in remains separate on 8771, through the existing account page. The older
 investigation/review/demo screens retain their demo state; their clock controls are hidden on
-the new live agent page. Reads do not need a controller token. Controller writes require the
-server's `CONTROLLER_API_TOKEN`, kept only in page memory and forwarded in Authorization.
+the new live agent page. There is no API token: controller decisions (confirm, reject, approve,
+evidence, delivery receipts, resolution) are plain requests recorded as made by `controller`.
 
 Added read-only invoice list/detail endpoints and a no-write daily preview. Saved daily runs
 reject dates beyond `rails.now()`; future dates are allowed for preview only. Backend approval
@@ -41,8 +41,7 @@ source .venv/bin/activate
 python -m chaser_agent.api
 ```
 
-These load `.env`. Set the same `CONTROLLER_API_TOKEN` in both API environments to use human
-sign-off. This token is separate from `ANTHROPIC_API_KEY`. No token is needed to see saved data.
+These load `.env` (`ANTHROPIC_API_KEY` for Claude). No sign-in or token is needed.
 The chaser's automatic loop stays off unless `CHASER_DAILY=on`; Run and save actions triggers an
 explicit check. PostgreSQL and the configured SpacetimeDB database must be available.
 

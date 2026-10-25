@@ -8,7 +8,7 @@ Triggers
                                (default 86400, once a day)
 Reads
     GET  /chaser/actions       every recorded action (reminders, escalations, hand-offs, holds)
-Controller (Authorization: Bearer $CONTROLLER_API_TOKEN)
+Controller decisions
     POST /chaser/actions/{action_id}/decide   {"approve": true|false, "note": "..."}
          approves or declines a firm / escalation reminder, or an escalation and its hold
     GET  /chaser/patterns      how regularly each vendor is paid late (worst first)
@@ -38,7 +38,7 @@ from typing import Annotated, Any, Literal
 
 import psycopg
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -347,9 +347,9 @@ class DecideIn(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
-def _controller(authorization: str | None = Header(default=None)) -> str:
+def _controller() -> str:
     from agreement_agent.api import controller
-    return controller(authorization)
+    return controller()
 
 
 @app.post("/chaser/actions/{action_id}/decide")

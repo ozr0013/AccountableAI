@@ -11,16 +11,14 @@ Each review is saved to SpacetimeDB's `agreement` table (one row per document, r
 re-review), and the rules derived from it (agreement_agent/rules_from_terms.py) to
 `agreement_rule`. The file itself is not stored; the escalation stays a draft, never sent.
 
-A complete agreement's rules go active. An incomplete one waits as `needs_controller`; only a
-controller (Authorization: Bearer $CONTROLLER_API_TOKEN) can then confirm it by supplying the
-missing terms, or reject it:
+A complete agreement's rules go active. An incomplete one waits as `needs_controller` until the
+controller confirms it by supplying the missing terms, or rejects it:
     GET  /agreements, GET /agreements/{doc_id}
     POST /agreements/{doc_id}/confirm  {"values": {"payment_due": "...", ...}, "note": "..."}
     POST /agreements/{doc_id}/reject   {"note": "..."}
 """
 from __future__ import annotations
 
-import hmac
 import json
 import logging
 import os
@@ -34,7 +32,7 @@ from pathlib import Path
 from typing import Annotated
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Header, HTTPException, Query, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
 from .controller import ControllerError, confirm, reject
@@ -172,14 +170,12 @@ async def review_document(file: Annotated[UploadFile, File(...)],
 _DOC_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
-def controller(authorization: str | None = Header(default=None)) -> str:
-    expected = os.getenv("CONTROLLER_API_TOKEN")
-    if not expected:
-        raise HTTPException(503, "controller sign-off is not configured (CONTROLLER_API_TOKEN)")
-    if authorization is None or not hmac.compare_digest(authorization.encode(),
-                                                        f"Bearer {expected}".encode()):
-        raise HTTPException(401, "controller token required")
-    return os.getenv("CONTROLLER_ID", "controller")
+APPROVER = "controller"
+
+
+def controller() -> str:
+    """Who human decisions are recorded as. No sign-in: every decision is the controller's."""
+    return APPROVER
 
 
 class ConfirmIn(BaseModel):

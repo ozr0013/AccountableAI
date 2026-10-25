@@ -16,7 +16,6 @@ COLUMNS = ('action_id','invoice_id','vendor_name','action','level','due_date','d
 RULE = {'rule_id':'agreement:deadline','vendor_name':'Rio Grande Plumbing LLC',
         'rule_type':'pay_within_days','params':'{"days":30,"basis":"calendar"}',
         'status':'active','check':'Pay within30days','source_quote':'within thirty days'}
-AUTH = {'Authorization':'Bearer test-controller'}
 
 
 def plain(value):
@@ -51,7 +50,6 @@ def fixture(monkeypatch):
     mirror=Mirror()
     monkeypatch.setattr(api,'_rails',lambda:rails)
     monkeypatch.setattr(api,'_mirror',lambda:mirror)
-    monkeypatch.setenv('CONTROLLER_API_TOKEN','test-controller')
     api._last.clear()
     return rails,mirror,TestClient(api.app)
 
@@ -90,7 +88,7 @@ def firm(client):
     client.post('/chaser/run?as_of=2026-04-22')
     case=client.get('/workflow/cases').json()['cases'][0]
     outbox=next(o for o in case['outbox'] if o['kind']=='chase_reminder' and o['status']=='queued')
-    assert client.post(f"/workflow/outbox/{outbox['id']}/ack",json={'reference':'test-delivery'},headers=AUTH).status_code==200
+    assert client.post(f"/workflow/outbox/{outbox['id']}/ack",json={'reference':'test-delivery'}).status_code==200
     rails.now=lambda:date(2026,4,27)
     out=client.post('/chaser/run?as_of=2026-04-27').json()
     return next(d for d in out['decisions'] if d['level']=='firm')
@@ -100,11 +98,10 @@ def test_controller_decides_exact_action_and_repeat_is_blocked(fixture):
     _,_,client=fixture
     action=firm(client)
     route=f"/chaser/actions/{action['action_id']}/decide"
-    assert client.post(route,json={'approve':True}).status_code==401
-    approved=client.post(route,json={'approve':True,'note':'Reviewed'},headers=AUTH)
+    approved=client.post(route,json={'approve':True,'note':'Reviewed'})
     assert approved.status_code==200,approved.text
     assert approved.json()['status']=='approved'
-    assert client.post(route,json={'approve':True},headers=AUTH).status_code==409
+    assert client.post(route,json={'approve':True}).status_code==409
 
 
 def test_payment_arriving_blocks_stale_approval_but_allows_rejection(fixture):
@@ -115,9 +112,9 @@ def test_payment_arriving_blocks_stale_approval_but_allows_rejection(fixture):
                   'vendor_id':'v-riogrande','amount':1240,'on':'2026-04-29'}]})
     rails.append_event(document_event(bank))
     route=f"/chaser/actions/{action['action_id']}/decide"
-    response=client.post(route,json={'approve':True},headers=AUTH)
+    response=client.post(route,json={'approve':True})
     assert response.status_code==409,response.text
-    assert client.post(route,json={'approve':False,'note':'Payment found'},headers=AUTH).status_code==200
+    assert client.post(route,json={'approve':False,'note':'Payment found'}).status_code==200
 
 
 def test_dependency_failure_is_structured_for_dashboard(fixture,monkeypatch):
@@ -146,7 +143,7 @@ def test_changed_cadence_invalidates_pending_reminder(fixture):
     action=firm(client)
     mirror.rules.append({**RULE,'rule_id':'agreement:cadence','rule_type':'reminder_cadence',
                          'params':'{"days":365}','check':'Wait365days'})
-    response=client.post(f"/chaser/actions/{action['action_id']}/decide",json={'approve':True},headers=AUTH)
+    response=client.post(f"/chaser/actions/{action['action_id']}/decide",json={'approve':True})
     assert response.status_code==409,response.text
 
 
@@ -154,7 +151,7 @@ def test_future_draft_cannot_be_approved_before_its_date(fixture):
     rails,_,client=fixture
     action=firm(client)
     rails.now=lambda:date(2026,4,22)
-    response=client.post(f"/chaser/actions/{action['action_id']}/decide",json={'approve':True},headers=AUTH)
+    response=client.post(f"/chaser/actions/{action['action_id']}/decide",json={'approve':True})
     assert response.status_code==409,response.text
 
 
@@ -162,7 +159,7 @@ def test_still_eligible_draft_can_be_approved_later(fixture):
     rails,_,client=fixture
     action=firm(client)
     rails.now=lambda:date(2026,4,30)
-    response=client.post(f"/chaser/actions/{action['action_id']}/decide",json={'approve':True},headers=AUTH)
+    response=client.post(f"/chaser/actions/{action['action_id']}/decide",json={'approve':True})
     assert response.status_code==200,response.text
 
 

@@ -68,7 +68,7 @@ function DecisionView({decision}: {decision: Decision}) {
     {decision.rule_quote && <p className="micro muted">Rule: {decision.rule_quote}</p>}
   </article>;
 }
-function EvidenceIntake({invoiceId,vendorId,token,busy,onSubmit}: {invoiceId: string; vendorId?: string; token: string; busy: boolean; onSubmit: (body: EvidenceInput) => void}) {
+function EvidenceIntake({invoiceId,vendorId,busy,onSubmit}: {invoiceId: string; vendorId?: string; busy: boolean; onSubmit: (body: EvidenceInput) => void}) {
   const [kind,setKind] = useState<EvidenceInput["kind"]>("vendor_invoice");
   const [fields,setFields] = useState({invoice_id:invoiceId,vendor_id:vendorId ?? "",amount:"",on:"",payee:"",account:"",routing:"",bank:"",reference:"",invoice_date:"",replaces:""});
   function field(name: keyof typeof fields, label: string, required = false, type = "text") {
@@ -100,10 +100,10 @@ function EvidenceIntake({invoiceId,vendorId,token,busy,onSubmit}: {invoiceId: st
     {field("replaces","Corrects document ID (optional)")}
     <p className="micro muted">For a correction, paste the prior document ID from the case timeline. The replacement preserves the original evidence history.</p>
     <p className="micro muted">Use the exact recipient details from the evidence. Missing or conflicting proof remains an open finding for review.</p>
-    <button className="pill" type="submit" disabled={busy || !token.trim()}>Save evidence and reconcile</button>
+    <button className="pill" type="submit" disabled={busy}>Save evidence and reconcile</button>
   </form>;
 }
-function OutboxItem({item,token,busy,onAcknowledge}: {item: WorkflowOutbox; token: string; busy: boolean; onAcknowledge: (id: string, reference: string) => void}) {
+function OutboxItem({item,busy,onAcknowledge}: {item: WorkflowOutbox; busy: boolean; onAcknowledge: (id: string, reference: string) => void}) {
   const [reference,setReference] = useState("");
   return <article className="doc stack" style={{gap:10}}>
     <div className="between"><strong>{item.kind} · {item.audience}</strong><span className="tag neutral">{item.status==="queued" ? "Queued · awaiting delivery" : item.status==="delivered" ? "Delivery acknowledged" : item.status.replaceAll("_"," ")}</span></div>
@@ -113,14 +113,13 @@ function OutboxItem({item,token,busy,onAcknowledge}: {item: WorkflowOutbox; toke
     {item.status==="needs_approval" && <p className="micro muted">{item.kind==="review_anomaly" ? "Review this case’s findings and use the controller resolution note above when all required evidence is verified." : <a href="#controller-approvals">Review the pending controller decision below.</a>}</p>}
     {item.status==="queued" && <form className="stack" style={{gap:8}} onSubmit={event=>{event.preventDefault();onAcknowledge(item.id,reference.trim());}}>
       <label className="body">External delivery reference<input className="input" required maxLength={500} value={reference} disabled={busy} onChange={event=>setReference(event.target.value)} placeholder="Receipt or message ID after delivering outside this app"/></label>
-      <button className="pill" type="submit" disabled={busy || !token.trim() || !reference.trim()}>Record completed external delivery</button>
+      <button className="pill" type="submit" disabled={busy || !reference.trim()}>Record completed external delivery</button>
     </form>}
   </article>;
 }
 
 export default function AgentWorkflow() {
   const [revision, setRevision] = useState(0);
-  const [token, setToken] = useState("");
   const [busy, setBusy] = useState(""); const busyRef = useRef(false);
   const [notice, setNotice] = useState(""); const [error, setError] = useState("");
   const [docId, setDocId] = useState(""); const [invoiceId, setInvoiceId] = useState("");
@@ -166,7 +165,7 @@ export default function AgentWorkflow() {
     <div className="top"><div className="stack" style={{gap:6}}><h1 className="display h2">Agent workflow</h1><p className="body muted">Agreement terms connect invoice monitoring, payment evidence, findings and statement reconciliation. Queued drafts await delivery.</p></div><div className="top-meta"><span className="chip live">Live agent APIs</span>{invoices.data?.as_of && <span className="chip">World date: {invoices.data.as_of}</span>}</div></div>
     <div className="between" style={{gap:16,marginBottom:20,flexWrap:"wrap"}}>
       <button className="pill" disabled={!!busy} onClick={refresh}>Refresh live data</button>
-      <label className="body">Controller token <input className="input" type="password" autoComplete="off" value={token} disabled={!!busy} onChange={event=>setToken(event.target.value)} placeholder="Kept only in this page’s memory"/></label>
+      
     </div>
     <div className="grid g2">
       {([["Agreement service",agreementHealth],["Chaser service",chaserHealth]] as const).map(([label,health]) => <div key={label} className="card"><strong>{label}</strong><ReadState error={health.error} loading={!health.data}><p>{health.data?.ok ? "API reachable" : "API not healthy"} · Claude key {health.data?.model_available ? "configured" : "not configured"}</p><small className="muted">Data dependencies are checked by each read below.</small></ReadState></div>)}
@@ -192,10 +191,10 @@ export default function AgentWorkflow() {
         {!docId ? <p className="muted">Select an agreement to inspect its rules.</p> : <ReadState error={agreement.error} loading={!selectedAgreement}>
           {selectedAgreement && <><p>{selectedAgreement.filename} · {selectedAgreement.vendor_name} · {selectedAgreement.status}</p><Rules rules={selectedAgreement.rules}/>
             {selectedAgreement.status === "needs_controller" && <><h3>Controller sign-off</h3>{missingTerms.map(term=><label key={term} className="body">{term}<input className="input" maxLength={500} value={values[term] ?? ""} disabled={!!busy} onChange={event=>setValues(current=>({...current,[term]:event.target.value}))}/></label>)}
-              <div className="row"><button className="pill" disabled={!!busy || !token.trim() || missingTerms.some(term=>!values[term]?.trim())} onClick={()=>perform("Confirm agreement",async()=>{const result=await api.confirm(docId,values,note,token);return ["Agreement confirmed.",deferredWorkflowMessage(result.workflow)].filter(Boolean).join(" ");})}>Confirm missing terms</button>
+              <div className="row"><button className="pill" disabled={!!busy || missingTerms.some(term=>!values[term]?.trim())} onClick={()=>perform("Confirm agreement",async()=>{const result=await api.confirm(docId,values,note);return ["Agreement confirmed.",deferredWorkflowMessage(result.workflow)].filter(Boolean).join(" ");})}>Confirm missing terms</button>
                 </div></>}
             {selectedAgreement.missing.some(term=>!missingTerms.includes(term)) && <p className="micro muted">Other missing metadata: {selectedAgreement.missing.filter(term=>!missingTerms.includes(term)).join(", ")}. These fields are not accepted by controller confirmation.</p>}
-            {canRejectAgreement(selectedAgreement) && <><label className="body">Review note (required to reject)<textarea className="input" maxLength={1000} value={note} disabled={!!busy} onChange={event=>setNote(event.target.value)}/></label><button className="pill" disabled={!!busy || !token.trim() || !note.trim()} onClick={()=>perform("Reject agreement",async()=>{const result=await api.reject(docId,note,token);return ["Agreement rejected.",deferredWorkflowMessage(result.workflow)].filter(Boolean).join(" ");})}>Reject agreement</button></>}
+            {canRejectAgreement(selectedAgreement) && <><label className="body">Review note (required to reject)<textarea className="input" maxLength={1000} value={note} disabled={!!busy} onChange={event=>setNote(event.target.value)}/></label><button className="pill" disabled={!!busy || !note.trim()} onClick={()=>perform("Reject agreement",async()=>{const result=await api.reject(docId,note);return ["Agreement rejected.",deferredWorkflowMessage(result.workflow)].filter(Boolean).join(" ");})}>Reject agreement</button></>}
             <details><summary>Saved agreement record</summary><Json value={selectedAgreement}/></details></>}
         </ReadState>}
       </section>
@@ -217,18 +216,18 @@ export default function AgentWorkflow() {
     </section>
     <div className="grid g2" style={{marginTop:16}}>
       <section className="card stack" style={{gap:14}}>
-        <EvidenceIntake key={`${invoiceId}:${selectedCase?.vendor_id ?? ""}`} invoiceId={invoiceId} vendorId={selectedCase?.vendor_id} token={token} busy={!!busy} onSubmit={body=>perform("Save evidence",async()=>{const result=await api.evidence(body,token);selectInvoice(body.invoice_id);return `Evidence ${result.document_id} saved; the linked case was reconciled.`;})}/>
+        <EvidenceIntake key={`${invoiceId}:${selectedCase?.vendor_id ?? ""}`} invoiceId={invoiceId} vendorId={selectedCase?.vendor_id} busy={!!busy} onSubmit={body=>perform("Save evidence",async()=>{const result=await api.evidence(body);selectInvoice(body.invoice_id);return `Evidence ${result.document_id} saved; the linked case was reconciled.`;})}/>
       </section>
       <section className="card stack" style={{gap:14}}><h2 className="h4 display">{selectedCase ? `${selectedCase.invoice_id} · ${selectedCase.state.replaceAll("_"," ")}` : "Case detail"}</h2>
         {!selectedCase ? <p className="muted">{invoiceId ? "No connected case is available for the selected invoice. Reconcile after adding its evidence." : "Select an invoice from the case list or invoice table."}</p> : <>
           <h3>Findings</h3>{selectedCase.findings.length ? selectedCase.findings.map((finding,index)=><article className="doc" key={`${finding.code}:${index}`}><strong>{finding.code.replaceAll("_"," ")}</strong><p>{finding.message}</p></article>) : <p className="muted">No current findings.</p>}
           <h3>Evidence sources</h3>{selectedCase.citations?.length ? selectedCase.citations.map(source=><p className="micro" key={source.source_id}>{source.kind.replaceAll("_"," ")} · <code>{source.source_id}</code></p>) : <p className="micro muted">{selectedCase.source_ids?.join(", ") || "No source documents recorded."}</p>}
           <h3>Case timeline</h3>{selectedCase.history.length ? <ol className="stack" style={{gap:10,paddingLeft:20}}>{selectedCase.history.map(event=><li key={event.id}><strong>{event.kind.replaceAll("_"," ")}</strong><p className="micro muted">{event.at}</p><details><summary>Event evidence</summary><Json value={event.payload}/></details></li>)}</ol> : <p className="muted">No case events recorded.</p>}
-          {selectedCase.state!=="closed" && <><label className="body">Controller resolution note<textarea className="input" maxLength={1000} value={resolveNote} disabled={!!busy} onChange={event=>setResolveNote(event.target.value)}/></label><p className="micro muted">Closure requires full verified payment and a reconciled statement. Your note acknowledges remaining findings; required missing evidence and unpaid amounts must be cleared first.</p><button className="pill" disabled={!!busy || !token.trim() || !resolveNote.trim() || selectedCase.closure_eligible===false} onClick={()=>perform("Resolve case",async()=>{await api.resolveCase(selectedCase.invoice_id,resolveNote.trim(),token);setResolveNote("");})}>Acknowledge findings and close case</button></>}
+          {selectedCase.state!=="closed" && <><label className="body">Controller resolution note<textarea className="input" maxLength={1000} value={resolveNote} disabled={!!busy} onChange={event=>setResolveNote(event.target.value)}/></label><p className="micro muted">Closure requires full verified payment and a reconciled statement. Your note acknowledges remaining findings; required missing evidence and unpaid amounts must be cleared first.</p><button className="pill" disabled={!!busy || !resolveNote.trim() || selectedCase.closure_eligible===false} onClick={()=>perform("Resolve case",async()=>{await api.resolveCase(selectedCase.invoice_id,resolveNote.trim());setResolveNote("");})}>Acknowledge findings and close case</button></>}
         </>}
       </section>
     </div>
-    {selectedCase && <section className="card stack" style={{gap:14,marginTop:16}}><h2 className="h4 display">{selectedCase.invoice_id} · communication outbox</h2><p className="muted">Queued communications await delivery. For an item delivered outside the app, record the receipt below. A controller approval authorizes delivery; the receipt confirms completion.</p>{selectedCase.outbox.length ? selectedCase.outbox.map(item=><OutboxItem key={item.id} item={item} token={token} busy={!!busy} onAcknowledge={(id,reference)=>perform("Record external delivery",async()=>{await api.acknowledgeOutbox(id,reference,token);return "External delivery acknowledgment recorded.";})}/>) : <p className="muted">No communication records for this case.</p>}</section>}
+    {selectedCase && <section className="card stack" style={{gap:14,marginTop:16}}><h2 className="h4 display">{selectedCase.invoice_id} · communication outbox</h2><p className="muted">Queued communications await delivery. For an item delivered outside the app, record the receipt below. A controller approval authorizes delivery; the receipt confirms completion.</p>{selectedCase.outbox.length ? selectedCase.outbox.map(item=><OutboxItem key={item.id} item={item} busy={!!busy} onAcknowledge={(id,reference)=>perform("Record external delivery",async()=>{await api.acknowledgeOutbox(id,reference);return "External delivery acknowledgment recorded.";})}/>) : <p className="muted">No communication records for this case.</p>}</section>}
 
     <SectionTitle>Invoice chasing</SectionTitle>
     <section className="card stack" style={{gap:14}}>
@@ -253,7 +252,7 @@ export default function AgentWorkflow() {
     <section className="card stack" id="controller-approvals" style={{gap:14}}>
       <p className="muted">Approvals record a controller decision. They do not deliver email or move money. Refresh before deciding if another controller may have acted.</p>
       <label>Decision note<textarea className="input" maxLength={1000} value={actionNote} disabled={!!busy} onChange={event=>setActionNote(event.target.value)}/></label>
-      <ReadState error={actions.error} loading={!actions.data}>{pending.length===0 && <p>No pending controller actions.</p>}{pending.map(action=><div key={action.action_id}><DecisionView decision={action}/><div className="row" style={{marginTop:8}}>{[true,false].map(approve=><button key={String(approve)} className="pill" disabled={!!busy || !token.trim()} onClick={()=>perform(`${approve ? "Approve" : "Reject"} ${action.invoice_id}`,async()=>{await api.decide(action.action_id,approve,actionNote,token);})}>{approve ? "Approve draft / proposal" : "Reject"}</button>)}</div></div>)}</ReadState>
+      <ReadState error={actions.error} loading={!actions.data}>{pending.length===0 && <p>No pending controller actions.</p>}{pending.map(action=><div key={action.action_id}><DecisionView decision={action}/><div className="row" style={{marginTop:8}}>{[true,false].map(approve=><button key={String(approve)} className="pill" disabled={!!busy} onClick={()=>perform(`${approve ? "Approve" : "Reject"} ${action.invoice_id}`,async()=>{await api.decide(action.action_id,approve,actionNote);})}>{approve ? "Approve draft / proposal" : "Reject"}</button>)}</div></div>)}</ReadState>
       <details><summary>All recorded actions</summary>{actions.data?.map(action=><DecisionView key={action.action_id} decision={action}/>)}</details>
     </section>
     <SectionTitle>Vendor payment patterns</SectionTitle>

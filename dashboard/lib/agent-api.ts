@@ -20,14 +20,10 @@ export type EvidenceInput = { kind: 'vendor_invoice' | 'manager_bank' | 'manager
 type Options = { fetch?: typeof fetch; timeoutMs?: number };
 export function createAgentApi(options: Options = {}) {
   const fetcher = options.fetch ?? globalThis.fetch;
-  async function request<T>(service: 'agreement' | 'chaser', path: string, body?: unknown, token?: string): Promise<T> {
+  async function request<T>(service: 'agreement' | 'chaser', path: string, body?: unknown): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(new Error('Agent request timed out; refresh before retrying a write.')), options.timeoutMs ?? 120_000);
     const headers = new Headers();
-    if (token !== undefined) {
-      if (!token.trim()) { clearTimeout(timer); throw new Error('A controller token is required.'); }
-      headers.set('Authorization', `Bearer ${token.trim()}`);
-    }
     const multipart = body instanceof FormData;
     if (body !== undefined && !multipart) headers.set('Content-Type', 'application/json');
     try {
@@ -53,22 +49,22 @@ export function createAgentApi(options: Options = {}) {
     agreements: () => request<Agreement[]>('agreement', '/agreements'),
     agreement: (doc: string) => request<Agreement>('agreement', `/agreements/${id(doc)}`),
     review: (file: File, model: boolean) => { const form = new FormData(); form.set('file', file); return request<ReviewResult>('agreement', `/review?model=${model}`, form); },
-    confirm: (doc: string, values: Record<string,string>, note: string, token: string) => request<Agreement>('agreement', `/agreements/${id(doc)}/confirm`, {values,note}, token),
-    reject: (doc: string, note: string, token: string) => request<Agreement>('agreement', `/agreements/${id(doc)}/reject`, {note}, token),
+    confirm: (doc: string, values: Record<string,string>, note: string) => request<Agreement>('agreement', `/agreements/${id(doc)}/confirm`, {values,note}),
+    reject: (doc: string, note: string) => request<Agreement>('agreement', `/agreements/${id(doc)}/reject`, {note}),
     invoices: (status = 'all', vendor = '') => request<{as_of?: string; count: number; invoices: Invoice[]}>('chaser', `/chaser/invoices${query({status,vendor,limit:'50'})}`),
     invoice: (invoice: string) => request<InvoiceDetail>('chaser', `/chaser/invoices/${id(invoice)}`),
     preview: (asOf: string) => request<Run>('chaser', `/chaser/preview${asOf ? query({as_of:asOf}) : ''}`, {}),
     run: (asOf: string) => request<Run>('chaser', `/chaser/run${asOf ? query({as_of:asOf}) : ''}`, {}),
     actions: (invoice = '') => request<Action[]>('chaser', `/chaser/actions${invoice ? query({invoice_id:invoice}) : ''}`),
     patterns: (vendor = '') => request<Pattern[]>('chaser', `/chaser/patterns${vendor ? query({vendor}) : ''}`),
-    decide: (action: string, approve: boolean, note: string, token: string) => request<Action>('chaser', `/chaser/actions/${id(action)}/decide`, {approve,note}, token),
+    decide: (action: string, approve: boolean, note: string) => request<Action>('chaser', `/chaser/actions/${id(action)}/decide`, {approve,note}),
     ask: (question: string) => request<Answer>('chaser', '/chaser/ask', {question}),
     reply: (invoice: string, text: string) => request<{invoice_id: string; verdict: string; proof: string[]; read_by: string; claims_paid: boolean}>('chaser', '/chaser/reply', {invoice_id:invoice,text}),
     cases: () => request<WorkflowCases>('chaser', '/workflow/cases'),
     tick: () => request<WorkflowCases>('chaser', '/workflow/tick', {}),
-    evidence: (body: EvidenceInput, token: string) => request<{document_id: string; cases: WorkflowCase[]}>('chaser', '/workflow/evidence', body, token),
-    acknowledgeOutbox: (outbox: string, reference: string, token: string) => request<{status: 'delivered'}>('chaser', `/workflow/outbox/${id(outbox)}/ack`, {reference}, token),
-    resolveCase: (invoice: string, note: string, token: string) => request<WorkflowCase>('chaser', `/workflow/cases/${id(invoice)}/resolve`, {note}, token),
+    evidence: (body: EvidenceInput) => request<{document_id: string; cases: WorkflowCase[]}>('chaser', '/workflow/evidence', body),
+    acknowledgeOutbox: (outbox: string, reference: string) => request<{status: 'delivered'}>('chaser', `/workflow/outbox/${id(outbox)}/ack`, {reference}),
+    resolveCase: (invoice: string, note: string) => request<WorkflowCase>('chaser', `/workflow/cases/${id(invoice)}/resolve`, {note}),
   };
 }
 

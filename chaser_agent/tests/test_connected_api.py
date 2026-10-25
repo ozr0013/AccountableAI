@@ -5,7 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from chaser_agent import api
-from chaser_agent.tests.test_api import AUTH, Mirror
+from chaser_agent.tests.test_api import Mirror
 from workflow.memrails import MemoryRails
 
 
@@ -16,7 +16,6 @@ def connected(monkeypatch):
     mirror = Mirror()
     monkeypatch.setattr(api, '_rails', lambda: rails)
     monkeypatch.setattr(api, '_mirror', lambda: mirror)
-    monkeypatch.setenv('CONTROLLER_API_TOKEN', 'test-controller')
     return rails, mirror, TestClient(api.app)
 
 
@@ -24,13 +23,12 @@ def test_evidence_requires_controller_and_ingests_invoice(connected):
     rails, _, client = connected
     body = {'kind':'vendor_invoice','invoice_id':'INV-KW-9998','vendor_id':'v-riogrande',
             'amount':400,'on':'2026-04-01'}
-    assert client.post('/workflow/evidence', json=body).status_code == 401
-    response = client.post('/workflow/evidence', json=body, headers=AUTH)
+    response = client.post('/workflow/evidence', json=body)
     assert response.status_code == 200, response.text
     assert any(line.invoice_id == body['invoice_id'] for line in rails.ledger('keyway'))
     assert any(case['invoice_id'] == body['invoice_id'] for case in response.json()['cases'])
     count = len(rails.events())
-    assert client.post('/workflow/evidence', json=body, headers=AUTH).status_code == 200
+    assert client.post('/workflow/evidence', json=body).status_code == 200
     assert len(rails.events()) == count
 
 
@@ -38,14 +36,14 @@ def test_bank_and_statement_intake_advances_case_without_manual_tick(connected):
     _, _, client = connected
     bank = {'kind':'manager_bank','invoice_id':'INV-KW-0301','vendor_id':'v-riogrande',
             'amount':1240,'on':'2026-04-02','payee':'Rio Grande Plumbing LLC'}
-    response = client.post('/workflow/evidence', json=bank, headers=AUTH)
+    response = client.post('/workflow/evidence', json=bank)
     assert response.status_code == 200, response.text
     case = next(row for row in response.json()['cases'] if row['invoice_id'] == bank['invoice_id'])
     assert case['state'] != 'chasing'
     assert any(row['kind'] == 'request_statement' for row in case['outbox'])
     statement = {'kind':'manager_statement','invoice_id':bank['invoice_id'],'amount':1240,
                  'on':'2026-04-03'}
-    response = client.post('/workflow/evidence', json=statement, headers=AUTH)
+    response = client.post('/workflow/evidence', json=statement)
     assert response.status_code == 200, response.text
     case = next(row for row in response.json()['cases'] if row['invoice_id'] == bank['invoice_id'])
     assert case['state'] == 'closed', case
@@ -56,16 +54,16 @@ def test_rejects_unknown_invoice_vendor_future_and_duplicate_conflict(connected)
     _, _, client = connected
     body = {'kind':'vendor_invoice','invoice_id':'INV-KW-9998','vendor_id':'v-missing',
             'amount':400,'on':'2026-04-01'}
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code == 422
+    assert client.post('/workflow/evidence',json=body).status_code == 422
     body['vendor_id']='v-riogrande'
     body['on']='2099-01-01'
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code == 422
+    assert client.post('/workflow/evidence',json=body).status_code == 422
     body.update(kind='manager_bank', on='2026-04-01')
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code == 404
+    assert client.post('/workflow/evidence',json=body).status_code == 404
     body.update(kind='vendor_invoice')
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code == 200
+    assert client.post('/workflow/evidence',json=body).status_code == 200
     body['amount']=401
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code == 409
+    assert client.post('/workflow/evidence',json=body).status_code == 409
 
 
 def test_tick_is_connected_and_requires_no_external_mail(connected):
@@ -80,15 +78,15 @@ def test_bank_correction_supersedes_instead_of_double_counting(connected):
     rails, _, client = connected
     body={'kind':'manager_bank','invoice_id':'INV-KW-0301','vendor_id':'v-riogrande',
           'amount':1240,'on':'2026-04-02','reference':'bank-ref-1'}
-    first=client.post('/workflow/evidence',json=body,headers=AUTH)
+    first=client.post('/workflow/evidence',json=body)
     assert first.status_code==200
     body['payee']='Rio Grande Plumbing LLC'
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code==409
+    assert client.post('/workflow/evidence',json=body).status_code==409
     body['replaces']=first.json()['document_id']
-    fixed=client.post('/workflow/evidence',json=body,headers=AUTH)
+    fixed=client.post('/workflow/evidence',json=body)
     assert fixed.status_code==200,fixed.text
     assert next(line for line in rails.ledger('keyway') if line.invoice_id==body['invoice_id']).paid_amount==1240
-    assert client.post('/workflow/evidence',json=body,headers=AUTH).status_code==200
+    assert client.post('/workflow/evidence',json=body).status_code==200
 
 
 def test_queued_is_not_delivered_and_cadence_starts_at_receipt(connected):
@@ -100,7 +98,7 @@ def test_queued_is_not_delivered_and_cadence_starts_at_receipt(connected):
     rails.now=lambda:date(2026,4,27)
     waiting=client.post('/chaser/run').json()['decisions'][0]
     assert waiting['action']=='wait' and 'delivery' in waiting['reason']
-    response=client.post(f"/workflow/outbox/{outbox['id']}/ack",headers=AUTH,
+    response=client.post(f"/workflow/outbox/{outbox['id']}/ack",
                           json={'reference':'external-message-1'})
     assert response.status_code==200,response.text
     assert client.post('/chaser/run').json()['decisions'][0]['action']=='wait'
@@ -154,7 +152,7 @@ def test_native_multi_invoice_bank_correction_preserves_other_rows(connected):
     rails.append_event(document_event(native))
     body={'kind':'manager_bank','invoice_id':'INV-KW-0301','vendor_id':'v-riogrande',
         'amount':1240,'on':'2026-04-02','payee':'Rio Grande Plumbing LLC','replaces':native.id}
-    response=client.post('/workflow/evidence',json=body,headers=AUTH)
+    response=client.post('/workflow/evidence',json=body)
     assert response.status_code==200,response.text
     corrected=next(d for d in rails.documents('keyway') if d.id==response.json()['document_id'])
     assert any(p['invoice_id']=='INV-KW-9997' for p in corrected.data['payments'])
@@ -171,7 +169,7 @@ def test_multi_vendor_statement_correction_keeps_envelope_vendor_neutral(connect
     rails.append_event(document_event(native))
     body={'kind':'manager_statement','invoice_id':'INV-KW-0301','vendor_id':'v-riogrande',
         'amount':1240,'on':'2026-04-02','replaces':native.id}
-    response=client.post('/workflow/evidence',json=body,headers=AUTH)
+    response=client.post('/workflow/evidence',json=body)
     assert response.status_code==200,response.text
     corrected=next(d for d in rails.documents('keyway') if d.id==response.json()['document_id'])
     assert corrected.vendor_id is None
