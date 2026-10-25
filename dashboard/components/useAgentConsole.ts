@@ -41,10 +41,13 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
 
 export function useAgentConsole() {
   const [cards, setCards] = useState<LiveCard[]>([]);
+  const cardsRef = useRef<LiveCard[]>([]);
+  cardsRef.current = cards;
   const [lit, setLit] = useState<Set<string>>(new Set());
   const [active, setActive] = useState<Set<string>>(new Set());
   const [run, setRun] = useState<AgentRun | null>(null);
   const [connected, setConnected] = useState(false);
+  const [doing, setDoing] = useState<string | null>(null);   // what is happening right now, in words
   const runningRef = useRef(false);
   const doneWaiter = useRef<(() => void) | null>(null);
   const dayCard = useRef<string | null>(null);
@@ -60,6 +63,8 @@ export function useAgentConsole() {
     return key;
   };
   const patch = (key: string, f: (c: LiveCard) => LiveCard) => setCards((cs) => cs.map((c) => (c.key === key ? f(c) : c)));
+  const agentName = (taskId: string) => cardsRef.current.find((c) => c.key === agentCard.current[taskId])?.who ?? "The agent";
+  const say = (text: string | null) => setDoing((d) => (d === text ? d : text));
   const log = (text: string) => setRun((r) => (r ? { ...r, log: [...r.log, text] } : r));
 
   useEffect(() => {
@@ -70,11 +75,13 @@ export function useAgentConsole() {
       es.addEventListener(type, (e) => { if (runningRef.current) f(JSON.parse((e as MessageEvent).data)); });
 
     on("fact", (m) => {
+      say("Your fact is filed. The investigator will check it against the books.");
       light("you", "you>log", "log");
       add({ who: "Your fact", tone: "src", status: "done", title: `\u201c${m.text}\u201d`,
         lines: [{ kind: "check", text: "A fact is a claim, not evidence: the investigator verifies it against the books" }] });
     });
     on("day_started", (m) => {
+      say(`${fmtDay(m.day)} begins: new paperwork arrives and the agents wake on their own.`);
       light("clock", "clock>log", "log");
       dayCard.current = add({ who: "Clock", tone: "src", status: "done", title: `${fmtDay(m.day)} begins: the agents wake on their own`, lines: [] });
       setRun((r) => (r ? { ...r, day: m.day } : r));
@@ -90,6 +97,7 @@ export function useAgentConsole() {
         lines: Object.entries(m.paid || {}).map(([inv, [a, b]]: any) => ({ kind: "evidence" as const, text: `${inv}: paid $${a} \u2192 $${b}` })) });
     });
     on("reader", (m) => {
+      say(`The reader is reading ${m.file}.`);
       light("inbox", "inbox>reader", "reader");
       add({ who: "Reader", tone: "src", status: m.kinds?.length ? "done" : "quiet",
         title: m.kinds?.length ? `Read ${m.file} as ${m.kinds.map(words).join(", ")}` : `Nothing usable in ${m.file}`,
@@ -97,6 +105,7 @@ export function useAgentConsole() {
           ...(m.flags || []).map((f: string) => ({ kind: "check" as const, text: f }))] });
     });
     on("filed", (m) => {
+      say("Filing what it read in the event log.");
       light("reader>log", "log");
       add({ who: "Event log", tone: "check", status: m.documents?.length ? "done" : "quiet",
         title: m.documents?.length ? `Filed ${m.documents.length} document(s) in the books` : "Already in the books; nothing new filed",
@@ -104,6 +113,7 @@ export function useAgentConsole() {
       (m.documents || []).forEach((d: string) => log(`Filed ${d.replace(/^raw:inbox\//, "")}`));
     });
     on("checks", (m) => {
+      say("Running the automatic checks on every invoice it touches.");
       light("log>router", "router");
       const entries = Object.entries(m.findings || {}) as [string, string[]][];
       const flagged = entries.filter(([, codes]) => codes.length);
@@ -116,12 +126,14 @@ export function useAgentConsole() {
     on("task_started", (m) => {
       const w = WHO[m.agent] || { who: m.agent, box: "router" };
       light("router>" + w.box, w.box);
+      say(`${w.who} woke up for ${m.invoice_id === "portfolio" ? "all invoices" : m.invoice_id}${m.reason ? `: ${m.reason}` : ""}`);
       agentCard.current[m.task_id] = add({ who: w.who, tone: "agent", status: "working",
         title: `${m.invoice_id === "portfolio" ? "All invoices" : m.invoice_id}`, question: m.reason });
     });
     on("thinking", (m) => {
       const k = agentCard.current[m.task_id];
       if (!k) return;
+      say(`${agentName(m.task_id)} is reasoning about the evidence.`);
       patch(k, (c) => {
         const last = c.lines[c.lines.length - 1];
         if (last?.kind === "thinking") return { ...c, lines: [...c.lines.slice(0, -1), { ...last, text: last.text + m.text }] };
@@ -131,11 +143,13 @@ export function useAgentConsole() {
     on("query", (m) => {
       const k = agentCard.current[m.task_id];
       if (!k) return;
+      say(`${agentName(m.task_id)} is querying the books: ${m.purpose}`);
       patch(k, (c) => ({ ...c, lines: [...c.lines, { kind: "sql", text: m.error ? `${m.purpose}: refused (${m.error})` : `${m.purpose}: ${m.row_count} rows`,
         rows: m.rows, columns: m.columns }] }));
     });
     on("tool_call", (m) => {
       const k = agentCard.current[m.task_id];
+      if (k && m.tool !== "query_books") say(`${agentName(m.task_id)} is using ${words(m.tool)}.`);
       if (k && m.tool !== "query_books") patch(k, (c) => ({ ...c, lines: [...c.lines, { kind: "check", text: `uses ${words(m.tool)}` }] }));
     });
     on("task_done", (m) => {
@@ -147,15 +161,18 @@ export function useAgentConsole() {
       patch(k, (c) => ({ ...c, status: m.status === "failed" ? "failed" : raised ? "raised" : "done",
         title: `${c.title} · ${verdict}`, lines: [...c.lines, { kind: "result", text: o.summary || o.rationale || o.error || verdict }] }));
       const box = WHO[m.agent]?.box || "router";
+      say(`${WHO[m.agent]?.who || m.agent} finished ${m.invoice_id}: ${verdict}.`);
       if (raised) light(box + ">verifier", "verifier", "verifier>owner", "owner");
       log(`${WHO[m.agent]?.who || m.agent} on ${m.invoice_id}: ${verdict}`);
     });
     on("flag_raised", (m) => {
+      say(`A flag on ${m.invoice_id} is waiting for the controller.`);
       light("gate>controller", "controller");
       add({ who: "Controller queue", tone: "out", status: "raised", title: `Flag on ${m.invoice_id}: ${words(m.kind)}`,
         lines: [{ kind: "result", text: m.summary || "" }] });
     });
     on("email_sent", (m) => {
+      say("A message to Keyway Management passed the policy gate.");
       light("gate", "gate>email", "email");
       add({ who: "Keyway Management email", tone: "out", status: m.simulated ? "quiet" : "sent",
         title: `${m.simulated ? "Recorded (sending is off)" : "Sent"}: ${m.subject || m.kind}`,
@@ -169,6 +186,7 @@ export function useAgentConsole() {
     });
     on("console_done", (m) => {
       runningRef.current = false;
+      say(null);
       setActive(new Set());
       setRun((r) => (r ? { ...r, status: m.ok === false ? "failed" : "done", error: m.error, books: m.books,
         usage: m.usage, day: m.day ?? r.day, summary: m.ok === false ? m.error : summarize(m) } : r));
@@ -183,9 +201,11 @@ export function useAgentConsole() {
     agentCard.current = {};
     setCards([]); setLit(new Set()); setActive(new Set());
     setRun({ label, status: "running", emails: 0, log: [] });
+    say("Sent to the agents. Waiting for the first one to wake up.");
   };
   const fail = (e: unknown) => {
     runningRef.current = false;
+    say(null);
     setRun((r) => ({ ...(r ?? { label: "", emails: 0, log: [] }), status: "failed", error: String((e as Error)?.message || e) }));
   };
 
@@ -226,7 +246,7 @@ export function useAgentConsole() {
     setCards([]); setLit(new Set()); setActive(new Set()); setRun(null);
   }, []);
 
-  return { cards, lit, active, run, connected, busy: run?.status === "running", sendSample, sendUpload, resetBooks,
+  return { cards, lit, active, run, connected, doing, busy: run?.status === "running", sendSample, sendUpload, resetBooks,
     sendEmail, tellFact, advance, play, stop };
 }
 

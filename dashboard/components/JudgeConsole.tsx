@@ -11,6 +11,7 @@ import { useFeed } from "./Feed";
 import { money } from "@/lib/format";
 import type { ActionResult, Books, Diff } from "@/lib/types";
 import { type LiveCard, useAgentConsole } from "./useAgentConsole";
+import { WhereNow } from "./WhereNow";
 
 type Ok = Extract<ActionResult, { ok: true }>;
 type Sample = { file: string; label: string; flow: string; expect: string };
@@ -302,6 +303,12 @@ export function JudgeConsole() {
         {playing && <button className="pill" onClick={() => { skip.current = true; waiters.current.forEach((w) => w()); }}>Skip to result</button>}
         {playing && auto && <button className="pill" onClick={() => { halt.current = true; skip.current = true; waiters.current.forEach((w) => w()); }}>Stop</button>}
       </div>
+
+      <WhereNow
+        lit={agentRun ? agent.lit : lit} active={agentRun ? agent.active : active}
+        running={agentRun ? agentRun.status === "running" : playing} started={!!(agentRun || run)}
+        stalled={agentRun?.status === "running" && !agent.connected}
+        doing={agentRun ? agent.doing : playing && cards[shown - 1] ? `${cards[shown - 1].who}: ${named(cards[shown - 1].title)}` : null} />
 
       <div className="jc-map"><EngineFlow lit={agentRun ? agent.lit : lit} active={agentRun ? agent.active : active} label={agentRun ? agentRun.label : run ? run.summary : "Waiting"} /></div>
 

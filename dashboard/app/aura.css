@@ -627,3 +627,25 @@
 /* the logo mark beside the wordmark */
 .wordmark { display: inline-flex; align-items: center; gap: 10px; }
 .wordmark-mark { width: 1.3em; height: 1.3em; flex: none; display: block; }
+
+/* Judge Console: where the work is now */
+.wn { margin-top: 12px; display: grid; gap: 10px; }
+.wn-now { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0; font-size: calc(14px * var(--dashboard-type-scale, 1)); color: var(--n10); }
+.wn-now b { color: var(--o-ink); font-weight: 600; }
+.wn-now span:not(.wn-dot) { flex: 1 1 280px; min-width: 0; }
+.wn-now em { font: calc(11px * var(--dashboard-type-scale, 1)) var(--mono); font-style: normal; color: var(--n9); }
+.wn-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--n9); align-self: center; flex: none; }
+.wn-now.live .wn-dot { background: #1d4ed8; animation: wn-pulse 1.2s ease-in-out infinite; }
+@keyframes wn-pulse { 50% { opacity: .25; transform: scale(.7); } }
+@media (prefers-reduced-motion: reduce) { .wn-now.live .wn-dot { animation: none; } }
+.wn-stages { display: flex; flex-wrap: wrap; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.wn-stages li { padding: 4px 10px; border: 1px solid var(--box-line); font-size: calc(12px * var(--dashboard-type-scale, 1)); color: var(--n9); background: #fff; }
+.wn-stages li.done { color: var(--o-ink); border-color: var(--n9); }
+.wn-stages li.now { color: #fff; background: #1d4ed8; border-color: #1d4ed8; }
+.wn-agents { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; list-style: none; margin: 0; padding: 0; }
+.wn-agents li { display: grid; gap: 2px; padding: 8px 10px; border: 1px dashed var(--box-line); background: #fff; font-size: calc(12px * var(--dashboard-type-scale, 1)); color: var(--n9); }
+.wn-agents li b { font-weight: 600; color: var(--o-ink); }
+.wn-agents li.done { border-style: solid; border-color: var(--n9); }
+.wn-agents li.now { border: 1px solid #1d4ed8; box-shadow: inset 3px 0 0 #1d4ed8; }
+.wn-agents li.now span { color: #1d4ed8; }
+@media (max-width: 760px) { .wn-agents { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
