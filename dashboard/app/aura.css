@@ -379,3 +379,6 @@
 .na-amt { text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink); }
 .na-group.g-expected .na-amt, .na-group.g-expected .na-who b { color: var(--n10); font-weight: 400; }
 @media (max-width: 760px) { .na-row { grid-template-columns: minmax(0, 1fr) auto 12px; } .na-why { grid-column: 1 / -1; grid-row: 2; } }
+
+.na-recon { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; font-size: 13px; color: var(--n9); }
+.na-recon b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }

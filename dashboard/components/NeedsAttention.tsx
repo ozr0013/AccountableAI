@@ -4,6 +4,7 @@
 // who has to act, each invoice in plain words. Shown at the top of the Review queue (and on /items).
 
 import Link from "next/link";
+import { balances } from "@/lib/balances";
 import { money } from "@/lib/format";
 import type { Item, State } from "@/lib/types";
 
@@ -31,6 +32,7 @@ export function NeedsAttention({ state }: { state: State }) {
   const open = state.items.filter((i) => i.attention);
   const rows = open.map((i) => ({ i, ...triage(i, state.items) }));
   const total = open.reduce((s, i) => s + i.owed, 0);
+  const bal = balances(state);
   const sum = (g: Group) => rows.filter((r) => r.group === g).reduce((s, r) => s + r.i.owed, 0);
   const pattern = state.alerts.find((a) => a.open && a.kind === "recurring_pattern");
 
@@ -50,6 +52,13 @@ export function NeedsAttention({ state }: { state: State }) {
         </div>
         <Link href="/invoices" className="pill">Every invoice ↗</Link>
       </div>
+      <p className="na-recon">
+        <span><b>{money(bal.keyway)}</b> Keyway still owes vendors</span>
+        {bal.unfunded > 0 && <span>+ <b>{money(bal.unfunded)}</b> not yet funded by you</span>}
+        {bal.retained > 0 && <span>+ <b>{money(bal.retained)}</b> retained under the agreement</span>}
+        {bal.duplicate > 0 && <span>+ <b>{money(bal.duplicate)}</b> billed twice</span>}
+        <span>= <b>{money(bal.open)}</b> open</span>
+      </p>
       <div className="na-bar" role="img" aria-label={GROUPS.map((g) => `${g.title} ${money(sum(g.id))}`).join(", ")}>
         {GROUPS.map((g) => sum(g.id) > 0 && <span key={g.id} className={`na-seg g-${g.id}`} style={{ flexGrow: sum(g.id) }} />)}
       </div>

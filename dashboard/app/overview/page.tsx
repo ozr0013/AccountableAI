@@ -5,12 +5,14 @@ import { Spotlight } from "@/components/Spotlight";
 import { Disclosure } from "@/components/Disclosure";
 import { useFeed } from "@/components/Feed";
 import { Badge, Loading, PageTop } from "@/components/ui";
+import { balances } from "@/lib/balances";
 import { ALERT, money } from "@/lib/format";
 
 export default function Overview() {
   const { state } = useFeed();
   if (!state) return <><PageTop title="Overview" /><Loading /></>;
   const h = state.headline;
+  const b = balances(state);
   const pending = state.cases.filter(c => c.status === "pending");
   const flagged = state.alerts.filter(a => a.open);
   const priorities = [...flagged].sort((a,b) => Number(b.kind === "unexplained_unpaid") - Number(a.kind === "unexplained_unpaid")).slice(0,3);
@@ -35,7 +37,7 @@ export default function Overview() {
       <div className="quiet-metrics">
         <Link href="/keyway"><span>Funded to Keyway</span><strong>{money(h.funded, false)}</strong><small>View reconciliation ↗</small></Link>
         <Link href="/keyway"><span>Confirmed paid</span><strong>{money(h.paid, false)}</strong><small>Bank or vendor proof ↗</small></Link>
-        <Link href="/items"><span>Still owed</span><strong>{money(h.owed, false)}</strong><small>{money(h.unexplained, false)} unexplained ↗</small></Link>
+        <Link href="/cases"><span>Keyway still owes vendors</span><strong>{money(b.keyway, false)}</strong><small>{money(b.unexplained, false)} unexplained · of {money(b.open, false)} open ↗</small></Link>
       </div>
 
       <section className="focus-panel">

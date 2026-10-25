@@ -35,7 +35,7 @@ export default function Keyway() {
       <div className="quiet-metrics">
         <div><span>Funded</span><strong>{money(r.funded, false)}</strong></div>
         <div><span>Paid to vendors</span><strong>{money(r.paid, false)}</strong></div>
-        <div><span>Still owed</span><strong>{money(r.owed, false)}</strong></div>
+        <div><span>Keyway still owes vendors</span><strong>{money(r.owed, false)}</strong></div>
       </div>
       <Disclosure title="Where the money went" hint="Reconciliation and payment breakdown">
       <div className="card">

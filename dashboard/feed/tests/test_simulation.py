@@ -41,3 +41,20 @@ def test_what_each_step_does(frames):
 def test_reminders_are_recorded_not_emailed(frames):
     notes = [w["text"] for f in frames for w in f["writes"]["notes"] if w["type"] == "chase_sent"]
     assert notes and all("not emailed" in n for n in notes)
+
+
+def _figures_agree(state):
+    """The dashboard shows these as one breakdown (dashboard/lib/balances.ts): they must add up."""
+    r, items = state["recon"], state["items"]
+    open_ = round(sum(i["owed"] for i in items if i["owed"] > 0), 2)
+    parts = round(r["owed"] + r["unfunded"] + r["held"] + r["duplicate_funded"], 2)
+    unexplained = round(sum(i["owed"] for i in items if i["cause"] == "unexplained" and i["owed"] > 0), 2)
+    return open_ == parts and state["headline"]["unexplained"] == unexplained, (open_, parts, unexplained)
+
+
+def test_open_balance_reconciles_at_the_start_and_after_every_step(frames):
+    ok, got = _figures_agree(DemoSession().snapshot())
+    assert ok, got
+    for f in frames:
+        ok, got = _figures_agree(f["state"])
+        assert ok, (f["label"], got)

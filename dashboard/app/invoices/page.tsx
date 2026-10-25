@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { causeTag } from "@/components/ItemsTable";
 import { useFeed } from "@/components/Feed";
 import { Loading, PageTop } from "@/components/ui";
+import { balances } from "@/lib/balances";
 import { money } from "@/lib/format";
 import type { Item } from "@/lib/types";
 
@@ -42,7 +43,7 @@ export default function Invoices() {
       <div><span>Invoices</span><strong>{rows.length}</strong><small>{state.items.length} in total</small></div>
       <div><span>Billed</span><strong>{money(total("amount"), false)}</strong><small>by vendors</small></div>
       <div><span>Paid to vendors</span><strong>{money(total("paid"), false)}</strong><small>bank or vendor proof</small></div>
-      <div><span>Still owed</span><strong>{money(total("owed"))}</strong><small>{rows.filter((i) => i.attention).length} need attention</small></div>
+      <div><span>Open vendor balance</span><strong>{money(total("owed"))}</strong><small>{filter === "all" && !home && !q ? `Keyway still owes ${money(balances(state).keyway, false)} of it` : `${rows.filter((i) => i.attention).length} need attention`}</small></div>
     </div>
     <div className="inv-bar">
       <div className="inv-filters" role="group" aria-label="Show">
