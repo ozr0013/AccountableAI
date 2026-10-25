@@ -39,7 +39,7 @@
 
 /* ---------- dashboard tokens under the aura theme ---------- */
 .theme-aura {
-  --sans: var(--font-geist), "Geist", system-ui, sans-serif;
+  --sans: var(--font-serif), "Instrument Serif", Georgia, serif;
   --mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
   --serif: var(--font-serif), "Instrument Serif", Georgia, serif;
   /* Enlarge dashboard text only; the shared logo and frame keep their original geometry. */
