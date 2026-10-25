@@ -92,7 +92,18 @@ def feed(demo, mirror) -> dict:
     if _FEED is None:
         from . import demo_feed
         _FEED = demo_feed.build(demo_feed.vendors(demo, mirror), START, END, pipeline.MANAGER)
+        global FATES
+        FATES = dict(demo_feed.build.fates)
     return _FEED
+
+
+FATES: dict[str, str] = {}          # the answer key: what the generator planted, by invoice
+
+
+def scorecard(demo, mirror) -> dict:
+    from . import scorecard as sc
+    feed(demo, mirror)
+    return sc.score(demo, mirror, demo.now(), FATES, pipeline.MANAGER)
 
 
 def _arrive(demo, mirror, today: date) -> list[dict]:

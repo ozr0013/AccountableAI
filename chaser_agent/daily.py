@@ -284,12 +284,16 @@ def run(rails, rule_rows: list[dict], history_rows: list[dict], today: date,
     patterns = {p["vendor"]: p for p in vendor_patterns(rails, rule_rows, today, manager_id)}
     out = []
     invoice_docs = {d.data.get('invoice_id'): d for d in rails.documents(manager_id) if d.kind == 'vendor_invoice'}
-    for line in rails.ledger(manager_id):
-        if line.duplicate_of:
+    bank = bank_rows_by_invoice(rails, manager_id, today)
+    for ledger_line in rails.ledger(manager_id):
+        if ledger_line.duplicate_of:
             continue
+        rows = bank.get(ledger_line.invoice_id, [])
+        line, source = verified_line(ledger_line, rows)
         vendor = name(line.vendor_id)
         d = decide(line, vendor, name(manager_id), rules_for(rules, vendor, name(manager_id)),
-                   history.get(line.invoice_id, []), today, invoice_docs.get(line.invoice_id))
+                   history.get(line.invoice_id, []), today, invoice_docs.get(line.invoice_id),
+                   payment_seen=bool(rows), paid_source=source)
         if d.action in ("reminder", "escalate", "wait") and vendor in patterns:
             # The vendor's payment history travels with every chasing decision.
             d = replace(d, reason=f"{d.reason}; history: {describe(patterns[vendor])}")

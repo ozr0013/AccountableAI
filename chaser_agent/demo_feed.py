@@ -113,6 +113,7 @@ def build(vendor_list: list[Vendor], start: date, end: date, manager_id: str = "
                 text=f"{v.name}. Invoice {iid[4:]}. {v.service}. Amount due: {_usd(amount)}. Terms: Net {TERMS_DAYS}.",
                 data={"amount": amount, "received": day.isoformat(), "invoice_id": iid}))
             if rng.randrange(100) < UNFUNDED_PERCENT:
+                fates[iid] = "unfunded"
                 continue                     # Oakline has not funded it; nothing for Keyway to pay
             funded_on = day + timedelta(days=rng.randint(1, 2))
             add(funded_on, Document(
