@@ -1,0 +1,363 @@
+
+================================================================================================
+STEP 1 - INPUT TO THE CHASER: the invoice (Postgres ledger)
+================================================================================================
+{
+  "invoice_id": "INV-KW-0301",
+  "manager_id": "keyway",
+  "vendor_id": "v-riogrande",
+  "amount": 1240.0,
+  "invoice_received": "2026-03-03",
+  "funded_amount": 1240.0,
+  "funded_on": "2026-03-05",
+  "paid_amount": 0.0,
+  "paid_on": null,
+  "due_date": "2026-03-13",
+  "status": "funded",
+  "duplicate_of": null
+}
+
+================================================================================================
+STEP 1 - INPUT TO THE CHASER: Rio Grande's agreement rules (SpacetimeDB, from the agreement agent)
+================================================================================================
+[
+  {
+    "rule_id": "9b5f2667dfdc3458:payee",
+    "rule_type": "payee",
+    "status": "active",
+    "check": "Every bank payment for this agreement must name Rio Grande Plumbing LLC.",
+    "source_quote": "Rio Grande Plumbing LLC (\"Vendor\")"
+  },
+  {
+    "rule_id": "9b5f2667dfdc3458:pay_within_days",
+    "rule_type": "pay_within_days",
+    "status": "active",
+    "check": "Pay within 30 calendar days of invoice receipt; chase after that.",
+    "source_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt."
+  },
+  {
+    "rule_id": "9b5f2667dfdc3458:amount",
+    "rule_type": "amount",
+    "status": "active",
+    "check": "Invoices are billed at $95.00 per hour; flag any other rate.",
+    "source_quote": "at the rate of $95 per hour plus approved materials"
+  },
+  {
+    "rule_id": "9b5f2667dfdc3458:pay_to_account",
+    "rule_type": "pay_to_account",
+    "status": "active",
+    "check": "Payments must go to bank First Mesa Bank, routing 102000021, account 4471029; any change needs controller approval and identity checks.",
+    "source_quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,"
+  }
+]
+
+================================================================================================
+SKILL FILES USED
+================================================================================================
+None. The chaser has no SKILL.md: the daily check is code, and Claude is guided only by its system prompt and the tool descriptions below.
+
+================================================================================================
+STEP 2 - DAILY CHECK, 2026-03-30 (code only, no Claude)
+================================================================================================
+{
+  "invoice_id": "INV-KW-0301",
+  "vendor_name": "Rio Grande Plumbing",
+  "action": "not_due",
+  "reason": "due 2026-04-02 (3 days left) under 'Pay within 30 calendar days of invoice receipt; chase after that.'",
+  "level": null,
+  "due_date": "2026-04-02",
+  "days_overdue": 0,
+  "amount_owed": 1240.0,
+  "message": null,
+  "rule_id": "9b5f2667dfdc3458:pay_within_days",
+  "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+  "status": "recorded",
+  "attempt": 0,
+  "action_id": "INV-KW-0301:not_due:not_due:0"
+}
+
+================================================================================================
+STEP 3 - DAILY CHECK, 2026-04-22 (deadline passed)
+================================================================================================
+{
+  "invoice_id": "INV-KW-0301",
+  "vendor_name": "Rio Grande Plumbing",
+  "action": "reminder",
+  "reason": "20 days past the 2026-04-02 deadline; polite reminder queued automatically; history: 0 of 4 past payments late (avg 0.0 days)",
+  "level": "polite",
+  "due_date": "2026-04-02",
+  "days_overdue": 20,
+  "amount_owed": 1240.0,
+  "message": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+  "rule_id": "9b5f2667dfdc3458:pay_within_days",
+  "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+  "status": "queued",
+  "attempt": 0,
+  "action_id": "INV-KW-0301:reminder:polite:0"
+}
+
+================================================================================================
+STEP 4 - KEYWAY REPLIES; CLAUDE READS IT (input)
+================================================================================================
+{
+  "reply": "Hi, we paid Rio Grande for this one last week, it should have cleared by now.",
+  "records_shown_to_claude": [
+    "doc-agreement-keyway (agreement)",
+    "doc-stmt-keyway-2026-01-ops (manager_statement)",
+    "doc-bank-keyway-2026-01-ops (manager_bank)",
+    "doc-stmt-keyway-2026-02-ops (manager_statement)",
+    "doc-stmt-kw-2026-02-dup (manager_statement)",
+    "doc-bank-kw-2026-02-dup (manager_bank)",
+    "doc-inv-kw-0301 (vendor_invoice)",
+    "doc-bank-keyway-2026-02-ops (manager_bank)",
+    "doc-funding-kw-0305 (funding)",
+    "doc-bank-kw-2026-03-hold (manager_bank)",
+    "doc-stmt-keyway-2026-03-ops (manager_statement)",
+    "doc-stmt-kw-2026-03 (manager_statement)",
+    "doc-stmt-kw-2026-03-dup (manager_statement)",
+    "doc-stmt-kw-2026-03-elec (manager_statement)",
+    "doc-bank-keyway-2026-03-ops (manager_bank)",
+    "doc-bank-kw-2026-03 (manager_bank)",
+    "doc-bank-kw-2026-04-s5 (manager_bank)",
+    "doc-stmt-kw-2026-04-hold (manager_statement)",
+    "doc-notice-riogrande-0420 (vendor_notice)",
+    "doc-bank-kw-2026-04-0901 (manager_bank)",
+    "doc-bank-keyway-2026-04-ops (manager_bank)",
+    "doc-stmt-keyway-2026-04-ops (manager_statement)"
+  ]
+}
+
+================================================================================================
+STEP 4 - CLAUDE CALL + CODE GUARD (thinking, answer, accepted?)
+================================================================================================
+[
+  {
+    "model": "claude-sonnet-5-5",
+    "attempt": 1,
+    "accepted": true,
+    "problems": [],
+    "answer": "{\"claims_paid\": true, \"invoice_ids\": [\"INV-KW-0301\"], \"proof_source_ids\": [], \"summary\": \"The reply states that Rio Grande was paid last week for the open invoice, but the records contain no bank record of an outgoing payment or vendor confirmation of receipt for INV-KW-0301.\"}",
+    "thinking": "",
+    "input_tokens": 5242,
+    "output_tokens": 110
+  }
+]
+
+================================================================================================
+STEP 4 - OUTPUT
+================================================================================================
+{
+  "claims_paid": true,
+  "proof": [],
+  "verdict": "holding position: no bank record shows the payment"
+}
+
+================================================================================================
+STEP 5 - DAILY CHECK, 2026-04-27 (reply was not proof; ladder continues)
+================================================================================================
+{
+  "invoice_id": "INV-KW-0301",
+  "vendor_name": "Rio Grande Plumbing",
+  "action": "reminder",
+  "reason": "25 days past the 2026-04-02 deadline; firm reminder drafted for controller approval; history: 0 of 4 past payments late (avg 0.0 days)",
+  "level": "firm",
+  "due_date": "2026-04-02",
+  "days_overdue": 25,
+  "amount_owed": 1240.0,
+  "message": "Hello Keyway Property Management, following up on our earlier note about $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301). We still have no bank record or vendor confirmation of payment. Please send one, or tell us what is holding it up.",
+  "rule_id": "9b5f2667dfdc3458:pay_within_days",
+  "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+  "status": "needs_approval",
+  "attempt": 0,
+  "action_id": "INV-KW-0301:reminder:firm:0"
+}
+
+================================================================================================
+STEP 6 - ASK THE CHASER (Claude + read-only tools): system prompt
+================================================================================================
+You are the chaser assistant for Oakline Homes, a property owner. Oakline funds a management company (Keyway), which pays the vendors. You answer the controller's questions about vendor invoices, payment deadlines, how often vendors are paid late, and what the chaser has done.
+
+How to work:
+- Answer only from tool results. Call tools to look things up; never guess an amount, date, deadline or status. If the tools don't have it, say so.
+- Deadlines come from each vendor's agreement rules (pay_within_days); a payment counts only when a bank record shows it.
+- Cite what you rely on: invoice ids, rule ids, dates and amounts from the tool results.
+- You can only read. If asked to send, approve, hold or change something, explain what the daily chaser or the controller would do instead.
+- Neutral wording: never accuse anyone. The strongest word for missing money is "unexplained".
+- Keep the answer short: a direct answer first, then the supporting facts.
+
+================================================================================================
+STEP 6 - tools Claude can call
+================================================================================================
+[
+  {
+    "name": "list_invoices",
+    "description": "List invoices with amount, receipt date, deadline, amount paid and status. Filter by status (overdue = past deadline and unpaid) and/or vendor name."
+  },
+  {
+    "name": "get_invoice",
+    "description": "One invoice in full: ledger line, the chaser's decision for today, the vendor's agreement rules, and every chaser action and controller decision."
+  },
+  {
+    "name": "vendor_lateness",
+    "description": "How regularly each vendor is paid late: paid count, late count, late rate, average and max days late, overdue unpaid invoices, chronic flag. Sorted worst first. Optionally one vendor."
+  },
+  {
+    "name": "agreement_rules",
+    "description": "The saved agreement and its payment rules for a vendor (deadline, amount, payee, account, holds) with the quote each rule came from."
+  },
+  {
+    "name": "chaser_actions",
+    "description": "Recorded chaser actions (reminders, escalations, hand-offs, holds, replies) with their status, optionally for one invoice or one status."
+  },
+  {
+    "name": "preview_daily_check",
+    "description": "Dry run of the chaser's daily check as of a date (default today): what it would do for each invoice. Saves nothing."
+  }
+]
+
+================================================================================================
+STEP 6 - Claude's reasoning summary (thinking)
+================================================================================================
+[
+  "I'm flagging that the ledger shows a due date differing from what the agreement rules actually dictate, so I should go with the rule-derived 2026-04-02 deadline and note the discrepancy. The payment was funded 2026-03-05 with no bank record of payment, making it 25 days overdue \u2014 a polite reminder is queued but not yet confirmed sent, and a firmer reminder would need approval.\n\nSince the vendor's lateness history is already noted in my reasoning, I don't need to dig further there \u2014 this needs to go to the controller for review and approve/reject on the firm reminder draft, since I can't approve it myself.\n\n"
+]
+
+================================================================================================
+STEP 6 - tool calls Claude chose, in order
+================================================================================================
+[
+  {
+    "tool": "get_invoice",
+    "input": {
+      "invoice_id": "INV-KW-0301"
+    },
+    "result": "{\"ledger\": {\"invoice_id\": \"INV-KW-0301\", \"manager_id\": \"keyway\", \"vendor_id\": \"v-riogrande\", \"amount\": 1240.0, \"invoice_received\": \"2026-03-03\", \"funded_amount\": 1240.0, \"funded_on\": \"2026-03-05\", \"paid_amount\": 0.0, \"pa"
+  }
+]
+
+================================================================================================
+STEP 6 - Claude's answer
+================================================================================================
+**INV-KW-0301 is 25 days past its deadline and has no recorded payment.** Oakline sent Keyway the money for it on 2026-03-05, but no bank record shows Keyway paying Rio Grande Plumbing. A firm reminder to Keyway is drafted and waiting for the controller's approval. The main thing to do now is review that draft.
+
+**The facts**
+- **Invoice:** $1,240.00 from Rio Grande Plumbing, received 2026-03-03.
+- **Funding:** Oakline funded the full $1,240.00 on 2026-03-05. Amount paid is $0.00 and there is no payment date. The ledger status is "funded."
+- **Deadline:** 2026-04-02. The agreement rule `9b5f2667dfdc3458:pay_within_days` says "Owner shall pay each undisputed invoice within thirty (30) days of receipt."
+- **Different ledger date:** The ledger shows a due date of 2026-03-13 (10 days after receipt), which doesn't match the 30-day rule. The chaser uses the rule's date, 2026-04-02. It may be worth finding out why the ledger shows 03-13.
+- **Vendor history:** 0 of 4 past payments to Rio Grande were late. Nothing in the records explains the delay so far.
+
+**What the chaser has done**
+1. **2026-04-22 (20 days overdue):** A polite reminder to Keyway (`INV-KW-0301:reminder:polite:0`) was queued automatically. Its status is still "queued," so the records don't confirm it was sent.
+2. **2026-04-27 (today, 25 days overdue):** A firm reminder (`INV-KW-0301:reminder:firm:0`) is drafted with status "needs_approval." It asks Keyway for a bank record or the vendor's confirmation, or an explanation of what is holding the payment up. The chaser is waiting on your decision before doing anything more.
+
+**What the controller should do**
+- **Review the firm reminder draft:** approve it or reject it. I can only read records, so I can't approve or send it for you.
+- **Check whether the polite reminder went out.** It's still "queued," so the firm reminder may be Keyway's first actual notice.
+- **Check any payment proof against the agreement.** If Keyway sends proof, the bank record must name Rio Grande Plumbing LLC (`…:payee`). It must also go to First Mesa Bank, routing 102000021, account 4471029 (`…:pay_to_account`). Any change to that account needs controller approval and identity checks.
+- **If nothing comes back, the $1,240.00 is funded but unexplained.** The chaser will keep stepping up its reminders under its normal process.
+
+================================================================================================
+STEP 6 - usage
+================================================================================================
+{
+  "input_tokens": 6,
+  "output_tokens": 1170,
+  "model": "claude-opus-5-5"
+}
+
+================================================================================================
+STEP 7 - NEW EVIDENCE: bank record (scratch copy only)
+================================================================================================
+{
+  "id": "scenario-bank-0301",
+  "kind": "manager_bank",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-04-29",
+  "text": "Keyway operating account, outgoing ACH",
+  "data": {
+    "payments": [
+      {
+        "invoice_id": "INV-KW-0301",
+        "vendor_id": "v-riogrande",
+        "amount": 1240.0,
+        "on": "2026-04-29"
+      }
+    ]
+  }
+}
+
+================================================================================================
+STEP 8 - DAILY CHECK, 2026-04-30 -> HAND-OFF TO THE ANOMALY AGENT
+================================================================================================
+{
+  "invoice_id": "INV-KW-0301",
+  "vendor_name": "Rio Grande Plumbing",
+  "action": "handoff_anomaly",
+  "reason": "bank shows $1,240.00 paid in full on 2026-04-29; anomaly agent checks amount, recipient and timing",
+  "level": null,
+  "due_date": "2026-04-02",
+  "days_overdue": 0,
+  "amount_owed": 0.0,
+  "message": null,
+  "rule_id": "9b5f2667dfdc3458:pay_within_days",
+  "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+  "status": "recorded",
+  "attempt": 0,
+  "action_id": "INV-KW-0301:handoff_anomaly:handoff_anomaly:0"
+}
+
+================================================================================================
+STEP 8 - hand-off record the anomaly agent picks up (SpacetimeDB chase_action)
+================================================================================================
+{
+  "action_id": "INV-KW-0301:handoff_anomaly:handoff_anomaly:0",
+  "invoice_id": "INV-KW-0301",
+  "vendor_name": "Rio Grande Plumbing",
+  "action": "handoff_anomaly",
+  "level": null,
+  "due_date": "2026-04-02",
+  "days_overdue": 0,
+  "amount_owed": 0.0,
+  "message": null,
+  "reason": "bank shows $1,240.00 paid in full on 2026-04-29; anomaly agent checks amount, recipient and timing",
+  "rule_id": "9b5f2667dfdc3458:pay_within_days",
+  "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
+  "status": "recorded",
+  "as_of": "2026-04-30",
+  "created_at": [
+    1792887300050147
+  ]
+}
+
+================================================================================================
+TRAIL FOR THIS INVOICE (every recorded chaser action)
+================================================================================================
+[
+  {
+    "as_of": "2026-04-30",
+    "action": "handoff_anomaly",
+    "level": null,
+    "status": "recorded",
+    "reason": "bank shows $1,240.00 paid in full on 2026-04-29; anomaly agent checks amount, recipient and timing"
+  },
+  {
+    "as_of": "2026-04-27",
+    "action": "reminder",
+    "level": "firm",
+    "status": "needs_approval",
+    "reason": "25 days past the 2026-04-02 deadline; firm reminder drafted for controller approval; history: 0 of 4 past payments late (avg 0.0 days)"
+  },
+  {
+    "as_of": "2026-04-22",
+    "action": "reminder",
+    "level": "polite",
+    "status": "queued",
+    "reason": "20 days past the 2026-04-02 deadline; polite reminder queued automatically; history: 0 of 4 past payments late (avg 0.0 days)"
+  }
+]
+
+================================================================================================
+Cleaned up: scratch schema dropped, chaser state restored to today.
+================================================================================================
