@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "Agents that confirm a middleman actually paid your vendors."
 requires-python = ">=3.11"
 dependencies = [
+    "x402[fastapi,evm,requests]>=2.25",   # paid_api: x402 paywall + buyer
+    "cdp-sdk>=1.51",                      # paid_api: Coinbase server wallets + faucet
     "pydantic>=2.7",
     "anthropic>=0.40",
     "psycopg[binary]>=3.2",
@@ -31,10 +33,10 @@ dependencies = [
 dev = ["pytest>=8", "ruff>=0.6", "httpx>=0.27"]
 
 [tool.setuptools.packages.find]
-include = ["contracts*", "rails*", "world*", "workflow*", "agents*", "evals*", "agreement_agent*", "chaser_agent*", "anomaly_agent*"]
+include = ["paid_api*", "contracts*", "rails*", "world*", "workflow*", "agents*", "evals*", "agreement_agent*", "chaser_agent*", "anomaly_agent*"]
 
 [tool.pytest.ini_options]
-testpaths = ["contracts", "evals", "rails", "world", "workflow", "agents", "dashboard/feed/tests", "agreement_agent/tests", "chaser_agent/tests", "anomaly_agent/tests"]
+testpaths = ["contracts", "evals", "rails", "world", "workflow", "agents", "dashboard/feed/tests", "agreement_agent/tests", "chaser_agent/tests", "anomaly_agent/tests", "paid_api"]
 
 [tool.ruff]
 line-length = 100
