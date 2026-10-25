@@ -64,5 +64,10 @@ out = {"pack": "messy_pack_v1 · 20 PDFs", "model": rep["model"].replace("claude
        "unexplained_start": start, "unexplained_end": rep["days"][-1]["unexplained"] if rep["days"] else start,
        "alerts": [{**x, "headline": named(x["headline"])} for x in alerts], "reminders": len(rep["reminders"]),
        "hold": last_hold, "quarantined": notes["quarantined"], "flags": notes["flags"], "days": days, "terms": rep["terms"]}
+sys.path.insert(0, str(Path(__file__).parent))
+from score import score
+
+out["score"] = score(OUT)
+out["ran_on"] = "2026-10-24"
 DEST.write_text(json.dumps(out, indent=1) + "\n")
 print(f"wrote {DEST}: {len(files)} files, {len(ledger)} invoices, {len(days)} days")
