@@ -24,10 +24,11 @@ type Ctx = {
   reply: (invoiceId: string, text: string, proof: "none" | "bank" | "vendor") => Promise<ActionResult>;
   decide: (approvalId: string, approve: boolean, identityVerified?: boolean) => Promise<ActionResult>;
   advance: (days: number) => Promise<ActionResult>;
+  addFile: (name: string) => Promise<ActionResult>;
+  refresh: () => Promise<void>;
   setLive: (on: boolean) => Promise<{ ok: boolean; error?: string }>;
   brief: (question: string) => Promise<Briefing>;
   reset: () => Promise<void>;
-  refresh: () => Promise<void>;
 };
 
 const FeedCtx = createContext<Ctx | null>(null);
@@ -123,6 +124,14 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const advance: Ctx["advance"] = (days) =>
     act(() => (mode === "live" ? post<ActionResult>("/api/clock", { days }) : replayOnly()));
 
+  const addFile: Ctx["addFile"] = (name) =>
+    act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()));
+
+  /** Re-read the session after work that ran outside these actions (the simulation, the Live loop page). */
+  const refresh: Ctx["refresh"] = async () => {
+    if (mode === "live") setState(await json<State>("/api/state"));
+  };
+
   const setLive: Ctx["setLive"] = async (on) => {
     if (mode !== "live") return { ok: false, error: NEEDS_LIVE };
     const r = await post<{ ok: boolean; error?: string; state: State }>("/api/live", { on });
@@ -149,13 +158,8 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     setPanel(false);
   };
 
-  /** Re-read the live state after work that ran outside these actions (the Live loop page). */
-  const refresh: Ctx["refresh"] = async () => {
-    if (mode === "live") setState(await json<State>("/api/state"));
-  };
-
   return (
-    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, setLive, brief, reset, refresh }}>
+    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, addFile, refresh, setLive, brief, reset }}>
       {children}
     </FeedCtx.Provider>
   );

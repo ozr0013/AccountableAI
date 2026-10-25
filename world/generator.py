@@ -11,6 +11,7 @@ All 9 planted scenarios, the judge moment, and clean background invoices; pick a
 from __future__ import annotations
 
 import random
+import zlib
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable
@@ -87,6 +88,8 @@ class World:
     terms: list[dict] = field(default_factory=list)   # human-confirmed agreement terms per manager
     facts: list[Event] = field(default_factory=list)  # facts read off documents (fact_recorded)
     moment: dict | None = None                         # the judge moment, when planted
+    properties: list[dict] = field(default_factory=list)  # Oakline's homes
+    home_of: dict[str, str] = field(default_factory=dict)  # invoice id -> property id (Oakline's records)
     recipe: dict = field(default_factory=dict)         # how it was generated (scenarios, n_clean)
 
     def events(self) -> list[Event]:
@@ -100,6 +103,10 @@ class World:
                 payload=t, source=Citation(source_id=f"doc-agreement-{t['manager_id']}",
                                            kind=SourceKind.agreement, locator="7.2")))
         start = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        for p in self.properties:
+            evs.append(Event(id=f"ev-property-{p['id']}", type="entity_registered", valid_from=start,
+                             learned_at=start, payload={"kind": "property", **p, "invoices": sorted(
+                                 i for i, h in self.home_of.items() if h == p["id"])}))
         for kind, rows in (("manager", self.managers), ("vendor", self.vendors)):
             for r in rows:
                 evs.append(Event(id=f"ev-{kind}-{r.id}", type="entity_registered", valid_from=start,
@@ -475,4 +482,34 @@ def generate(seed: int = 13, scenarios: tuple[int, ...] = (3,), n_clean: int = 1
     if moment if moment is not None else set(ALL_SCENARIOS) <= set(scenarios):
         plant_moment(w)
     w.recipe["moment"] = w.moment is not None
+    _assign_properties(w, seed)
     return w
+
+
+# Oakline's portfolio: ~60 single-family rentals Keyway manages in three cities. Its own random
+# stream, so adding it changes nothing else in the world.
+_CITIES = [("Albuquerque", "NM", "871"), ("El Paso", "TX", "799"), ("Tucson", "AZ", "857")]
+_STREETS = ["Alder Ct", "Birch Ln", "Cedar Dr", "Elm St", "Juniper Way", "Mesa Vista Rd", "Pinon Pl",
+            "Cottonwood Ave", "Sage Brush Trl", "Yucca St", "Canyon Rd", "Desert Willow Dr",
+            "Saguaro Ln", "Ocotillo Ct", "Mesquite St", "Sandia View Dr"]
+
+
+def _assign_properties(w: World, seed: int, n: int = 60) -> None:
+    rng = random.Random(f"oakline-properties-{seed}")
+    homes, used = [], set()
+    while len(homes) < n:
+        city, state, zip3 = _CITIES[len(homes) % 3]
+        addr = f"{rng.randint(100, 9899)} {rng.choice(_STREETS)}"
+        if addr in used:
+            continue
+        used.add(addr)
+        homes.append({"id": f"p-{len(homes) + 1:03d}", "address": addr, "city": city, "state": state,
+                      "zip": f"{zip3}{rng.randint(0, 99):02d}", "beds": rng.choice([2, 3, 3, 3, 4, 4, 5])})
+    w.properties = homes
+    # Each invoice goes to one home, by a stable key: the vendor's own reference when it has one,
+    # so the same work billed twice (scenario 8) lands on the same home. Kept in Oakline's own
+    # records (the property list), not added to the vendor's invoice, which stays as received.
+    for d in w.documents:
+        if d.kind == SourceKind.vendor_invoice:
+            key = f"{d.vendor_id}|{d.data.get('vendor_ref') or d.data['invoice_id']}"
+            w.home_of[d.data["invoice_id"]] = homes[zlib.crc32(key.encode()) % n]["id"]

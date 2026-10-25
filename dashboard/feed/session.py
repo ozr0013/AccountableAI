@@ -10,8 +10,10 @@ change goes through the real Judge Console, workflow, approvals and policy gate.
 from __future__ import annotations
 
 import logging
+import os
 from collections import Counter
 from datetime import date, datetime
+from pathlib import Path
 
 from contracts.models import AlertKind, Event, SourceKind, Verdict, VerdictStatus
 
@@ -117,6 +119,50 @@ def _responses(events: list[Event], trace: list[str], names: dict,
     return out
 
 
+def _properties(homes: dict, items: list[dict]) -> list[dict]:
+    """Oakline's homes with what was spent on each and what's still open there."""
+    out = []
+    for pid, h in homes.items():
+        mine = [i for i in items if i.get("property_id") == pid]
+        out.append({**{k: h.get(k) for k in ("id", "address", "city", "state", "zip", "beds")},
+                    "invoices": len(mine), "amount": round(sum(i["amount"] for i in mine), 2),
+                    "funded": round(sum(i["funded"] for i in mine), 2), "paid": round(sum(i["paid"] for i in mine), 2),
+                    "owed": round(sum(i["owed"] for i in mine), 2), "attention": sum(1 for i in mine if i["attention"]),
+                    "last_invoice": max((i["received"] for i in mine if i["received"]), default=None)})
+    return sorted(out, key=lambda p: (-p["attention"], -p["owed"], p["id"]))
+
+
+def _write_note(e: Event, open_before: set[str]) -> dict | None:
+    """One event-log write in plain words, or None for internal bookkeeping."""
+    p = e.payload or {}
+    if e.type == "document_ingested":
+        text = f"Stored {str(p.get('id', '')).removeprefix('raw:inbox/')} ({str(p.get('kind', '')).replace('_', ' ')})"
+    elif e.type == "chase_reply":
+        text = "Stored Keyway's reply"
+    elif e.type == "fact_corrected":
+        text = "Stored a corrected fact"
+    elif e.type == "world_meta":
+        text = f"Clock moved to {str(p.get('as_of', ''))[:10]}"
+    elif e.type == "alert_raised":
+        d = p.get("draft", {})
+        if d.get("id") in open_before:
+            return None                        # the same alert, refreshed with new evidence
+        text = f"Owner alerted: {d.get('headline', '')}"
+    elif e.type == "alert_withdrawn":
+        text = f"Alert withdrawn: {p.get('reason', '')}"
+    elif e.type == "chase_sent":
+        c = p.get("chase", {})
+        text = f"Reminder to Keyway, {c.get('level', '')} ({', '.join(c.get('invoice_ids', []))}) · recorded, not emailed"
+    elif e.type == "reply_read":
+        text = f"Reply read: {p.get('verdict', '')}"
+    elif e.type == "case_proposed":
+        c = p.get("case", {})
+        text = f"Hold proposed: ${float(c.get('proposed_hold', 0)):,.2f} of ${float(p.get('funding_amount', 0)):,.2f}"
+    else:
+        return None
+    return {"type": e.type, "text": text, "invoice_id": e.invoice_id}
+
+
 def _iso(x) -> str | None:
     if x is None:
         return None
@@ -134,6 +180,10 @@ class DemoSession:
         self.live = False
         self.hub = Hub()                       # live decisions for /api/stream
         self._unwatch = None
+        # FEED_MESSY=1: the session reads the paperwork the parser got out of raw PDFs, scans,
+        # emails and bank CSVs (world/mess -> agents/extract), not the generator's clean records.
+        self.messy = os.getenv("FEED_MESSY", "").lower() in ("1", "true", "yes")
+        self.paperwork: dict | None = None
         self.build()
 
     # -- setup ----------------------------------------------------------------------------
@@ -148,6 +198,12 @@ class DemoSession:
 
         logging.getLogger("langgraph").setLevel(logging.ERROR)
         self.world = generate(self.seed, ALL_SCENARIOS, self.n_clean)
+        if self.messy:
+            from evals.messy import messy_world
+            os.environ.setdefault("EXTRACT_LLM", "off")      # free unless asked for
+            self.world, parsed = messy_world(self.world)
+            self.paperwork = {"records": len(parsed.records), "documents": len(parsed.documents),
+                              "flagged": len(parsed.needs_human), "ignored": len(parsed.ignored)}
         self.rails = MemoryRails()
         # approvals are stamped on the demo clock, not the wall clock
         self.approvals = RailsApprovals(self.rails, clock=lambda: self._clock(23, 50))
@@ -215,24 +271,32 @@ class DemoSession:
         """Handle the action's events, then let the other agents respond: a scan (chaser
         follows up on schedule, pattern and causes refresh) and, when what Keyway owes changed,
         a fresh case-agent review of the pending funding. Returns what each agent did."""
+        from workflow.book import WorkflowBook
         from workflow.run import funding_event
         seq0 = before["meta"]["events"]
         spent0 = self.meter.spent
+        open_before = set(WorkflowBook.load(self.rails).open_ids)
+        signals: list[dict] = []                # every step and agent start, in order
+        stop = self.wf.subscribe_live(lambda m: signals.append(m) if m.get("type") in ("step", "agent_started") else None)
         self.hub.publish({"type": "action", "status": "started", "kind": kind, "summary": summary,
                           "as_of": self.rails.now().isoformat(), "live": self.live})
-        runs = [self.wf.handle(e) if appended else self.wf.ingest(e) for e in events]
-        self.actions += 1
-        n, t = self.actions, (events[-1].learned_at if events else self._clock())
-        scan = Event(id=f"ev-scan-{MANAGER}-followup-{n}", type="scan_requested", manager_id=MANAGER,
-                     valid_from=t, learned_at=t + _sec(1),
-                     payload={"as_of": self.rails.now().isoformat()})
-        runs += self.wf.replay([scan])
-        if self._unexplained() != before["headline"]["unexplained"]:
-            ev = funding_event(MANAGER, FUNDING, self.rails.now())
-            runs += self.wf.replay([ev.model_copy(update={
-                "id": f"{ev.id}-recheck-{n}", "valid_from": t, "learned_at": t + _sec(2)})])
-        emails = self._deliver(seq0)
+        try:
+            runs = [self.wf.handle(e) if appended else self.wf.ingest(e) for e in events]
+            self.actions += 1
+            n, t = self.actions, (events[-1].learned_at if events else self._clock())
+            scan = Event(id=f"ev-scan-{MANAGER}-followup-{n}", type="scan_requested", manager_id=MANAGER,
+                         valid_from=t, learned_at=t + _sec(1),
+                         payload={"as_of": self.rails.now().isoformat()})
+            runs += self.wf.replay([scan])
+            if self._unexplained() != before["headline"]["unexplained"]:
+                ev = funding_event(MANAGER, FUNDING, self.rails.now())
+                runs += self.wf.replay([ev.model_copy(update={
+                    "id": f"{ev.id}-recheck-{n}", "valid_from": t, "learned_at": t + _sec(2)})])
+            emails = self._deliver(seq0)
+        finally:
+            stop()
         after = self.snapshot()
+        written = self.rails.events()[seq0:]
         trace = [line for r in runs for line in r.trace]
         out = {"ok": True, "kind": kind, "summary": summary, "affected": affected,
                "events": [e.model_dump(mode="json") for e in events], "trace": trace,
@@ -240,6 +304,11 @@ class DemoSession:
                "responses": _responses(self.rails.events()[seq0:], trace, after["meta"]["names"],
                                        set(affected) | {c["id"] for c in d["changed"]}),
                "cost": round(self.meter.spent - spent0, 4), "live": self.live,
+               # exactly what ran and what was written, for the simulation's map and log
+               "steps": [m["step"] for m in signals if m["type"] == "step"],
+               "agents": dict(Counter(m.get("agent") for m in signals if m["type"] == "agent_started")),
+               "writes": {"total": len(written),
+                          "notes": [w for e in written if (w := _write_note(e, open_before))]},
                "emails": emails, "state": after}
         self.history.append({k: out[k] for k in ("kind", "summary", "affected", "diff", "responses", "cost")})
         self.hub.publish({"type": "action", "status": "finished", "kind": kind, "summary": summary,
@@ -310,6 +379,41 @@ class DemoSession:
         except ConsoleError as e:
             return {"ok": False, "error": str(e), "suggestions": e.suggestions}
         return self._act("fact", res.summary, res.events, res.affected, before, appended=True)
+
+    def add_file(self, path: Path) -> dict:
+        """A raw file arrives (PDF, email, bank CSV): the parser reads it, and what it read goes
+        through the workflow like any other paperwork. A Keyway reply becomes a reply to the
+        reminder; anything else is a new document."""
+        from agents.extract import parse_file, to_document
+        from agents.extract.fields import VendorIndex
+        from rails.events.ingest import document_event
+        try:
+            from world.mess.noise import VENDOR_DOMAINS
+        except ImportError:
+            VENDOR_DOMAINS = {}
+        before = self.snapshot()
+        from agents.extract.link import link
+        records = link(parse_file(path, f"inbox/{path.name}", VendorIndex(self.world.vendors, dict(VENDOR_DOMAINS))))
+        flags = [w for p in records for w in p.warnings]
+        read = [p for p in records if p.kind is not None and p.dated]
+        if not read:
+            return {"ok": False, "error": f"Nothing usable in {path.name}", "flags": flags}
+        reply = next((p for p in read if p.kind == SourceKind.manager_reply), None)
+        if reply:
+            if not reply.data.get("invoice_id"):
+                return {"ok": False, "error": "The reply doesn't say which invoice", "flags": flags}
+            out = self.reply(reply.data["invoice_id"], reply.text or "")
+            out["parsed"] = {"file": path.name, "kind": "manager_reply", "flags": flags}
+            return out
+        at = self._clock(15, 10 + self.actions % 40)
+        events = [document_event(to_document(p), learned_at=at).model_copy(update={"id": f"ev-doc-upload-{self.actions}-{i}"})
+                  for i, p in enumerate(read)]
+        kinds = sorted({p.kind.value for p in read})
+        affected = sorted({i for p in read for i in ([p.data.get("invoice_id")] + [ln.get("invoice_id") for ln in p.data.get("lines", [])]) if i})
+        out = self._act("document", f"{path.name} arrived: read as {', '.join(k.replace('_', ' ') for k in kinds)}",
+                        events, affected, before)
+        out["parsed"] = {"file": path.name, "kind": kinds, "flags": flags}
+        return out
 
     def reply(self, invoice_id: str, text: str, proof: str = "none") -> dict:
         """The judge plays Keyway and answers a reminder. Proof, if attached, is the record it
@@ -430,6 +534,9 @@ class DemoSession:
         vendors = {e.payload["id"]: e.payload for e in events
                    if e.type == "entity_registered" and e.payload.get("kind") == "vendor"}
         docs = {d.id: d for d in r.documents(MANAGER)}
+        homes = {e.payload["id"]: e.payload for e in events
+                 if e.type == "entity_registered" and e.payload.get("kind") == "property"}
+        home_of = {i: pid for pid, h in homes.items() for i in h.get("invoices", [])}
         from workflow import Deps
         # Rendering a read model must never invoke paid agents.
         steps = Steps(Deps(r, self.rules_agents, self.rules_verifier, self.approvals))
@@ -454,6 +561,8 @@ class DemoSession:
                 "due": _iso(line.due_date), "status": line.status.value,
                 "duplicate_of": line.duplicate_of, "alerts": open_by_item.get(line.invoice_id, []),
                 "state": "settled", "cause": None, "days_late": 0,
+                "property_id": home_of.get(line.invoice_id),
+                "property": (lambda h: f"{h['address']}, {h['city']}" if h else None)(homes.get(home_of.get(line.invoice_id))),
             }
             if relevant:
                 a = steps._assess_one(line, now, explain=line.invoice_id in open_by_item)
@@ -513,6 +622,7 @@ class DemoSession:
                      "agents": "live" if self.live else "rules",
                      "live_available": _live_available(), "meter": self.meter.to_json(),
                      "start": _iso(self.world.as_of), "actions": self.actions,
+                     "paperwork": self.paperwork,
                      "names": {**{v: name(v) for v in vendors}, MANAGER: name(MANAGER)},
                      "generated_at": datetime.now().isoformat(timespec="seconds")},
             "headline": {
@@ -534,6 +644,7 @@ class DemoSession:
             "late_months": r.late_months(MANAGER),
             "terms": terms,
             "items": items,
+            "properties": _properties(homes, items),
             "alerts": sorted(alerts, key=lambda a: (not a["open"], -a["amount"], a["id"])),
             "cases": cases,
             "chases": chases,
