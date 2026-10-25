@@ -19,8 +19,10 @@ def terms_for(rails, agents, manager_id: str) -> AgreementTerms | None:
         def term(name: str) -> Term | None:
             if confirmed.get(name) is None:
                 return None
+            # the clause the agreement agent quoted, when confirmed terms carry it; else the default
+            locator = (confirmed.get("clauses") or {}).get(name) or _CLAUSE[name]
             return Term(value=confirmed[name], citation=Citation(
-                source_id=doc.id, kind=SourceKind.agreement, locator=_CLAUSE[name]))
+                source_id=doc.id, kind=SourceKind.agreement, locator=locator))
         return AgreementTerms(
             manager_id=manager_id, vendor_payment_days=term("vendor_payment_days"),
             holdback_pct=term("holdback_pct"), approval_limit=term("approval_limit"),

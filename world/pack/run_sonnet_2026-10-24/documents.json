@@ -1,0 +1,397 @@
+[
+ {
+  "id": "pack:04_invoice_riogrande_4471.pdf",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-riogrande",
+  "dated": "2026-02-28",
+  "text": "Invoice #4471 from Rio Grande Plumbing LLC to Keyway Property Management (for Oakline Homes) for a water heater pressure relief valve replacement at 318 Alder Ct, total due $1,240.00, due on receipt.",
+  "data": {
+   "invoice_id": "RG-4471",
+   "amount": 1240.0,
+   "received": "2026-02-28"
+  }
+ },
+ {
+  "id": "pack:05_invoice_riogrande_4502.pdf",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-riogrande",
+  "dated": "2026-03-06",
+  "text": "Invoice #4502 from Rio Grande Plumbing LLC to Keyway Property Management (for Oakline Homes) for toilet flange repair, main drain snaking and materials at 318 Alder Ct, total due $880.00, due on receipt.",
+  "data": {
+   "invoice_id": "RG-4502",
+   "amount": 880.0,
+   "received": "2026-03-06"
+  }
+ },
+ {
+  "id": "pack:06_invoice_brightcurrent_2210.pdf",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-brightcurrent",
+  "dated": "2026-04-01",
+  "text": "Invoice #2210 from Bright Current Electric to Keyway Property Management for electrical panel breaker replacement at 1208 Birch Ln, Albuquerque NM, owner Oakline Homes, total $1,560.00, due Net 10 - 04/11/2026.",
+  "data": {
+   "invoice_id": "BC-2210",
+   "amount": 1560.0,
+   "received": "2026-04-01"
+  }
+ },
+ {
+  "id": "pack:07_invoice_summit_2231.pdf",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-summit",
+  "dated": "2026-02-20",
+  "text": "Invoice 2231 from Summit Roofing Co. to Keyway Property Management for Oakline Homes for chimney and step flashing repair at 1208 Birch Ln, total 2,000.00, with a note that 10 PCT retainage (200.00) may be held until inspection.",
+  "data": {
+   "invoice_id": "SR-2231",
+   "amount": 2000.0,
+   "received": "2026-02-20",
+   "inspection": "pending"
+  }
+ },
+ {
+  "id": "pack:08_invoice_greenleaf_G0291.pdf",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-greenleaf",
+  "dated": "2025-02-14",
+  "text": "GreenLeaf Landscaping invoice G-0291 dated 2/14/2025 to Keyway Property Management for one-time storm debris cleanup at 904 Cedar Dr, total $450.00, due Net 15.",
+  "data": {
+   "invoice_id": "GL-0291",
+   "amount": 450.0,
+   "received": "2025-02-14"
+  }
+ },
+ {
+  "id": "pack:09_invoice_lonestar_LS7718.pdf",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-lonestar",
+  "dated": "2026-03-12",
+  "text": "Lone Star HVAC invoice LS-7718 to Keyway Property Management for replacement of a failed 3-ton split system at 1422 Elm St, owner Oakline Homes, totaling $7,800.00 and noted as requiring owner approval.",
+  "data": {
+   "invoice_id": "LS-7718",
+   "amount": 7800.0,
+   "received": "2026-03-12"
+  }
+ },
+ {
+  "id": "pack:03_keyway_owner_statement_mar2026.pdf#L7",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-metro",
+  "dated": "2026-03-24",
+  "text": "Known from Keyway's statement: Metro Appliance Repair M-5520",
+  "data": {
+   "invoice_id": "MA-5520",
+   "amount": 1150.0,
+   "received": "2026-03-24"
+  }
+ },
+ {
+  "id": "pack:03_keyway_owner_statement_mar2026.pdf#L8",
+  "kind": "vendor_invoice",
+  "manager_id": "keyway",
+  "vendor_id": "v-sparkle",
+  "dated": "2026-03-19",
+  "text": "Known from Keyway's statement: Sparkle Clean Svcs SC-118",
+  "data": {
+   "invoice_id": "SC-118",
+   "amount": 325.0,
+   "received": "2026-03-19"
+  }
+ },
+ {
+  "id": "pack:03_keyway_owner_statement_mar2026.pdf",
+  "kind": "manager_statement",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-04-04",
+  "text": "Keyway Property Management owner statement for Oakline Homes LLC's repair reserve for March 1-31, 2026, listing vendor invoices with paid, retained, open, held and awaiting-approval statuses and a funds on hand balance.",
+  "data": {
+   "lines": [
+    {
+     "line": "L1",
+     "invoice_id": "RG-4471",
+     "amount": 620.0,
+     "status": "paid",
+     "on": "2026-03-03"
+    },
+    {
+     "line": "L2",
+     "invoice_id": "RG-4471",
+     "amount": 620.0,
+     "status": "paid",
+     "on": "2026-03-17"
+    },
+    {
+     "line": "L3",
+     "invoice_id": "RG-4502",
+     "amount": 880.0,
+     "status": "paid",
+     "on": "2026-03-10"
+    },
+    {
+     "line": "L4",
+     "invoice_id": "SR-2231",
+     "amount": 1800.0,
+     "status": "paid",
+     "on": "2026-03-09"
+    },
+    {
+     "line": "L6",
+     "invoice_id": "GL-0291",
+     "amount": 450.0,
+     "status": "open",
+     "on": null
+    },
+    {
+     "line": "L7",
+     "invoice_id": "MA-5520",
+     "amount": 1150.0,
+     "status": "paid",
+     "on": "2026-03-24"
+    },
+    {
+     "line": "L8",
+     "invoice_id": "SC-118",
+     "amount": 325.0,
+     "status": "hold_missing_w9",
+     "on": null
+    },
+    {
+     "line": "L9",
+     "invoice_id": "LS-7718",
+     "amount": 7800.0,
+     "status": "awaiting owner",
+     "on": null
+    }
+   ]
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->RG-4471",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "RG-4471",
+   "amount": 1240.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->RG-4502",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "RG-4502",
+   "amount": 880.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->BC-2210",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "BC-2210",
+   "amount": 1560.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->SR-2231",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "SR-2231",
+   "amount": 2000.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->GL-0291",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "GL-0291",
+   "amount": 450.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->MA-5520",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "MA-5520",
+   "amount": 1150.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf#wire->SC-118",
+  "kind": "funding",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-02",
+  "text": "Repair reserve wire 18,400.00 on 03/02",
+  "data": {
+   "invoice_id": "SC-118",
+   "amount": 325.0,
+   "funded_on": "2026-03-02"
+  }
+ },
+ {
+  "id": "pack:02_bank_export_keyway_trust_mar2026.pdf",
+  "kind": "manager_bank",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-04-02",
+  "text": "Sandia Community Bank account activity export for the Keyway Property Mgmt trust account FBO Oakline Homes covering 03/01/2026 to 03/31/2026, listing a repair funding wire in and several debits.",
+  "data": {
+   "payments": [
+    {
+     "invoice_id": "SR-2231",
+     "vendor_id": "v-summit",
+     "amount": 1800.0,
+     "on": "2026-03-09"
+    },
+    {
+     "invoice_id": "MA-5520",
+     "vendor_id": "v-metro",
+     "amount": 1150.0,
+     "on": "2026-03-24"
+    },
+    {
+     "invoice_id": "RG-4471",
+     "vendor_id": "v-riogrande",
+     "amount": 620.0,
+     "on": "2026-03-03"
+    },
+    {
+     "invoice_id": "RG-4471",
+     "vendor_id": "v-riogrande",
+     "amount": 619.5,
+     "on": "2026-03-17"
+    },
+    {
+     "invoice_id": "GL-0291",
+     "vendor_id": "v-greenleaf",
+     "amount": 450.0,
+     "on": "2026-03-05"
+    }
+   ]
+  }
+ },
+ {
+  "id": "pack:10_email_riogrande_pastdue_apr20.pdf",
+  "kind": "vendor_notice",
+  "manager_id": "keyway",
+  "vendor_id": "v-riogrande",
+  "dated": "2026-04-20",
+  "text": "Second past-due notice email from Rio Grande Plumbing's accounts receivable asking when invoice 4502 for the 318 Alder Ct job ($880.00, 45 days open) will be paid, and noting that two payments on job 0301 (ref 4471) were received.",
+  "data": {
+   "invoice_id": "RG-4502",
+   "status": "not_received"
+  }
+ },
+ {
+  "id": "pack:12_email_keyway_reply_summit_holdback.pdf",
+  "kind": "manager_reply",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-04-15",
+  "text": "Email reply from Keyway property manager Marcus Bell explaining that the $200 difference on Summit Roofing 2231 is 10% retainage under section 4.1, to be released the week after an inspection on Fri 4/24 if it passes.",
+  "data": {
+   "invoice_id": "SR-2231",
+   "status": "other",
+   "reply_id": "12_email_keyway_reply_summit_holdback.pdf"
+  }
+ },
+ {
+  "id": "pack:13_email_brightcurrent_payment_received.pdf",
+  "kind": "vendor_confirmation",
+  "manager_id": "keyway",
+  "vendor_id": "v-brightcurrent",
+  "dated": "2026-04-08",
+  "text": "Automated email receipt from Bright Current Electric confirming it received an ACH payment of $1,560.00 on 04/08/2026 applied to Invoice #2210, leaving a balance of $0.00.",
+  "data": {
+   "invoice_id": "BC-2210",
+   "status": "paid",
+   "amount": 1560.0,
+   "paid_on": "2026-04-08"
+  }
+ },
+ {
+  "id": "pack:15_email_keyway_to_sparkle_w9_request.pdf",
+  "kind": "manager_reply",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-25",
+  "text": "Keyway AP emails Sparkle Clean requesting a completed W-9 before a first payment on invoice SC-118 can be released.",
+  "data": {
+   "invoice_id": "SC-118",
+   "status": "other",
+   "reply_id": "15_email_keyway_to_sparkle_w9_request.pdf"
+  }
+ },
+ {
+  "id": "pack:16_email_sparkle_w9_sent_late.pdf",
+  "kind": "vendor_notice",
+  "manager_id": "keyway",
+  "vendor_id": "v-sparkle",
+  "dated": "2026-04-14",
+  "text": "Email from Sparkle Clean to Keyway AP sending the requested W-9 as an attachment and noting their invoice number is written SC118 rather than SC-118.",
+  "data": {
+   "invoice_id": "SC-118",
+   "status": "paperwork_received"
+  }
+ },
+ {
+  "id": "pack:17_email_metro_bank_detail_change.pdf",
+  "kind": "vendor_notice",
+  "manager_id": "keyway",
+  "vendor_id": "v-metro",
+  "dated": "2026-04-16",
+  "text": "Email from Metro Appliance Repair to Keyway AP saying it has changed banks and asking that payment for invoice M-5561 be sent to new First Horizon Bank account details.",
+  "data": {
+   "invoice_id": "MA-5561",
+   "status": "bank_change_request"
+  }
+ },
+ {
+  "id": "pack:18_email_keyway_fwd_lonestar_approval.pdf",
+  "kind": "manager_reply",
+  "manager_id": "keyway",
+  "vendor_id": null,
+  "dated": "2026-03-12",
+  "text": "Property manager Marcus Bell forwards a Lone Star HVAC quote/invoice LS-7718 for $7,800 for an HVAC replacement at 1422 Elm and requests the owner's written approval and separate funding because it exceeds the $5k limit.",
+  "data": {
+   "invoice_id": "LS-7718",
+   "status": "other",
+   "reply_id": "18_email_keyway_fwd_lonestar_approval.pdf"
+  }
+ }
+]
