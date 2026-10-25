@@ -20,11 +20,16 @@ type Ctx = {
   busy: boolean;
   panel: boolean;
   setPanel: (open: boolean) => void;
-  runConsole: (q: { preset?: string; params?: Record<string, string>; text?: string }) => Promise<ActionResult>;
+  runConsole: (q: { preset?: string; params?: Record<string, string>; text?: string }, quiet?: boolean) => Promise<ActionResult>;
   reply: (invoiceId: string, text: string, proof: "none" | "bank" | "vendor") => Promise<ActionResult>;
   decide: (approvalId: string, approve: boolean, identityVerified?: boolean) => Promise<ActionResult>;
-  advance: (days: number) => Promise<ActionResult>;
-  addFile: (name: string) => Promise<ActionResult>;
+  /** `quiet`: the caller shows the result itself, so the responses drawer stays shut. */
+  advance: (days: number, quiet?: boolean) => Promise<ActionResult>;
+  addFile: (name: string, quiet?: boolean) => Promise<ActionResult>;
+  /** An email the judge writes as Keyway or a vendor (sender: "keyway" or a vendor id). */
+  write: (sender: string, subject: string, body: string) => Promise<ActionResult>;
+  /** A file the judge brings: PDF, .eml or bank CSV, base64. */
+  upload: (name: string, data: string) => Promise<ActionResult>;
   refresh: () => Promise<void>;
   setLive: (on: boolean) => Promise<{ ok: boolean; error?: string }>;
   brief: (question: string) => Promise<Briefing>;
@@ -87,7 +92,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   }, [loadReplay]);
 
   /** Run one action: update state, keep the result, open the responses panel. */
-  const act = async (run: () => Promise<ActionResult>): Promise<ActionResult> => {
+  const act = async (run: () => Promise<ActionResult>, quiet = false): Promise<ActionResult> => {
     setBusy(true);
     let res: ActionResult;
     try {
@@ -97,13 +102,13 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     }
     if (res.state) setState(res.state);
     setLast(res);
-    setPanel(true);
+    if (!quiet) setPanel(true);
     setBusy(false);
     return res;
   };
   const replayOnly = async (): Promise<ActionResult> => ({ ok: false, error: NEEDS_LIVE });
 
-  const runConsole: Ctx["runConsole"] = (q) => act(async () => {
+  const runConsole: Ctx["runConsole"] = (q, quiet) => act(async () => {
     if (mode === "live") return post<ActionResult>("/api/console", q);
     if (q.preset === "invoice_received_correction" || (q.text && MOMENT_TEXT.test(q.text))) {
       if (state?.history.length) return { ok: false, error: "The replay feed has already played the moment. Reset to play it again." };
@@ -111,7 +116,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       return json<ActionResult>("/feed/moment.json");
     }
     return { ok: false, error: "The replay feed plays the moment only. " + NEEDS_LIVE };
-  });
+  }, quiet);
 
   const reply: Ctx["reply"] = (invoiceId, text, proof) =>
     act(() => (mode === "live" ? post<ActionResult>("/api/reply", { invoice_id: invoiceId, text, proof }) : replayOnly()));
@@ -121,11 +126,17 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       ? post<ActionResult>(`/api/approvals/${approvalId}`, { approve, by: state?.meta.controller ?? "controller.dana", identity_verified: identityVerified })
       : replayOnly()));
 
-  const advance: Ctx["advance"] = (days) =>
-    act(() => (mode === "live" ? post<ActionResult>("/api/clock", { days }) : replayOnly()));
+  const advance: Ctx["advance"] = (days, quiet) =>
+    act(() => (mode === "live" ? post<ActionResult>("/api/clock", { days }) : replayOnly()), quiet);
 
-  const addFile: Ctx["addFile"] = (name) =>
-    act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()));
+  const addFile: Ctx["addFile"] = (name, quiet) =>
+    act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()), quiet);
+
+  const write: Ctx["write"] = (sender, subject, body) =>
+    act(() => (mode === "live" ? post<ActionResult>("/api/write", { sender, subject, body }) : replayOnly()), true);
+
+  const upload: Ctx["upload"] = (name, data) =>
+    act(() => (mode === "live" ? post<ActionResult>("/api/upload", { name, data }) : replayOnly()), true);
 
   /** Re-read the session after work that ran outside these actions (the simulation, the Live loop page). */
   const refresh: Ctx["refresh"] = async () => {
@@ -159,7 +170,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, addFile, refresh, setLive, brief, reset }}>
+    <FeedCtx.Provider value={{ state, mode, error, presets, last, busy, panel, setPanel, runConsole, reply, decide, advance, addFile, write, upload, refresh, setLive, brief, reset }}>
       {children}
     </FeedCtx.Provider>
   );

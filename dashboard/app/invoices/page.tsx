@@ -5,16 +5,20 @@ import { useEffect, useMemo, useState } from "react";
 import { causeTag } from "@/components/ItemsTable";
 import { useFeed } from "@/components/Feed";
 import { Loading, PageTop } from "@/components/ui";
-import { balances } from "@/lib/balances";
+import { lateToPay, leftToPay, notFunded, totals } from "@/lib/balances";
 import { money } from "@/lib/format";
 import type { Item } from "@/lib/types";
 
+// The same rules as every other page (lib/balances.ts), so a filter here shows exactly the bills
+// behind a box anywhere else.
 const FILTERS: { id: string; label: string; keep: (i: Item) => boolean }[] = [
   { id: "all", label: "All", keep: () => true },
   { id: "attention", label: "Needs attention", keep: (i) => i.attention },
-  { id: "unpaid", label: "Unpaid", keep: (i) => i.owed > 0 },
-  { id: "paid", label: "Paid", keep: (i) => i.owed <= 0 && !i.paid_late },
-  { id: "late", label: "Paid late", keep: (i) => i.paid_late },
+  { id: "left", label: "Outstanding", keep: (i) => leftToPay(i) > 0 },
+  { id: "late", label: "Past due", keep: lateToPay },
+  { id: "unfunded", label: "Not yet funded", keep: (i) => notFunded(i) > 0 },
+  { id: "paid", label: "Paid", keep: (i) => i.paid > 0 },
+  { id: "paidlate", label: "Paid late", keep: (i) => i.paid_late },
 ];
 const short = (iso: string | null) => (iso ? new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "—");
 
@@ -24,26 +28,33 @@ export default function Invoices() {
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [home, setHome] = useState<string | null>(null);
-  useEffect(() => { setHome(new URLSearchParams(window.location.search).get("property")); }, []);
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search);
+    setHome(u.get("property"));
+    if (FILTERS.some((f) => f.id === u.get("show"))) setFilter(u.get("show")!);
+  }, []);
   const rows = useMemo(() => {
     if (!state) return [];
     const f = FILTERS.find((x) => x.id === filter) ?? FILTERS[0];
     const needle = q.trim().toLowerCase();
     return state.items.filter((i) => f.keep(i) && (!home || i.property_id === home)
       && (!needle || `${i.id} ${i.vendor} ${i.property ?? ""}`.toLowerCase().includes(needle)))
-      .sort((a, b) => Number(b.attention) - Number(a.attention) || b.owed - a.owed || (b.received ?? "").localeCompare(a.received ?? ""));
+      .sort((a, b) => Number(b.attention) - Number(a.attention) || (b.amount - b.paid) - (a.amount - a.paid) || (b.received ?? "").localeCompare(a.received ?? ""));
   }, [state, filter, q, home]);
   if (!state) return <><PageTop title="Invoices" /><Loading /></>;
   const homeLabel = home ? state.properties?.find((p) => p.id === home) : null;
-  const total = (k: "amount" | "paid" | "owed") => rows.reduce((s, i) => s + i[k], 0);
+  const t = totals(rows);
+  const box = (id: string, label: string, v: number, cls = "") => (
+    <button type="button" className={`${cls}${filter === id ? " on" : ""}`} onClick={() => setFilter(id)}><span>{label}</span><strong>{money(v)}</strong></button>
+  );
 
   return <>
-    <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor invoice Keyway was funded for, across Oakline's homes."} />
-    <div className="sim-stats">
-      <div><span>Invoices</span><strong>{rows.length}</strong><small>{state.items.length} in total</small></div>
-      <div><span>Billed</span><strong>{money(total("amount"))}</strong><small>by vendors</small></div>
-      <div><span>Paid to vendors</span><strong>{money(total("paid"))}</strong><small>bank or vendor proof</small></div>
-      <div><span>Open vendor balance</span><strong>{money(total("owed"))}</strong><small>{filter === "all" && !home && !q ? `Keyway still owes ${money(balances(state).keyway)} of it` : `${rows.filter((i) => i.attention).length} need attention`}</small></div>
+    <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor bill: billed = paid + outstanding + not yet funded."} />
+    <div className="ov-boxes inv-boxes">
+      {box("all", `Billed by vendors · ${rows.length} bill${rows.length === 1 ? "" : "s"}`, t.billed)}
+      {box("paid", "Paid", t.paid, "paid")}
+      {box("left", "Outstanding", t.left)}
+      {box("unfunded", "Not yet funded by Oakline", t.notFunded)}
     </div>
     <div className="inv-bar">
       <div className="inv-filters" role="group" aria-label="Show">
@@ -54,13 +65,14 @@ export default function Invoices() {
     </div>
     <div className="table-scroll lr-box">
       <table className="table lr-table">
-        <thead><tr><th>Invoice</th><th>Home</th><th>Vendor</th><th className="r">Amount</th><th className="r">Paid</th><th className="r">Owed</th><th>Received</th><th>Due</th><th>Status</th></tr></thead>
+        <thead><tr><th>Invoice</th><th>Home</th><th>Vendor</th><th className="r">Billed</th><th className="r">Paid</th><th className="r">Outstanding</th><th className="r">Not funded</th><th>Received</th><th>Due</th><th>Status</th></tr></thead>
         <tbody>{rows.map((i) => (
           <tr key={i.id} className={i.attention ? "u-alert" : ""}>
             <td className="mono"><Link href={`/items/${i.id}`}>{i.id}</Link></td>
             <td>{i.property ?? "—"}</td><td>{i.vendor}</td>
             <td className="r num">{money(i.amount)}</td><td className="r num">{money(i.paid)}</td>
-            <td className="r num">{i.owed > 0 ? money(i.owed) : "—"}</td>
+            <td className={`r num${lateToPay(i) ? " late-ink" : ""}`}>{leftToPay(i) > 0 ? money(leftToPay(i)) : "—"}</td>
+            <td className="r num">{notFunded(i) > 0 ? money(notFunded(i)) : "—"}</td>
             <td className="mono">{short(i.received)}</td><td className="mono">{short(i.due)}</td>
             <td>{i.owed > 0 || i.attention ? causeTag(i) : <span className="tag ok">{i.paid_late ? "Paid late" : "Paid"}</span>}</td>
           </tr>))}

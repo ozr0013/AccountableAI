@@ -36,7 +36,7 @@ function CaseCard({ c }: { c: Case }) {
       <div style={{ padding: 24, borderBottom: "1px solid var(--n3)" }}>
         <div className="between case-header">
           <div className="stack" style={{ gap: 8 }}>
-            <span className="micro muted">{c.kind === "funding" ? `Funding review · ${money(c.funding_amount ?? 0, false)} to Keyway` : "Vendor bank-detail change"}</span>
+            <span className="micro muted">{c.kind === "funding" ? `Funding review · ${money(c.funding_amount ?? 0, false)} to Keyway Management` : "Vendor bank-detail change"}</span>
             <div className="display h1 num">{money(c.proposed_hold, false)} <span className="h4 muted">hold</span></div>
           </div>
           <span className={`tag ${c.status === "pending" ? "" : c.status === "approved" ? "ok" : "neutral"}`}>{c.kind === "bank_change" && c.status === "approved" ? "Bank change approved" : STATUS[c.status]}</span>
@@ -107,7 +107,7 @@ export default function Cases() {
 
   return (
     <>
-      <PageTop title="Review queue" sub="What still needs someone, and the holds waiting for your decision. Nothing here moves money." />
+      <PageTop title="Review queue" sub="What needs someone, and the holds waiting for you." />
       <NeedsAttention state={state} />
       <h2 className="lr-h">Waiting for your decision</h2>
       <div className="case-layout">
@@ -126,7 +126,7 @@ export default function Cases() {
                     <span className="micro muted">by {d.by} · for a person to carry out · no money moved by the system</span>
                   </div>
                   <div className="row" style={{ gap: 28 }}>
-                    <div><div className="micro ok">Send to Keyway</div><div className="display h2 num">{money(d.release, false)}</div></div>
+                    <div><div className="micro ok">Send to Keyway Management</div><div className="display h2 num">{money(d.release, false)}</div></div>
                     <div><div className="micro warn">Hold</div><div className="display h2 num warn">{money(d.hold, false)}</div></div>
                   </div>
                 </div>

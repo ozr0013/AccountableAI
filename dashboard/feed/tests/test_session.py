@@ -104,3 +104,63 @@ def test_a_session_never_emails_unless_the_server_turns_it_on(demo, monkeypatch)
     monkeypatch.setattr(mailer, "enabled", lambda: True)      # as if the send token existed
     demo.advance(5)                                           # reminders go out on this step
     assert not sent.called and demo.send_email is False
+
+
+def test_a_document_reports_the_books_before_and_after():
+    """Live investigation shows these: a claim with no proof moves nothing, a bank record moves one invoice."""
+    demo = DemoSession()                         # the full world the dashboard runs
+    samples = Path(__file__).resolve().parents[1] / 'samples'
+    said = demo.add_file(samples / 'Keyway_Reply_KW-0901.eml')
+    assert said['books']['before'] == said['books']['after']
+    assert said['diff']['changed'] == []
+    bank = demo.add_file(samples / 'Keyway_Bank_Export_Apr22.csv')
+    b, a = bank['books']['before'], bank['books']['after']
+    assert [c['id'] for c in bank['diff']['changed']] == ['INV-KW-0901']
+    # $1,000 proven paid: it moves from "left to pay" (and past due) to "paid to vendors", nothing else
+    assert (a['paid'] - b['paid'], b['left'] - a['left'], b['late'] - a['late']) == (1000, 1000, 1000)
+    assert (a['funded'], a['not_funded'], b['unexplained'] - a['unexplained']) == (b['funded'], b['not_funded'], 1000)
+    assert b['attention'] - a['attention'] == 1
+
+
+@pytest.fixture(scope='module')
+def full():
+    return DemoSession()                         # the full world the dashboard runs
+
+
+def test_an_action_returns_its_run_as_an_ordered_timeline(full):
+    """Live investigation plays this back: what the reader read, then each step, agent and gate check."""
+    full.reset()
+    out = full.add_file(Path(__file__).resolve().parents[1] / 'samples' / 'Keyway_Bank_Export_Apr22.csv')
+    t = out['timeline']
+    assert t[0]['type'] == 'reader' and t[0]['kind'] == ['manager_bank']
+    assert t[1] == {'type': 'step', 'step': 'route'}
+    decisions = [x for x in t if x['type'] == 'decision']
+    assert {'trail', 'cause', 'verifier', 'case'} <= {d['agent'] for d in decisions}
+    assert all(d['steps'] and d['question'] for d in decisions)
+    gate = [x for x in t if x['type'] == 'policy']
+    assert {(g['action'], g['ok']) for g in gate} == {('send_chase', False), ('propose_hold', True)}
+    assert all(g['why'] for g in gate)            # a reminder too soon is refused, with the reason
+    # each agent's decision follows its own start
+    starts = [i for i, x in enumerate(t) if x['type'] == 'agent_started']
+    assert starts and all(t[i + 1]['type'] == 'decision' and t[i + 1]['agent'] == t[i]['agent'] for i in starts)
+    assert 'policy_check' not in vars(full.rails)          # the gate is the rails' own again
+
+
+def test_an_email_the_judge_writes_goes_through_the_reader(full):
+    full.reset()
+    said = full.write_email('keyway', 'Re: KW-0402', 'Hi, Sparkline Electric was paid for KW-0402 last week.')
+    assert said['ok'] and said['kind'] == 'reply' and said['timeline'][0]['type'] == 'reader'
+    assert said['books']['before'] == said['books']['after']               # a claim alone moves nothing
+    rio = full.write_email('v-riogrande', 'Payment received - KW-0301',
+                           'We received your payment of $1,240.00 for KW-0301 today. Thank you.')
+    assert rio['ok'] and [c['id'] for c in rio['diff']['changed']] == ['INV-KW-0301']
+    assert rio['books']['before']['unexplained'] - rio['books']['after']['unexplained'] == 1240
+    vague = full.write_email('keyway', 'hello', 'Everything is paid, thanks.')
+    assert not vague['ok'] and vague['error']
+
+
+def test_an_upload_must_be_a_file_the_reader_takes(full):
+    assert not full.upload('notes.docx', b'x')['ok']
+    assert not full.upload('big.pdf', b'x' * 2_000_001)['ok']
+    assert full.upload('../../etc/passwd.csv', b'Date,Amount\n')['ok'] is False      # nothing usable
+    assert not list(full.inbox.parent.glob('passwd.csv'))                          # stayed in the inbox

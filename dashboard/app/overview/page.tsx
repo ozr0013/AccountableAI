@@ -1,51 +1,53 @@
 "use client";
 
 import Link from "next/link";
-import { Spotlight } from "@/components/Spotlight";
 import { Disclosure } from "@/components/Disclosure";
 import { useFeed } from "@/components/Feed";
 import { MoneyStrip } from "@/components/MoneyStrip";
+import { FundingChart, OutstandingChart } from "@/components/OverviewCharts";
 import { Badge, Loading, PageTop } from "@/components/ui";
 import { ALERT, money } from "@/lib/format";
+
+const SHOWN = 3;
 
 export default function Overview() {
   const { state } = useFeed();
   if (!state) return <><PageTop title="Overview" /><Loading /></>;
-  const h = state.headline;
-  const pending = state.cases.filter(c => c.status === "pending");
-  const flagged = state.alerts.filter(a => a.open);
-  const priorities = [...flagged].sort((a,b) => Number(b.kind === "unexplained_unpaid") - Number(a.kind === "unexplained_unpaid")).slice(0,3);
-  const instruction = (state.decisions ?? []).filter(d => d.type === "funding_instruction").at(-1);
-  const fundingPending = pending.some(c => c.kind === "funding");
+  const items = state.items;
+  const open = state.alerts.filter((a) => a.open && a.kind !== "recurring_pattern")
+    .sort((a, b) => Number(b.kind === "unexplained_unpaid") - Number(a.kind === "unexplained_unpaid") || b.amount - a.amount);
 
   return (
     <>
-      <PageTop title="Your money, accounted for." sub="A clear view of Keyway. Start with what needs you." />
-      <Spotlight className="overview-hero">
-        <div>
-          <span className="label">/ {fundingPending ? "Your next decision" : instruction ? "Decision recorded" : "Your funding overview"}</span>
-          <div className="moment-amount num" style={{ marginTop: 20 }}>{money(instruction && !fundingPending ? instruction.hold : h.proposed_hold, false)}<small>{instruction && !fundingPending ? "hold recorded" : "recommended hold"}</small></div>
-          <p>{h.unexplained_items.length} invoices still need payment proof.</p>
-        </div>
-        <div className="moment-actions">
-          <Link href="/investigation" className="btn on-wine">Run live investigation <span aria-hidden="true">↗</span></Link>
-          <span className="micro" style={{ color: "#ddd", lineHeight: "16px" }}>{pending.length ? `${pending.length} case${pending.length === 1 ? "" : "s"} waiting after review` : "You decide. No money moves here."}</span>
-        </div>
-      </Spotlight>
+      <PageTop title="Overview" sub="Where Oakline's money to Keyway Management stands today." />
 
-      <MoneyStrip state={state} />
+      {open.length > 0 && (
+        <section className="ov-alerts" aria-label="Needs a closer look">
+          <div className="ov-alerts-head">
+            <span className="label">Alert</span>
+            <Link href="/cases" className="pill">Review queue ↗</Link>
+          </div>
+          <div className="ov-alerts-row">
+            {open.slice(0, SHOWN).map((a) => {
+              const item = items.find((i) => i.id === a.invoice_ids[0]);
+              return <Link key={a.id} href={`/items/${a.invoice_ids[0]}`} className="ov-alert">
+                <span className="ov-dot" aria-hidden="true" />
+                <span className="ov-alert-txt"><b>{item?.vendor ?? "Keyway Management"}</b><small>{a.kind === "unexplained_unpaid" ? "Past due" : ALERT[a.kind] ?? a.kind.replace(/_/g, " ")}</small></span>
+                <strong>{money(a.amount, false)}</strong>
+              </Link>;
+            })}
+            {open.length > SHOWN && <Link href="/cases" className="ov-alert ov-more">+{open.length - SHOWN} more ↗</Link>}
+          </div>
+        </section>
+      )}
 
-      <section className="focus-panel">
-        <div className="focus-heading"><div><span className="label muted">/ Start here</span><h2>Needs a <em>closer look.</em></h2></div><Link href="/cases" className="pill">Review queue ↗</Link></div>
-        <div className="focus-list">
-          {priorities.length === 0 && <p className="body muted">No open alerts. You’re caught up.</p>}
-          {priorities.map(a => {
-            const item = state.items.find(i => i.id === a.invoice_ids[0]);
-            return <Link key={a.id} href={a.kind === "recurring_pattern" ? "/keyway" : `/items/${a.invoice_ids[0]}`} className="focus-row"><Badge kind={a.kind === "unexplained_unpaid" ? "flag" : "idle"} /><span><strong>{item?.vendor ?? "Keyway"}</strong><small>{ALERT[a.kind] ?? a.kind}</small></span><b>{money(a.amount, false)}</b><span aria-hidden="true">↗</span></Link>;
-          })}
-        </div>
-        {flagged.length > priorities.length && <p className="body muted" style={{ margin: "18px 0 0" }}>{flagged.length - priorities.length} more alerts available in open items.</p>}
-      </section>
+      <MoneyStrip items={items} />
+
+      <div className="ov-charts">
+        <FundingChart items={items} asOf={state.meta.as_of} />
+        <OutstandingChart items={items} />
+      </div>
+
       <Disclosure title="What happened behind the scenes" hint="Agent activity and source coverage" meta={`${state.meta.documents} records`}>
         <div className="rows">{state.agents.map(a => <div className="arow" key={a.agent}><Badge kind={a.flagged ? "flag" : "done"} /><div className="arow-main"><span className="arow-title">{a.agent}</span><span className="body muted">{a.done}{a.flagged ? ` · ${a.flagged}` : ""}</span></div></div>)}</div>
         <Link href="/agents" className="link" style={{ display: "inline-block", marginTop: 20 }}>Explore the team ↗</Link>

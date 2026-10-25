@@ -45,7 +45,7 @@ Built vs planned (keep this honest when you change things):
 | `rails/` | Event log, ledger, matcher, trust rules, recon, policy gate (`rails/guards/policy.py`), templates |
 | `world/` | Deterministic demo world (seed 13, demo date Apr 22 2026, 9 planted scenarios) |
 | `ui-revamp-2/` | The frontend: static HTML/CSS/JS served by `dashboard/feed/serve.py` at its root. Every page is the designer's (`app.js`, her demo data) except Judgment › Agent Workflow, which `live.js` replaces with the live three-agent loop; leave `app.js` as is |
-| `dashboard/` | The Next.js owner dashboard (`npm run dev`, :3000): Overview, Live investigation, Simulated flow, Review queue, Invoices, Properties; `dashboard/feed/serve.py` is the backend for both |
+| `dashboard/` | The Next.js owner dashboard (`npm run dev`, :3000): Overview, Judge Console (feed the live engine, watch each agent it wakes), Review queue, Invoices, Properties; `dashboard/feed/serve.py` is the backend for both |
 | `evals/` | Scorer, harness, baselines |
 
 ## How an event flows

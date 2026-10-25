@@ -1,7 +1,7 @@
 [
   {
     "file": "Keyway_Owner_Statement_Apr2026.pdf",
-    "label": "Keyway statement (PDF)",
+    "label": "Keyway Management statement (PDF)",
     "flow": "statement",
     "expect": "One line says $640.00 for Rio Grande's $1,240.00 invoice: a mismatch alert."
   },
@@ -13,13 +13,13 @@
   },
   {
     "file": "Keyway_Reply_KW-0901.eml",
-    "label": "Keyway reply: \u201cBrightside was paid\u201d",
+    "label": "Keyway Management reply: \u201cBrightside was paid\u201d",
     "flow": "reply",
     "expect": "A reply with no receipt is not proof: the $1,000.00 alert stays open."
   },
   {
     "file": "Keyway_Bank_Export_Apr22.csv",
-    "label": "Keyway bank export (CSV)",
+    "label": "Keyway Management bank export (CSV)",
     "flow": "evidence",
     "expect": "The bank shows the $1,000.00 Brightside payment: that alert is withdrawn."
   }
