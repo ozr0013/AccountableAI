@@ -33,6 +33,8 @@ def _d(s: str | None) -> date | None:
 class InvoiceEvidence:
     invoice_id: str
     bank_cents: int = 0
+    # Exact assignments made during the full ordered pass, including unique fallbacks.
+    bank_rows: list[tuple[str, Payment]] = field(default_factory=list)
     bank_on: list[date] = field(default_factory=list)
     statement_paid: list[tuple[int, date | None]] = field(default_factory=list)  # manager's claim
     vendor_paid: tuple[int, date | None] | None = None                          # vendor confirmed
@@ -71,6 +73,7 @@ def gather_evidence(docs: list[Document], fuzzy: Fuzzy | None = None) -> MatchRe
                     unmatched.append((d.id, p))
                     continue
                 e.bank_cents += cents(p["amount"])
+                e.bank_rows.append((d.id, dict(p)))
                 if _d(p.get("on")):
                     e.bank_on.append(_d(p["on"]))
                 e.cites.setdefault("bank", []).append(_cite(d))

@@ -2,6 +2,7 @@
 implementation the env selects (RAILS / VERIFIER / APPROVALS = fake | real)."""
 
 import inspect
+from uuid import uuid4
 
 import pytest
 
@@ -64,7 +65,7 @@ def test_proposer_cannot_approve_via_approvals():
 
 def test_controller_can_approve():
     approvals = registry.approvals()
-    case = Case(id="c2", manager_id="keyway", alerts=["a1"], proposed_hold=3140.0,
+    case = Case(id=f"test-controller-{uuid4().hex}", manager_id="keyway", alerts=["a1"], proposed_hold=3140.0,
                 summary="hold", evidence=[])
     decided = approvals.decide(approvals.request(case), approver="controller", approve=True)
     assert decided.approved_by == "controller"

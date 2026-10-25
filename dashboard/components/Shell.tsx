@@ -28,6 +28,7 @@ export function Shell({ children }: { children: ReactNode }) {
   const controllerInitial = controllerName?.trim().charAt(0).toUpperCase() || "G";
   const nav = [
     { href: "/overview", label: "Overview", icon: Home },
+    { href: "/agent-workflow", label: "Agent workflow", icon: Spark },
     { href: "/investigation", label: "Live investigation", icon: Spark },
     { href: "/cases", label: "Review queue", icon: Inbox, count: pending },
     { href: "/items", label: "Needs attention", icon: ListIcon, count: open },
@@ -71,7 +72,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <DemoBar />
+          {!path.startsWith("/agent-workflow") && <DemoBar />}
           <div className="side-foot">
             <Link href="/agreements" className="who" title={account?.signed_in ? "Manage your Google profile" : "Connect your Google account"}>
               <span className="who-av">{account?.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : controllerInitial}</span>

@@ -95,7 +95,7 @@ def _cadence(rules: list[dict]) -> tuple[int, str]:
 
 
 def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history: list[dict],
-           today: date) -> Decision:
+           today: date, invoice=None) -> Decision:
     base = {"invoice_id": line.invoice_id, "vendor_name": vendor_name}
     if not rules:
         return Decision(**base, action="skip", reason="no saved agreement for this vendor")
@@ -111,7 +111,23 @@ def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history
     if line.invoice_received is None:
         return Decision(**base, action="skip", reason="invoice receipt date unknown")
     p = term["params"]
-    due = add_days(line.invoice_received, int(p["days"]), p.get("basis", "calendar"))
+    start = line.invoice_received
+    if p.get('basis', 'calendar') not in ('calendar', 'business'):
+        return Decision(**base, action='hold', reason='Unsupported agreement day basis; controller review required.')
+    if p.get('from') == 'invoice date':
+        raw = invoice.data.get('invoice_date') or invoice.dated if invoice else None
+        try:
+            start = raw if isinstance(raw, date) else date.fromisoformat(raw)
+        except (ValueError, TypeError):
+            return Decision(**base, action='hold', reason='Invoice date evidence is missing; controller review required.')
+    if p.get('undisputed_only') and invoice and (invoice.data.get('disputed') or invoice.data.get('status') == 'disputed'):
+        return Decision(**base, action='hold', reason='Disputed invoice requires controller review before chasing.')
+    for rule in rules:
+        if (rule['rule_type'] == 'amount' and rule['status'] == 'active'
+                and rule['params'].get('per') == 'fixed'
+                and round(float(rule['params']['amount']) * 100) != round(line.amount * 100)):
+            return Decision(**base, action='hold', reason='Invoice amount differs from the agreement; controller review required.')
+    due = add_days(start, int(p["days"]), p.get("basis", "calendar"))
     cite = {"rule_id": term["rule_id"], "rule_quote": term.get("source_quote"),
             "due_date": due.isoformat()}
     owed = round(line.amount - line.paid_amount, 2)
@@ -133,6 +149,8 @@ def _chase(base, cite, line, manager_name, rules, history, today, due, owed) -> 
     common = {**base, **cite, "days_overdue": overdue, "amount_owed": owed}
     drafts = sorted((h for h in history if h["action"] == "reminder"),
                     key=lambda h: (h["as_of"], h["action_id"]))
+    if any(h['status'] == 'awaiting_delivery' for h in drafts):
+        return Decision(**common, action='wait', reason='Reminder queued; waiting for confirmed delivery before another reminder.')
     if any(h["status"] == "needs_approval" for h in drafts):
         return Decision(**common, action="wait", reason="reminder draft awaiting controller approval")
     sent = [h for h in drafts if h["status"] in DELIVERED]
@@ -188,12 +206,13 @@ def run(rails, rule_rows: list[dict], history_rows: list[dict], today: date,
     from .patterns import describe, vendor_patterns
     patterns = {p["vendor"]: p for p in vendor_patterns(rails, rule_rows, today, manager_id)}
     out = []
+    invoice_docs = {d.data.get('invoice_id'): d for d in rails.documents(manager_id) if d.kind == 'vendor_invoice'}
     for line in rails.ledger(manager_id):
         if line.duplicate_of:
             continue
         vendor = name(line.vendor_id)
         d = decide(line, vendor, name(manager_id), rules.get(norm_name(vendor), []),
-                   history.get(line.invoice_id, []), today)
+                   history.get(line.invoice_id, []), today, invoice_docs.get(line.invoice_id))
         if d.action in ("reminder", "escalate", "wait") and vendor in patterns:
             # The vendor's payment history travels with every chasing decision.
             d = replace(d, reason=f"{d.reason}; history: {describe(patterns[vendor])}")

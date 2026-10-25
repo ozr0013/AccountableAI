@@ -22,18 +22,11 @@ STEP 1 - INPUT TO THE CHASER: Rio Grande's agreement rules (SpacetimeDB, from th
 ================================================================================================
 [
   {
-    "rule_id": "9b5f2667dfdc3458:payee",
-    "rule_type": "payee",
+    "rule_id": "9b5f2667dfdc3458:pay_to_account",
+    "rule_type": "pay_to_account",
     "status": "active",
-    "check": "Every bank payment for this agreement must name Rio Grande Plumbing LLC.",
-    "source_quote": "Rio Grande Plumbing LLC (\"Vendor\")"
-  },
-  {
-    "rule_id": "9b5f2667dfdc3458:pay_within_days",
-    "rule_type": "pay_within_days",
-    "status": "active",
-    "check": "Pay within 30 calendar days of invoice receipt; chase after that.",
-    "source_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt."
+    "check": "Payments must go to bank First Mesa Bank, routing 102000021, account 4471029; any change needs controller approval and identity checks.",
+    "source_quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,"
   },
   {
     "rule_id": "9b5f2667dfdc3458:amount",
@@ -43,11 +36,18 @@ STEP 1 - INPUT TO THE CHASER: Rio Grande's agreement rules (SpacetimeDB, from th
     "source_quote": "at the rate of $95 per hour plus approved materials"
   },
   {
-    "rule_id": "9b5f2667dfdc3458:pay_to_account",
-    "rule_type": "pay_to_account",
+    "rule_id": "9b5f2667dfdc3458:pay_within_days",
+    "rule_type": "pay_within_days",
     "status": "active",
-    "check": "Payments must go to bank First Mesa Bank, routing 102000021, account 4471029; any change needs controller approval and identity checks.",
-    "source_quote": "Payments shall be made by ACH to First Mesa Bank, routing number 102000021,"
+    "check": "Pay within 30 calendar days of invoice receipt; chase after that.",
+    "source_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt."
+  },
+  {
+    "rule_id": "9b5f2667dfdc3458:payee",
+    "rule_type": "payee",
+    "status": "active",
+    "check": "Every bank payment for this agreement must name Rio Grande Plumbing LLC.",
+    "source_quote": "Rio Grande Plumbing LLC (\"Vendor\")"
   }
 ]
 
@@ -82,18 +82,29 @@ STEP 3 - DAILY CHECK, 2026-04-22 (deadline passed)
 {
   "invoice_id": "INV-KW-0301",
   "vendor_name": "Rio Grande Plumbing",
-  "action": "reminder",
-  "reason": "20 days past the 2026-04-02 deadline; polite reminder queued automatically; history: 0 of 4 past payments late (avg 0.0 days)",
-  "level": "polite",
+  "action": "wait",
+  "reason": "Reminder queued; waiting for confirmed delivery before another reminder.; history: 0 of 4 past payments late (avg 0.0 days)",
+  "level": null,
   "due_date": "2026-04-02",
   "days_overdue": 20,
   "amount_owed": 1240.0,
-  "message": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?",
+  "message": null,
   "rule_id": "9b5f2667dfdc3458:pay_within_days",
   "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
-  "status": "queued",
+  "status": "recorded",
   "attempt": 0,
-  "action_id": "INV-KW-0301:reminder:polite:0"
+  "action_id": "INV-KW-0301:wait:wait:0"
+}
+
+================================================================================================
+STEP 3b - OUTBOX: polite reminder confirmed delivered (receipt recorded)
+================================================================================================
+{
+  "id": "out-09b326f9529841c85a5544a2b14773cd85cb076f165d2169668f9733577ab977",
+  "kind": "chase_reminder",
+  "status": "delivered",
+  "reference": "smtp-receipt-0422",
+  "acknowledged_by": "controller.dana"
 }
 
 ================================================================================================
@@ -136,10 +147,10 @@ STEP 4 - CLAUDE CALL + CODE GUARD (thinking, answer, accepted?)
     "attempt": 1,
     "accepted": true,
     "problems": [],
-    "answer": "{\"claims_paid\": true, \"invoice_ids\": [\"INV-KW-0301\"], \"proof_source_ids\": [], \"summary\": \"The reply states that Rio Grande was paid last week for the open invoice, but the records contain no bank record of an outgoing payment or vendor confirmation of receipt for INV-KW-0301.\"}",
+    "answer": "{\"claims_paid\": true, \"invoice_ids\": [\"INV-KW-0301\"], \"proof_source_ids\": [], \"summary\": \"The reply says Rio Grande was paid last week for the open invoice, but no bank record or vendor confirmation in the records shows an outgoing payment for INV-KW-0301.\"}",
     "thinking": "",
     "input_tokens": 5242,
-    "output_tokens": 110
+    "output_tokens": 105
   }
 ]
 
@@ -219,7 +230,7 @@ STEP 6 - tools Claude can call
 STEP 6 - Claude's reasoning summary (thinking)
 ================================================================================================
 [
-  "I'm flagging that the ledger shows a due date differing from what the agreement rules actually dictate, so I should go with the rule-derived 2026-04-02 deadline and note the discrepancy. The payment was funded 2026-03-05 with no bank record of payment, making it 25 days overdue \u2014 a polite reminder is queued but not yet confirmed sent, and a firmer reminder would need approval.\n\nSince the vendor's lateness history is already noted in my reasoning, I don't need to dig further there \u2014 this needs to go to the controller for review and approve/reject on the firm reminder draft, since I can't approve it myself.\n\n"
+  "I'm noting the discrepancy between the ledger's 10-day due date and the agreement's actual 30-day term, which should govern since it's funded with no payment yet. The polite reminder is only queued, not confirmed sent, so the controller needs to review and approve or reject the firm reminder in the queue, and also flag the ledger date mismatch \u2014 vendor history otherwise looks clean.\n\n"
 ]
 
 ================================================================================================
@@ -238,31 +249,32 @@ STEP 6 - tool calls Claude chose, in order
 ================================================================================================
 STEP 6 - Claude's answer
 ================================================================================================
-**INV-KW-0301 is 25 days past its deadline and has no recorded payment.** Oakline sent Keyway the money for it on 2026-03-05, but no bank record shows Keyway paying Rio Grande Plumbing. A firm reminder to Keyway is drafted and waiting for the controller's approval. The main thing to do now is review that draft.
+**INV-KW-0301 is 25 days overdue, and the only thing pending is a firm reminder that needs your approval.** Oakline funded the full $1,240.00, but no bank record shows Keyway paid Rio Grande Plumbing. The chaser is holding off on anything further until you approve or reject that reminder.
 
-**The facts**
+**Key facts**
 - **Invoice:** $1,240.00 from Rio Grande Plumbing, received 2026-03-03.
-- **Funding:** Oakline funded the full $1,240.00 on 2026-03-05. Amount paid is $0.00 and there is no payment date. The ledger status is "funded."
-- **Deadline:** 2026-04-02. The agreement rule `9b5f2667dfdc3458:pay_within_days` says "Owner shall pay each undisputed invoice within thirty (30) days of receipt."
-- **Different ledger date:** The ledger shows a due date of 2026-03-13 (10 days after receipt), which doesn't match the 30-day rule. The chaser uses the rule's date, 2026-04-02. It may be worth finding out why the ledger shows 03-13.
-- **Vendor history:** 0 of 4 past payments to Rio Grande were late. Nothing in the records explains the delay so far.
+- **Funding:** Oakline funded $1,240.00 on 2026-03-05.
+- **Payment:** Paid amount is $0.00 with no payment date. The ledger status is "funded," so no payment has been confirmed.
+- **Deadline:** 2026-04-02. Rule `9b5f2667dfdc3458:pay_within_days` says: "Owner shall pay each undisputed invoice within thirty (30) days of receipt."
+- **Mismatch:** The ledger shows a due date of 2026-03-13, which doesn't match the 30-day agreement term. The chaser goes by the agreement date (2026-04-02), but the ledger may be worth correcting.
+- **Vendor history:** 0 of 4 past payments were late, so this is unusual for this vendor.
 
 **What the chaser has done**
-1. **2026-04-22 (20 days overdue):** A polite reminder to Keyway (`INV-KW-0301:reminder:polite:0`) was queued automatically. Its status is still "queued," so the records don't confirm it was sent.
-2. **2026-04-27 (today, 25 days overdue):** A firm reminder (`INV-KW-0301:reminder:firm:0`) is drafted with status "needs_approval." It asks Keyway for a bank record or the vendor's confirmation, or an explanation of what is holding the payment up. The chaser is waiting on your decision before doing anything more.
+1. **2026-04-22 (20 days overdue):** A polite reminder to Keyway was queued automatically (`INV-KW-0301:reminder:polite:0`). Its status is still "queued," so the records don't confirm it was actually sent.
+2. **2026-04-27 (25 days overdue):** A firm reminder was drafted (`INV-KW-0301:reminder:firm:0`) and is waiting for your approval. It asks Keyway for a bank record or vendor confirmation, or the reason for the delay.
 
-**What the controller should do**
-- **Review the firm reminder draft:** approve it or reject it. I can only read records, so I can't approve or send it for you.
-- **Check whether the polite reminder went out.** It's still "queued," so the firm reminder may be Keyway's first actual notice.
-- **Check any payment proof against the agreement.** If Keyway sends proof, the bank record must name Rio Grande Plumbing LLC (`…:payee`). It must also go to First Mesa Bank, routing 102000021, account 4471029 (`…:pay_to_account`). Any change to that account needs controller approval and identity checks.
-- **If nothing comes back, the $1,240.00 is funded but unexplained.** The chaser will keep stepping up its reminders under its normal process.
+**What to do**
+1. **Approve or reject the firm reminder** in the approval queue. I can only read records, so I can't approve it myself. Given the 25 days overdue and the vendor's clean history, asking Keyway to explain makes sense.
+2. **Check whether the polite reminder actually went out.** If it didn't, Keyway may not have been contacted yet.
+3. **Ask Keyway for proof of payment.** Until a bank record or vendor confirmation comes in, the $1,240 Oakline funded is unexplained.
+4. **Optional:** Correct the ledger due date to 2026-04-02.
 
 ================================================================================================
 STEP 6 - usage
 ================================================================================================
 {
   "input_tokens": 6,
-  "output_tokens": 1170,
+  "output_tokens": 1047,
   "model": "claude-opus-5-5"
 }
 
@@ -281,6 +293,10 @@ STEP 7 - NEW EVIDENCE: bank record (scratch copy only)
       {
         "invoice_id": "INV-KW-0301",
         "vendor_id": "v-riogrande",
+        "payee": "Rio Grande Plumbing LLC",
+        "bank": "First Mesa Bank",
+        "routing": "102000021",
+        "account": "4471029",
         "amount": 1240.0,
         "on": "2026-04-29"
       }
@@ -324,12 +340,69 @@ STEP 8 - hand-off record the anomaly agent picks up (SpacetimeDB chase_action)
   "reason": "bank shows $1,240.00 paid in full on 2026-04-29; anomaly agent checks amount, recipient and timing",
   "rule_id": "9b5f2667dfdc3458:pay_within_days",
   "rule_quote": "Owner shall pay each undisputed invoice within thirty (30) days of receipt.",
-  "status": "recorded",
+  "status": "reviewed",
   "as_of": "2026-04-30",
   "created_at": [
-    1792887300050147
+    1792895585283721
+  ],
+  "decided_by": "anomaly_checks",
+  "decision_note": "case needs_controller: late_payment, statement_predates_payment"
+}
+
+================================================================================================
+STEP 9 - ANOMALY CHECKS: the case verdict (Postgres workflow_case)
+================================================================================================
+{
+  "state": "needs_controller",
+  "findings": [
+    {
+      "code": "late_payment",
+      "message": "Payment was made after the agreement deadline 2026-04-02."
+    },
+    {
+      "code": "statement_predates_payment",
+      "message": "A statement dated after the payment is required."
+    }
+  ],
+  "closure_eligible": false,
+  "source_ids": [
+    "doc-inv-kw-0301",
+    "doc-funding-kw-0305",
+    "doc-stmt-kw-2026-03",
+    "doc-notice-riogrande-0420",
+    "scenario-bank-0301"
   ]
 }
+
+================================================================================================
+STEP 9 - outbox for this invoice after the hand-off (stale drafts cancelled)
+================================================================================================
+[
+  {
+    "kind": "chase_reminder",
+    "status": "delivered",
+    "audience": "management:keyway",
+    "body": "Hello Keyway Property Management, a friendly reminder: Oakline Homes funded $1,240.00 for Rio Grande Plumbing (invoice INV-KW-0301) and we have not yet seen the vendor payment confirmed. Could you share the payment details or the vendor's confirmation?"
+  },
+  {
+    "kind": "chase_reminder",
+    "status": "cancelled",
+    "audience": "management:keyway",
+    "body": "Hello Keyway Property Management, following up on our earlier note about $1,240.00 funded for Rio Grande Plumbing (invoice INV-KW-0301). We still have no bank record or vendor confirmation of payment. Please send one, or tell us what is holding it up."
+  },
+  {
+    "kind": "request_statement",
+    "status": "queued",
+    "audience": "management:keyway",
+    "body": "Provide a matching financial statement for INV-KW-0301."
+  },
+  {
+    "kind": "review_anomaly",
+    "status": "needs_approval",
+    "audience": "controller",
+    "body": "Review INV-KW-0301: Payment was made after the agreement deadline 2026-04-02.; A statement dated after the payment is required."
+  }
+]
 
 ================================================================================================
 TRAIL FOR THIS INVOICE (every recorded chaser action)
@@ -339,14 +412,18 @@ TRAIL FOR THIS INVOICE (every recorded chaser action)
     "as_of": "2026-04-30",
     "action": "handoff_anomaly",
     "level": null,
-    "status": "recorded",
+    "status": "reviewed",
+    "decided_by": "anomaly_checks",
+    "decision_note": "case needs_controller: late_payment, statement_predates_payment",
     "reason": "bank shows $1,240.00 paid in full on 2026-04-29; anomaly agent checks amount, recipient and timing"
   },
   {
     "as_of": "2026-04-27",
     "action": "reminder",
     "level": "firm",
-    "status": "needs_approval",
+    "status": "cancelled",
+    "decided_by": "anomaly_checks",
+    "decision_note": "payment evidence arrived; see anomaly review",
     "reason": "25 days past the 2026-04-02 deadline; firm reminder drafted for controller approval; history: 0 of 4 past payments late (avg 0.0 days)"
   },
   {
@@ -354,6 +431,8 @@ TRAIL FOR THIS INVOICE (every recorded chaser action)
     "action": "reminder",
     "level": "polite",
     "status": "queued",
+    "decided_by": null,
+    "decision_note": null,
     "reason": "20 days past the 2026-04-02 deadline; polite reminder queued automatically; history: 0 of 4 past payments late (avg 0.0 days)"
   }
 ]

@@ -1,0 +1,95 @@
+{
+  "branch": "api-convert",
+  "base_commit": "529d12f",
+  "date": "2026-10-24",
+  "http_checks": {
+    "8772/health": {
+      "status": 200,
+      "count": null,
+      "as_of": null
+    },
+    "8772/agreements": {
+      "status": 200,
+      "count": 2,
+      "as_of": null
+    },
+    "8773/health": {
+      "status": 200,
+      "count": null,
+      "as_of": null
+    },
+    "8773/chaser/invoices?limit=2": {
+      "status": 200,
+      "count": 110,
+      "as_of": "2026-04-22"
+    },
+    "8773/chaser/actions": {
+      "status": 200,
+      "count": 13,
+      "as_of": null
+    }
+  },
+  "agreement_live": {
+    "transport": "ASGI test client; real Claude, in-memory SpacetimeDB fixture",
+    "mode": "model",
+    "complete": true,
+    "fields": 8,
+    "rules": 4,
+    "steps": [
+      "parsed rio_grande_services_agreement.pdf: 1 page(s), 8 sections, kind agreement (agreement wording: agreement, between, shall, services, terms, fees, (\"owner\"), (\"vendor\"))",
+      "model turn 1: read_header, list_sections",
+      "read the header (top of the document)",
+      "listed 8 sections",
+      "model turn 2: read_section, read_section, read_section, search",
+      "read section 4",
+      "read section 5",
+      "read section Signatures",
+      "searched for 'late': 0 hit(s)",
+      "model turn 3: record_field, record_field, record_field, record_field, record_field, record_field, record_field, mark_missing",
+      "recorded Owner company name: Oakline Homes LLC",
+      "recorded Vendor company name: Rio Grande Plumbing LLC",
+      "recorded Payment due date or terms: Within 30 days of receipt of each undisputed invoice",
+      "recorded Payment amount or rate: $95 per hour plus approved materials",
+      "recorded Payment information: ACH to First Mesa Bank, routing 102000021, account 4471029, in the name of Rio Grande Plumbing LLC",
+      "recorded Effective date: March 1, 2026",
+      "recorded Signatures: Signed by both parties: Dana Ortiz (Controller, Oakline Homes LLC) and Luis Ortega (Owner, Rio Grande Plumbing LLC), both dated March 1, 2026",
+      "marked Reminder or grace terms missing: Searched for 'late' and read payment sections; no grace period, reminder, or late fee terms.",
+      "model turn 4: done",
+      "checked 8 fields: complete"
+    ],
+    "estimated_cost_usd": 0.03532
+  },
+  "chaser_live": {
+    "transport": "live HTTP service with real PostgreSQL and SpacetimeDB reads",
+    "model": "claude-opus-5-5",
+    "tools": [
+      "get_invoice"
+    ],
+    "answer": "INV-KW-0301 (Rio Grande Plumbing, $1,240.00) is **20 days past its agreement deadline**. There's no record yet of Keyway paying the vendor, and the chaser has queued a polite reminder to Keyway today.\n\n**Agreement deadline**\n- Rule `9b5f2667dfdc3458:pay_within_days`: \"Owner shall pay each undisputed invoice within thirty (30) days of receipt\" (\u00a73).\n- The invoice was received 2026-03-03, so it was due **2026-04-02**. As of 2026-04-22 that's 20 days overdue.\n- The ledger shows a different due date, **2026-03-13**, which is only 10 days after receipt and doesn't match the 30-day rule. The chaser uses the agreement's 2026-04-02. You may want to check why the ledger date is different.\n\n**Payment proof**\n- Oakline paid Keyway the full $1,240.00 for this invoice on 2026-03-05. The ledger status is \"funded.\"\n- Keyway's payment to the vendor shows $0.00 with no paid date, so there's no bank record of it. The $1,240.00 Oakline sent is unexplained so far.\n- Once a bank payment is recorded, it must name Rio Grande Plumbing LLC (`:payee`) and go to First Mesa Bank, routing 102000021, account 4471029 (`:pay_to_account`).\n\n**Chaser action**\n- `INV-KW-0301:reminder:polite:0` is a polite reminder to Keyway asking for the payment details or the vendor's confirmation. Its status is **queued** (dated 2026-04-22), so nothing shows it as sent yet.\n- Today's decision is **wait** (`INV-KW-0301:wait:wait:0`), because the last reminder was 0 days ago. The next one can go after the approved 5-day gap.\n- Context: Rio Grande has been paid late 0 of 4 times before (average 0.0 days late).\n\nI only looked things up. Nothing was sent or changed.",
+    "usage": {
+      "input_tokens": 6,
+      "output_tokens": 915
+    }
+  },
+  "validation": {
+    "python_full": {
+      "passed": 439,
+      "skipped": 3
+    },
+    "python_agent_focused": {
+      "passed": 53,
+      "skipped": 1
+    },
+    "browser_client_tests": 8,
+    "typescript": "passed",
+    "production_build": "passed",
+    "browser": "saved agreement/rules, invoice detail, deadline discrepancy and no-write preview passed"
+  },
+  "limitations": [
+    "No standalone anomaly handoff consumer on this branch",
+    "Messages are queued drafts, not delivered",
+    "Existing investigation/review demo screens retain their separate demo state"
+  ],
+  "shared_test_data_cleared": false,
+  "external_messages_sent": 0
+}

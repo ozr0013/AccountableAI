@@ -20,6 +20,9 @@ class Rails:
     def __init__(self, lines):
         self.lines = lines
 
+    def documents(self, manager_id=None):
+        return []
+
     def ledger(self, manager_id):
         return self.lines
 
