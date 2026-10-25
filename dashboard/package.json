@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "scripts": {
+    "predev": "python3 scripts/export_agent_prompts.py",
     "dev": "next dev -p 3000",
+    "prebuild": "python3 scripts/export_agent_prompts.py",
     "build": "next build",
     "start": "next start -p 3000",
     "feed": "python feed/serve.py",
