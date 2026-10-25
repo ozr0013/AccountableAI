@@ -57,6 +57,8 @@ class RealRails:
     def append_event(self, event: Event) -> None:
         if self.store.append(event):
             self.deps.index_event(event)
+            from rails.live.spacetime import mirror_new
+            mirror_new(self.store, event)
 
     def events(self, manager_id: str | None = None) -> list[Event]:
         return self.store.events(manager_id=manager_id)

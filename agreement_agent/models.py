@@ -61,7 +61,7 @@ class FieldResult(BaseModel):
     quote: str | None = None             # verbatim text from the document backing the value
     location: str | None = None          # "§4.2", "p.1", "header"
     note: str = ""                       # why missing / unclear, what was searched
-    by: Literal["rules", "model"] = "rules"
+    by: Literal["rules", "model", "controller"] = "rules"
 
 
 class Escalation(BaseModel):
