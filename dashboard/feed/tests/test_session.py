@@ -104,3 +104,20 @@ def test_a_session_never_emails_unless_the_server_turns_it_on(demo, monkeypatch)
     monkeypatch.setattr(mailer, "enabled", lambda: True)      # as if the send token existed
     demo.advance(5)                                           # reminders go out on this step
     assert not sent.called and demo.send_email is False
+
+
+def test_a_document_reports_the_books_before_and_after():
+    """Live investigation shows these: a claim with no proof moves nothing, a bank record moves one invoice."""
+    demo = DemoSession()                         # the full world the dashboard runs
+    samples = Path(__file__).resolve().parents[1] / 'samples'
+    said = demo.add_file(samples / 'Keyway_Reply_KW-0901.eml')
+    assert said['books']['before'] == said['books']['after']
+    assert said['diff']['changed'] == []
+    bank = demo.add_file(samples / 'Keyway_Bank_Export_Apr22.csv')
+    b, a = bank['books']['before'], bank['books']['after']
+    assert [c['id'] for c in bank['diff']['changed']] == ['INV-KW-0901']
+    assert (b['unexplained'] - a['unexplained'], b['keyway'] - a['keyway'], b['open'] - a['open']) == (1000, 1000, 1000)
+    assert b['attention'] - a['attention'] == 1
+    assert a == {'unexplained': bank['state']['headline']['unexplained'], 'keyway': bank['state']['recon']['owed'],
+                 'open': round(sum(i['owed'] for i in bank['state']['items'] if i['owed'] > 0), 2),
+                 'attention': sum(1 for i in bank['state']['items'] if i['attention'])}

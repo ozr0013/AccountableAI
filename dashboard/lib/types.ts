@@ -90,8 +90,14 @@ export type State = {
 
 export type Response = { agent: string; what: string; type: string; invoice_id: string | null };
 
+/** The figures every tab shows, before and after one action (session.py `books`). */
+export type Books = { unexplained: number; keyway: number; open: number; attention: number };
+
 export type ActionResult =
-  | { ok: true; kind: string; summary: string; affected: string[]; trace: string[]; diff: Diff; responses: Response[]; cost: number; live: boolean; state: State; events: unknown[]; parsed?: Parsed }
+  | { ok: true; kind: string; summary: string; affected: string[]; trace: string[]; diff: Diff; responses: Response[]; cost: number; live: boolean; state: State; events: unknown[]; parsed?: Parsed;
+      // what ran and what was written (dashboard/feed/session.py _act)
+      books?: { before: Books; after: Books };
+      steps?: string[]; agents?: Record<string, number>; writes?: { total: number; notes: { type: string; text: string; invoice_id: string | null }[] } }
   | { ok: false; error: string; suggestions?: string[]; state?: State };
 
 export type ConsoleResult = ActionResult;

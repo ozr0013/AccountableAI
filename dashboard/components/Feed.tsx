@@ -23,8 +23,9 @@ type Ctx = {
   runConsole: (q: { preset?: string; params?: Record<string, string>; text?: string }) => Promise<ActionResult>;
   reply: (invoiceId: string, text: string, proof: "none" | "bank" | "vendor") => Promise<ActionResult>;
   decide: (approvalId: string, approve: boolean, identityVerified?: boolean) => Promise<ActionResult>;
-  advance: (days: number) => Promise<ActionResult>;
-  addFile: (name: string) => Promise<ActionResult>;
+  /** `quiet`: the caller shows the result itself, so the responses drawer stays shut. */
+  advance: (days: number, quiet?: boolean) => Promise<ActionResult>;
+  addFile: (name: string, quiet?: boolean) => Promise<ActionResult>;
   refresh: () => Promise<void>;
   setLive: (on: boolean) => Promise<{ ok: boolean; error?: string }>;
   brief: (question: string) => Promise<Briefing>;
@@ -87,7 +88,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   }, [loadReplay]);
 
   /** Run one action: update state, keep the result, open the responses panel. */
-  const act = async (run: () => Promise<ActionResult>): Promise<ActionResult> => {
+  const act = async (run: () => Promise<ActionResult>, quiet = false): Promise<ActionResult> => {
     setBusy(true);
     let res: ActionResult;
     try {
@@ -97,7 +98,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
     }
     if (res.state) setState(res.state);
     setLast(res);
-    setPanel(true);
+    if (!quiet) setPanel(true);
     setBusy(false);
     return res;
   };
@@ -121,11 +122,11 @@ export function FeedProvider({ children }: { children: ReactNode }) {
       ? post<ActionResult>(`/api/approvals/${approvalId}`, { approve, by: state?.meta.controller ?? "controller.dana", identity_verified: identityVerified })
       : replayOnly()));
 
-  const advance: Ctx["advance"] = (days) =>
-    act(() => (mode === "live" ? post<ActionResult>("/api/clock", { days }) : replayOnly()));
+  const advance: Ctx["advance"] = (days, quiet) =>
+    act(() => (mode === "live" ? post<ActionResult>("/api/clock", { days }) : replayOnly()), quiet);
 
-  const addFile: Ctx["addFile"] = (name) =>
-    act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()));
+  const addFile: Ctx["addFile"] = (name, quiet) =>
+    act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()), quiet);
 
   /** Re-read the session after work that ran outside these actions (the simulation, the Live loop page). */
   const refresh: Ctx["refresh"] = async () => {

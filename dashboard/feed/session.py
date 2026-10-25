@@ -301,6 +301,7 @@ class DemoSession:
         out = {"ok": True, "kind": kind, "summary": summary, "affected": affected,
                "events": [e.model_dump(mode="json") for e in events], "trace": trace,
                "diff": (d := diff(before, after, affected)),
+               "books": {"before": books(before), "after": books(after)},
                "responses": _responses(self.rails.events()[seq0:], trace, after["meta"]["names"],
                                        set(affected) | {c["id"] for c in d["changed"]}),
                "cost": round(self.meter.spent - spent0, 4), "live": self.live,
@@ -818,6 +819,14 @@ def _audit(events: list[Event]) -> list[dict]:
                     "actor": AGENT_OF_STEP[e.type], "what": what,
                     "invoice_id": e.invoice_id})
     return out[::-1]
+
+
+def books(snap: dict) -> dict:
+    """The figures every tab shows, from one snapshot (the same as dashboard/lib/balances.ts)."""
+    items = snap["items"]
+    return {"unexplained": snap["headline"]["unexplained"], "keyway": snap["recon"]["owed"],
+            "open": round(sum(i["owed"] for i in items if i["owed"] > 0), 2),
+            "attention": sum(1 for i in items if i["attention"])}
 
 
 def diff(before: dict, after: dict, rechecked: list[str]) -> dict:
