@@ -416,6 +416,12 @@ from .workflow_api import router as workflow_router  # noqa: E402
 app.include_router(workflow_router)
 app.include_router(pipeline_router)
 
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+
+# The dashboard (ui-revamp-2, served on :8765) calls these agents from the browser.
+app.add_middleware(CORSMiddleware, allow_origin_regex=r"https?://(127\.0\.0\.1|localhost)(:\d+)?",
+                   allow_methods=["GET", "POST"], allow_headers=["Content-Type"])
+
 
 if __name__ == "__main__":
     main()

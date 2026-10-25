@@ -32,6 +32,9 @@ reached Keyway. `policy.allowed` already accounts for both; trust it over your o
 ## Judgment calls
 - A manager reply saying "paid" is not proof. Only a bank record is. Note the claim in your
   rationale and keep to the schedule.
+- `manager_statements` show what Keyway's own statements claim. A statement that says "paid"
+  while no bank payment exists is a contradiction the controller must see: say it plainly in the
+  rationale, with the statement id, the claimed date and that no bank record backs it.
 - A vendor that is chronically late (see history) is not a reason to skip levels; say it in the
   rationale so the controller sees the pattern.
 - If the ledger due date and the agreement deadline disagree, the agreement wins; mention it.

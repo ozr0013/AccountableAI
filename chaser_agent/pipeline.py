@@ -44,8 +44,9 @@ def enqueue(mirror, agent: str, invoice_id: str, reason: str, payload: dict, tod
 
 
 def dispatch(rails, mirror, today: date, vendor: str | None = None,
-             created_by: str = "daily_schedule") -> list[str]:
-    """One chaser task per invoice whose vendor has saved agreement rules (no model calls)."""
+             created_by: str = "daily_schedule", since: date | None = None) -> list[str]:
+    """One chaser task per invoice whose vendor has saved agreement rules (no model calls).
+    `since`: skip invoices already paid in full before that day (settled history)."""
     from workflow.names import names_from
     name = names_from(rails)
     covered = {daily.norm_name(r["vendor_name"]) for r in mirror.query("SELECT * FROM agreement_rule")}
@@ -56,6 +57,8 @@ def dispatch(rails, mirror, today: date, vendor: str | None = None,
         if line.duplicate_of or daily.norm_name(v) not in covered or line.invoice_id in done:
             continue
         if vendor and daily.norm_name(vendor) != daily.norm_name(v):
+            continue
+        if since and line.paid_on and line.paid_on < since and line.paid_amount >= line.amount:
             continue
         out.append(enqueue(mirror, "chaser", line.invoice_id,
                            f"daily check for {v}", {"vendor": v}, today, created_by))
@@ -86,6 +89,15 @@ def run_chaser(task, rails, mirror, today, client=None) -> dict:
 
     tools = llm_chaser.ChaserTools(rails, mirror, task["invoice_id"], today, history_rows,
                                    handoff, _record_chase(mirror, today), MANAGER)
+    if tools.allowed() == ["wait"]:
+        # Nothing to decide today (not due, waiting on approval or delivery, no agreement):
+        # the schedule waits without a model call, and says why.
+        reason = tools.code.reason if tools.code else "no ledger line for this invoice"
+        return {"outcome": {"decision": "wait", "rationale": reason, "decided_by": "schedule",
+                            "result": {"waiting": True}, "error": None},
+                "trace": {"agent": "chaser", "model": "schedule (no model call)", "thinking": [],
+                          "steps": [], "decision": {"tool": "wait", "input": {"rationale": reason}},
+                          "text": "", "usage": {}, "error": None}}
     trace = llm_chaser.run(tools, client)
     return {"outcome": llm_chaser.outcome(trace), "trace": trace.to_dict()}
 

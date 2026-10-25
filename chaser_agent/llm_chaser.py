@@ -71,12 +71,25 @@ class ChaserTools:
             "manager_replies": [{"on": h["as_of"], "reply": h.get("message"), "verdict": h["reason"]}
                                 for h in self.history if h["action"] == "reply_read"],
             "vendor_history": describe(pattern),
+            "manager_statements": self.statement_claims(),
             "policy": {"allowed": self.allowed(), "schedule_says": c.action if c else None,
                        "level": c.level if c else None, "due_date": c.due_date if c else None,
                        "days_overdue": c.days_overdue if c else 0,
                        "amount_owed": c.amount_owed if c else None,
                        "why": c.reason if c else "no ledger line"},
         }
+
+    def statement_claims(self) -> list[dict]:
+        """What Keyway's own statements say about this invoice (a claim, not proof)."""
+        out = []
+        for d in self.rails.documents(self.manager_id):
+            if d.kind.value != "manager_statement" or (d.dated and d.dated > self.today):
+                continue
+            for row in d.data.get("lines", []):
+                if row.get("invoice_id") == self.invoice_id:
+                    out.append({"statement": d.id, "dated": str(d.dated), "says": row.get("status"),
+                                "amount": row.get("amount"), "paid_on": row.get("on")})
+        return out
 
     # -- decisions (terminal) -------------------------------------------------------------
     def _guard(self, tool: str) -> dict | None:
