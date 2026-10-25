@@ -616,3 +616,7 @@
   .theme-aura .side-brand .brand { padding-left: 14px; }
   .theme-aura.sidebar-collapsed :is(.nav, .side-foot) { display: none; }
 }
+
+/* the logo mark beside the wordmark */
+.wordmark { display: inline-flex; align-items: center; gap: 10px; }
+.wordmark-mark { width: 1.3em; height: 1.3em; flex: none; display: block; }

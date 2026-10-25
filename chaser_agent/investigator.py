@@ -8,6 +8,7 @@ invoice to the chaser with a note. It never chases, never sends anything and nev
 """
 from __future__ import annotations
 
+import os
 from datetime import date
 
 from . import books, daily
@@ -112,8 +113,9 @@ def run(tools: InvestigatorTools, client=None) -> Trace:
     task = (f"Task: today is {tools.today.isoformat()}. Sweep Keyway's books for problems no single "
             "invoice shows. Investigate with query_books, flag or hand on what you prove, then "
             "finish_sweep.")
+    # INVESTIGATOR_EFFORT=low makes each daily sweep quicker, for a time-boxed showing.
     return run_agent("investigator", SYSTEM, load_skill("investigating"), tools.tools(), task,
-                     client, max_turns=MAX_TURNS)
+                     client, effort=os.getenv("INVESTIGATOR_EFFORT", "medium"), max_turns=MAX_TURNS)
 
 
 def outcome(trace: Trace) -> dict:

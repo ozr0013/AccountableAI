@@ -149,7 +149,7 @@ async def stream():
 
 @router.get("/demo")
 def demo_state() -> dict:
-    return demo.state(_demo_rails())
+    return {**demo.state(_demo_rails()), "usage": pipeline.usage_total(service._mirror())}
 
 
 @router.post("/demo/reset")

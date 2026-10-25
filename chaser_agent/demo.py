@@ -16,6 +16,7 @@ Simulated: the calendar speed, the storyboard evidence, and email delivery when 
 """
 from __future__ import annotations
 
+import os
 from datetime import UTC, date, datetime, time, timedelta
 
 from contracts.models import Document, Event
@@ -25,7 +26,8 @@ from . import pipeline
 
 SCHEMA = "demo_live"
 START = date(2026, 4, 22)
-END = date(2026, 5, 12)
+# DEMO_END shortens the calendar for a quick showing; the INV-KW-0301 story is complete by May 1.
+END = date.fromisoformat(os.getenv("DEMO_END", "2026-05-12"))
 FOCUS = "INV-KW-0301"
 
 # Evidence that arrives on its own during the demo; the agents are not told it is coming.
@@ -92,10 +94,11 @@ def feed(demo, mirror) -> dict:
     """The seeded daily paperwork (chaser_agent/demo_feed.py), built once from the books."""
     global _FEED
     if _FEED is None:
-        from . import demo_feed
         # Built from the original books, never the demo copy: the copy already holds earlier
         # days' paperwork, which would change the vendors' usual amounts and so the whole month.
         from rails.real import RealRails
+
+        from . import demo_feed
         _FEED = demo_feed.build(demo_feed.vendors(RealRails(), mirror), START, END, pipeline.MANAGER)
     return _FEED
 

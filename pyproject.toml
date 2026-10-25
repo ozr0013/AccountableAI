@@ -12,6 +12,7 @@ dependencies = [
     "cdp-sdk>=1.51",                      # paid_api: Coinbase server wallets + faucet
     "pydantic>=2.7",
     "anthropic>=0.40",
+    "google-genai>=1.0",
     "psycopg[binary]>=3.2",
     "neo4j>=5.20",
     "fastapi>=0.115",

@@ -3,7 +3,8 @@
 Two layers, same output (contracts.models.Briefing):
   * code briefing: built straight from open alerts, past rulings and reminders. Free, always
     available, every claim carries the alert's own citations. Also the fallback.
-  * model briefing: one structured Claude call that writes a short answer over the same record.
+  * model briefing: one structured model call (Gemini when GEMINI_API_KEY is set, else Claude)
+    that writes a short answer over the same record.
     Code checks every claim: it must cite documents the model was shown, use no accusatory
     wording, and the answer itself must pass the wording check. Claims that fail are dropped;
     if the answer fails, or the call fails, the code briefing is returned instead.
@@ -25,6 +26,10 @@ from ..verifier.rules import find_banned
 log = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "claude-sonnet-5-5"     # README: Sonnet for the briefing agent
+# Gemini's free tier, tried in order. "-latest" aliases follow Google's current versions (pinned
+# versions get retired and 404); Flash-Lite answers fastest when the free tier is busy.
+GEMINI_MODELS = ("gemini-flash-lite-latest", "gemini-flash-latest")
+GEMINI_TIMEOUT_MS = 20_000
 _FALLBACK_MODELS = {"claude-opus-5-5", "claude-sonnet-5-5", "claude-fable-5-1"}
 
 SYSTEM = """You brief Oakline Homes' controller on a property manager that Oakline funds to pay \
@@ -132,21 +137,69 @@ def code_briefing(rec: Record, question: str) -> Briefing:
                     claims=claims, prior_rulings=rulings)
 
 
+def _prompt(rec: Record, question: str) -> str:
+    return f"<record>\n{rec.render()}\n</record>\n\nController's question: {question}"
+
+
+class GeminiBriefer:
+    """The same structured call on Gemini (google-genai). Returns (answer, meta) or raises."""
+
+    def __init__(self, client=None, model: str | None = None):
+        from google import genai
+        from google.genai import types
+        # One attempt per model with a hard timeout: a busy free tier must not hang the Ask page.
+        self.client = client or genai.Client(
+            api_key=os.environ["GEMINI_API_KEY"],
+            http_options=types.HttpOptions(timeout=GEMINI_TIMEOUT_MS, retry_options=types.HttpRetryOptions(attempts=1)))
+        chosen = model or os.getenv("GEMINI_MODEL")
+        self.models = (chosen,) if chosen else GEMINI_MODELS
+
+    def __call__(self, rec: Record, question: str) -> tuple[_BriefingOut | None, dict]:
+        import httpx
+        from google.genai import errors
+        for i, model in enumerate(self.models):
+            try:
+                return self._one(model, rec, question)
+            except (errors.APIError, httpx.HTTPError) as e:     # busy (503), timeout (504), network
+                if i == len(self.models) - 1:
+                    raise
+                log.warning("Gemini %s failed (%s), trying %s", model, type(e).__name__, self.models[i + 1])
+        raise AssertionError("unreachable")
+
+    def _one(self, model: str, rec: Record, question: str) -> tuple[_BriefingOut | None, dict]:
+        from google.genai import types
+        resp = self.client.models.generate_content(
+            model=model, contents=_prompt(rec, question),
+            config=types.GenerateContentConfig(system_instruction=SYSTEM, response_mime_type="application/json",
+                                               response_schema=_BriefingOut))
+        out = resp.parsed if isinstance(resp.parsed, _BriefingOut) else None
+        u = resp.usage_metadata
+        return out, {"model": model, "provider": "gemini",
+                     "input_tokens": getattr(u, "prompt_token_count", 0) or 0,
+                     "output_tokens": getattr(u, "candidates_token_count", 0) or 0}
+
+
 class Briefer:
-    """contracts.steps.Briefer. Uses the model when a client is available, else the code briefing."""
+    """contracts.steps.Briefer. Uses the model when a client is available, else the code briefing.
+    With GEMINI_API_KEY set, the model is Gemini; otherwise Claude."""
 
     def __init__(self, rails: Rails, client: anthropic.Anthropic | None = None,
-                 model: str | None = None, use_model: bool = True):
+                 model: str | None = None, use_model: bool = True, gemini: GeminiBriefer | None = None):
         self.rails = rails
         self.model = model or os.getenv("BRIEFING_MODEL", DEFAULT_MODEL)
         self.client = client
-        if client is None and use_model and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")):
+        self.gemini = gemini
+        if gemini is None and client is None and use_model and os.getenv("GEMINI_API_KEY"):
+            self.gemini = GeminiBriefer()
+        elif client is None and use_model and (os.getenv("ANTHROPIC_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")):
             self.client = anthropic.Anthropic()
         self.last: dict = {}             # how the last briefing was made, for logs and evals
 
     def brief(self, manager_id: str, question: str) -> Briefing:
         rec = Record(self.rails, manager_id)
         fallback = code_briefing(rec, question)
+        if self.gemini is not None:
+            return self._brief_gemini(rec, question, fallback)
         if self.client is None:
             self.last = {"mode": "code"}
             return fallback
@@ -160,7 +213,22 @@ class Briefer:
         if resp.stop_reason == "refusal" or out is None:
             self.last = {"mode": "code", "why": f"no model answer ({resp.stop_reason})"}
             return fallback
-        return self._check(rec, question, out, fallback, resp)
+        meta = {"model": resp.model, "input_tokens": resp.usage.input_tokens, "output_tokens": resp.usage.output_tokens}
+        return self._check(rec, question, out, fallback, meta)
+
+    def _brief_gemini(self, rec: Record, question: str, fallback: Briefing) -> Briefing:
+        import httpx
+        from google.genai import errors
+        try:
+            out, meta = self.gemini(rec, question)
+        except (errors.APIError, httpx.HTTPError, ValueError) as e:   # quota, busy, timeout, bad JSON
+            log.warning("Gemini briefing call failed: %s", e)
+            self.last = {"mode": "code", "why": f"Gemini unavailable: {type(e).__name__}"}
+            return fallback
+        if out is None:
+            self.last = {"mode": "code", "why": "no Gemini answer", **meta}
+            return fallback
+        return self._check(rec, question, out, fallback, meta)
 
     def _call(self, rec: Record, question: str):
         extra = {}
@@ -168,11 +236,10 @@ class Briefer:
             extra = {"betas": ["server-side-fallback-2026-07-01"], "fallbacks": "default"}
         return self.client.beta.messages.parse(
             model=self.model, max_tokens=16000, system=SYSTEM,
-            messages=[{"role": "user", "content": f"<record>\n{rec.render()}\n</record>\n\n"
-                                                  f"Controller's question: {question}"}],
+            messages=[{"role": "user", "content": _prompt(rec, question)}],
             output_format=_BriefingOut, **extra)
 
-    def _check(self, rec: Record, question: str, out: _BriefingOut, fallback: Briefing, resp) -> Briefing:
+    def _check(self, rec: Record, question: str, out: _BriefingOut, fallback: Briefing, meta: dict) -> Briefing:
         kinds = {d.id: d.kind for d in rec.docs}
         claims, dropped = [], []
         for c in out.claims:
@@ -181,8 +248,7 @@ class Briefer:
                 dropped.append(c.text)
                 continue
             claims.append(Claim(text=c.text, citations=[Citation(source_id=i, kind=kinds[i]) for i in ids]))
-        meta = {"model": resp.model, "input_tokens": resp.usage.input_tokens,
-                "output_tokens": resp.usage.output_tokens, "dropped_claims": dropped}
+        meta = {**meta, "dropped_claims": dropped}
         if find_banned(out.answer) or not claims:
             self.last = {"mode": "code", "why": "model answer failed the checks", **meta}
             return fallback

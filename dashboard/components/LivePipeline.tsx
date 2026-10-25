@@ -27,12 +27,12 @@ type Claim = { statement: string; dated: string; says?: string; amount?: number;
 type Flow = { vendor: string; invoice: Invoice; tasks: Task[]; chaser_actions: Action[]; deadline?: string | null;
   statements?: Claim[]; rules: { rule_type: string; check: string }[];
   case?: { state?: string; findings?: { code: string; message: string }[] } | null };
-type Demo = { today: string; start: string; end: string; focus: string; done: boolean };
+type Demo = { today: string; start: string; end: string; focus: string; done: boolean; usage?: { calls: number; input: number; cached: number; output: number } };
 type LiveTool = { tool: string; state: "running" | "done" | "refused"; preview?: string };
 type Query = { purpose: string; sql: string; columns?: string[]; rows?: unknown[][]; row_count?: number; error?: string };
 type Live = { task_id: string; agent: string; invoice_id: string; day: string; reason: string;
   thinking: string; text: string; tools: LiveTool[]; queries: Query[]; decision: string | null; status: "working" | "done" | "failed" };
-type Line = { at: string; agent: string; kind: string; detail: string };
+type Line = { id: number; at: string; agent: string; kind: string; detail: string };
 type Row = { invoice_id: string; vendor: string; amount: number; funded_amount: number; deadline: string | null;
   deadline_source: string | null; paid_on: string | null; paid_amount: number; state: string; days: number | null;
   reminders: string[]; escalated: boolean; flags?: string[]; usage?: { calls: number; input: number; cached: number; output: number } | null;
@@ -120,6 +120,67 @@ function describe(t: Task, flow: Flow): { label: string; tone: "" | "hold" | "qu
   return { label: o.decision || t.status, tone: "", line: plain(o.error) };
 }
 
+/** Streamed text revealed at a steady reading pace instead of in network-sized bursts. Speeds up
+ *  gently when far behind, and finishes quickly once the agent is done. */
+function usePaced(target: string, settle: boolean) {
+  const [shown, setShown] = useState(target);
+  const st = useRef({ n: target.length, target });
+  useEffect(() => {
+    const cur = st.current;
+    if (cur.n > target.length || target.slice(0, cur.n) !== cur.target.slice(0, cur.n)) { cur.n = 0; setShown(""); }
+    cur.target = target;
+    let raf = 0, last = performance.now();
+    const tick = (now: number) => {
+      const dt = Math.min(64, now - last); last = now;
+      const backlog = cur.target.length - cur.n;
+      if (backlog <= 0) return;
+      const rate = settle ? 1600 : Math.max(70, backlog / 1.4);          // characters per second
+      cur.n = Math.min(cur.target.length, cur.n + Math.max(1, Math.round((rate * dt) / 1000)));
+      setShown(cur.target.slice(0, cur.n));
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [target, settle]);
+  return shown;
+}
+
+/** A scroll box that follows new content only while the reader is at its bottom. Scrolling up to
+ *  read stops the following until the reader scrolls back down; nothing re-arms it behind their back. */
+function useFollow(dep: unknown, smooth = false) {
+  const el = useRef<HTMLDivElement | null>(null);
+  const stuck = useRef(true);
+  const ref = useCallback((node: HTMLDivElement | null) => {
+    el.current = node;
+    if (node) node.onscroll = () => { stuck.current = node.scrollHeight - node.scrollTop - node.clientHeight < 56; };
+  }, []);
+  useEffect(() => {
+    const n = el.current;
+    if (n && stuck.current) n.scrollTo({ top: n.scrollHeight, behavior: smooth ? "smooth" : "auto" });
+  }, [dep, smooth]);
+  return ref;
+}
+
+/** A number that eases to its new value rather than jumping. */
+function Count({ value, format }: { value: number; format: (n: number) => string }) {
+  const [v, setV] = useState(value);
+  const from = useRef(value);
+  useEffect(() => {
+    const a = from.current, b = value;
+    if (a === b) return;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const p = Math.min(1, (now - start) / 700), x = a + (b - a) * (1 - Math.pow(1 - p, 3));
+      from.current = x; setV(x);
+      if (p < 1) raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value]);
+  return <>{format(v)}</>;
+}
+
 async function call<T>(path: string, method = "GET"): Promise<T> {
   const r = await fetch(`${API}${path}`, { method, cache: "no-store" });
   const body = await r.json().catch(() => ({}));
@@ -164,7 +225,7 @@ function InvoiceTable({ rows, selected, working, onSelect }:
     .sort((a, b) => (RANK[a.state] - RANK[b.state]) || ((b.days || 0) - (a.days || 0)));
   const count = (k: string) => rows.filter(r => r.state === k).length;
   return (
-    <section className={`card ${s.panel}`}>
+    <section className={s.panel}>
       <div className={s.panelHead}>
         <span className="micro">All invoices</span>
         <span className={s.mono}>{rows.length} checked · {count("overdue")} overdue · {count("paid_late")} paid late · {count("paid_on_time")} on time</span>
@@ -172,7 +233,7 @@ function InvoiceTable({ rows, selected, working, onSelect }:
         {[["attention", "Needs attention"], ["all", "All"]].map(([k, l]) =>
           <button key={k} className={`${s.filter} ${filter === k ? s.filterOn : ""}`} onClick={() => setFilter(k)}>{l}</button>)}
       </div>
-      <div className={s.tableWrap}>
+      <div className={s.tableWrap} data-lenis-prevent>
         <table className={s.table}>
           <thead><tr><th>Invoice</th><th>Vendor</th><th className={s.num}>Funded</th><th>Deadline</th><th>Status</th><th>Emails</th><th>Agents</th></tr></thead>
           <tbody>
@@ -211,16 +272,16 @@ export function LivePipeline() {
   const [selected, setSelected] = useState("");
   const selectedRef = useRef("");
   const playRef = useRef(false);
-  const thinkRef = useRef<HTMLDivElement>(null);
-  const recordRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     try {
       const d = await call<Demo>("/pipeline/demo");
       setDemo(d);
+      const r = await call<Row[]>("/pipeline/demo/invoices");
+      setRows(r);
+      if (!r.length) { setFlow(null); setError(""); return; }   // books empty until Start: nothing to show yet
       const pick = selectedRef.current || d.focus;
-      const [f, r] = await Promise.all([call<Flow>(`/pipeline/demo/flow/${pick}`), call<Row[]>("/pipeline/demo/invoices")]);
-      setFlow(f); setRows(r);
+      setFlow(await call<Flow>(`/pipeline/demo/flow/${pick}`));
     } catch (e) {
       if (!/demo not started/.test(String(e))) setError(String((e as Error).message || e));
       setDemo(null);
@@ -230,8 +291,9 @@ export function LivePipeline() {
   // live events
   useEffect(() => {
     const es = new EventSource(`${API}/pipeline/stream`);
+    let seq = 0;      // stable keys: only a new line animates in, the rest stay put
     const log = (agent: string, kind: string, detail: string) =>
-      setLines(prev => [{ at: clock(), agent, kind, detail }, ...prev].slice(0, 80));
+      setLines(prev => [{ id: ++seq, at: clock(), agent, kind, detail }, ...prev].slice(0, 80));
     const on = (type: string, f: (m: Record<string, unknown>) => void) =>
       es.addEventListener(type, e => f(JSON.parse((e as MessageEvent).data)));
     es.onopen = () => setConnected(true);
@@ -272,7 +334,8 @@ export function LivePipeline() {
     on("task_done", m => {
       const o = (m.outcome || {}) as Outcome;
       setLive(l => (l && l.task_id === m.task_id ? { ...l, status: m.status === "failed" ? "failed" : "done",
-        decision: l.decision || o.decision || null } : l));
+        decision: l.decision || o.decision || null,
+        tools: l.tools.map(t => (t.state === "running" ? { ...t, state: "done" } : t)) } : l));
       if (o.decided_by === "schedule") log(String(m.agent), "wait", `${m.invoice_id} · not due yet, no model call`);
       refresh();
     });
@@ -284,8 +347,9 @@ export function LivePipeline() {
   }, [refresh]);
 
   useEffect(() => { refresh(); }, [refresh]);
-  useEffect(() => { thinkRef.current?.scrollTo({ top: thinkRef.current.scrollHeight }); }, [live?.thinking, live?.tools.length]);
-  useEffect(() => { recordRef.current?.scrollTo({ top: recordRef.current.scrollHeight, behavior: "smooth" }); }, [flow?.tasks.length]);
+  const thinking = usePaced(live?.thinking || "", live?.status !== "working");
+  const thinkRef = useFollow(`${thinking.length}:${live?.tools.length}:${live?.queries.length}`);
+  const recordRef = useFollow(flow?.tasks.length, true);
 
   const select = (id: string) => { if (id === "portfolio") return; selectedRef.current = id; setSelected(id); setOpen(null); refresh(); };
   const act = async (what: string, path: string) => {
@@ -305,7 +369,7 @@ export function LivePipeline() {
       // A person must decide before the story moves on: pause on any draft waiting for approval.
       const f = await call<Flow>(`/pipeline/demo/flow/${d.focus}`).catch(() => null);
       if (f?.chaser_actions.some(a => a.status === "needs_approval")) break;
-      await new Promise(r => setTimeout(r, 1800));
+      await new Promise(r => setTimeout(r, 600));
     }
     playRef.current = false; setPlaying(false);
   };
@@ -314,7 +378,8 @@ export function LivePipeline() {
 
   const tasks = flow?.tasks || [];
   // Every agent call across all invoices, not just the case on screen.
-  const usage = rows.reduce((u, r) => (r.usage ? { calls: u.calls + r.usage.calls, input: u.input + r.usage.input,
+  // The service's total includes the investigator's portfolio sweep, which no invoice row carries.
+  const usage = demo?.usage ?? rows.reduce((u, r) => (r.usage ? { calls: u.calls + r.usage.calls, input: u.input + r.usage.input,
     cached: u.cached + r.usage.cached, output: u.output + r.usage.output } : u), { calls: 0, input: 0, cached: 0, output: 0 });
   const cost = (usage.input - usage.cached) * PRICE.input + usage.cached * PRICE.cached + usage.output * PRICE.output;
   const pending = flow?.chaser_actions.find(a => a.action !== "flag" && ["needs_approval", "needs_controller"].includes(a.status));
@@ -331,28 +396,38 @@ export function LivePipeline() {
 
   return (
     <div className={s.wrap}>
-      <div className={s.bar}>
-        <div className={s.title}>
+      <header className={s.hero}>
+        <div className={s.eyebrow}>
           <span className={`${s.dot} ${connected ? s.on : ""}`} />
-          <span className="micro">{connected ? "Live" : "Connecting"}</span>
-          {demo && <span className={s.mono}>Keyway Property Management · {day(demo.today)}</span>}
+          <span>{connected ? "Live" : "Connecting"}</span>
+          {demo && <span className={s.faint}>Keyway Property Management · {day(demo.today)}</span>}
         </div>
-        <div className={s.controls}>
-          {busy && <span className={s.busy}>{busy}</span>}
-          {demo ? <>
-            <button className="btn ghost" onClick={reset} disabled={!!busy || playing}>Reset</button>
-            <button className="btn ghost" onClick={next} disabled={!!busy || playing || demo.done}>Next day</button>
-            <button className="btn" onClick={play} disabled={(!!busy && !playing) || demo.done}>{playing ? "Pause" : "Play"}</button>
-          </> : <button className="btn" onClick={reset} disabled={!!busy}>Start</button>}
+        <div className={s.heroRow}>
+          <div>
+            <p className={s.kicker}>Agreement · Investigator · Chaser · Anomaly</p>
+            <h2 className={s.headline}>The agents, <em>working the books.</em></h2>
+            <p className={s.lede}>Each day they read the new paperwork and check every invoice against the agreement.
+              Anything that would hold money waits for you.</p>
+          </div>
+          <div className={s.controls}>
+            {busy && <span className={s.busy}><span className={s.spinner} />{busy}</span>}
+            {demo ? <>
+              <button className={s.textBtn} onClick={reset} disabled={!!busy || playing}>Reset</button>
+              <button className={s.textBtn} onClick={next} disabled={!!busy || playing || demo.done}>Next day <span aria-hidden>↗</span></button>
+              <button className={s.primary} onClick={play} disabled={(!!busy && !playing) || demo.done}>
+                {playing ? "Pause" : "Play"}<span className={s.orb} aria-hidden>{playing ? "❚❚" : "↘"}</span></button>
+            </> : <button className={s.primary} onClick={reset} disabled={!!busy}>Start<span className={s.orb} aria-hidden>↘</span></button>}
+          </div>
         </div>
-      </div>
+      </header>
 
       {error && <div className={s.error}>{error}</div>}
 
       {demo && <div className={s.metrics}>
-        {[["Invoices checked", num(rows.length)], ["Reminder emails", num(emails)], ["Model calls", num(usage.calls)], ["Input tokens", num(usage.input)],
-          ["Output tokens", num(usage.output)], ["Cost", `$${cost.toFixed(3)}`]].map(([k, v]) =>
-          <div key={k} className={s.metric}><span className="micro">{k}</span><b>{v}</b></div>)}
+        {([["Invoices checked", rows.length, num], ["Reminder emails", emails, num], ["Model calls", usage.calls, num],
+          ["Input tokens", usage.input, num], ["Output tokens", usage.output, num],
+          ["Cost", cost, (n: number) => `$${n.toFixed(3)}`]] as [string, number, (n: number) => string][]).map(([k, v, f]) =>
+          <div key={k} className={s.metric}><b><Count value={v} format={x => f(k === "Cost" ? x : Math.round(x))} /></b><span>{k}</span></div>)}
       </div>}
 
       {demo && <div className={s.engine}>
@@ -360,6 +435,7 @@ export function LivePipeline() {
           const waiting = k === "controller" && controllerWaiting;
           return <div key={k} className={s.stage}>
             <span className={`${s.node} ${activeAgent === k ? s.active : ""} ${waiting ? s.waiting : ran(k) ? s.done : ""}`} />
+            <span className={s.stageNum}>{String(i + 1).padStart(2, "0")}</span>
             <span>{n}{waiting && <em className={s.pendingTag}>decision pending</em>}</span>{i < 4 && <span className={s.link} />}
           </div>;
         })}
@@ -381,7 +457,7 @@ export function LivePipeline() {
       </div>}
 
       {demo && <div className={s.grid}>
-        <section className={`card ${s.panel}`}>
+        <section className={s.panel}>
           <div className={s.panelHead}>
             <span className="micro">Live reasoning</span>
             {live && (live.invoice_id === "portfolio"
@@ -389,38 +465,47 @@ export function LivePipeline() {
               : <button className={s.linkBtn} onClick={() => select(live.invoice_id)}>{live.agent} agent · {live.invoice_id} · {day(live.day)}</button>)}
             {live && <span className={`${s.state} ${s[live.status]}`}>{live.status === "working" ? "Working" : live.status === "failed" ? "Failed" : "Done"}</span>}
           </div>
-          {live ? <div className={s.liveBody} ref={thinkRef}>
+          {live ? <div className={s.liveBody} ref={thinkRef} data-lenis-prevent>
             <p className={s.reason}>{plain(live.reason)}</p>
             {(live.thinking || live.status === "working" || live.tools.length === 0) && <div className={s.thinking}>
-              {plain(live.thinking) || (live.status === "working" ? "" : "Not due yet: the schedule waited without calling the model.")}
+              {plain(thinking) || (live.status === "working" ? "" : "Not due yet: the schedule waited without calling the model.")}
               {live.status === "working" && <span className={s.caret} />}</div>}
             {live.queries.length > 0 && <div className={s.queries}>
-              {live.queries.map((q, i) => <div key={i} className={`${s.query} ${q.error ? s.refused : ""}`}>
-                <div className={s.queryHead}><span className={s.ring} /><b>{q.purpose}</b>
-                  <span className={s.toolState}>{q.error ? "Refused" : `${q.row_count} rows`}</span></div>
+              {live.queries.map((q, i) => <details key={i} className={`${s.query} ${q.error ? s.refused : ""}`}>
+                <summary className={s.queryHead}><span className={s.ring} /><b>{q.purpose}</b>
+                  <span className={s.toolState}>{q.error ? "Refused" : `${q.row_count} rows`}</span></summary>
                 <pre className={s.sql}>{q.sql}</pre>
                 {q.error ? <p className={s.queryErr}>{q.error}</p> : !!q.rows?.length && <div className={s.qtableWrap}><table className={s.qtable}>
-                  <thead><tr>{q.columns?.map(c => <th key={c}>{c}</th>)}</tr></thead>
-                  <tbody>{q.rows.map((r, j) => <tr key={j}>{r.map((v, k) => <td key={k}>{v == null ? "—" : String(v)}</td>)}</tr>)}</tbody>
-                </table>{(q.row_count || 0) > q.rows.length && <span className={s.more}>+{(q.row_count || 0) - q.rows.length} more rows</span>}</div>}
-              </div>)}
+                  <thead><tr>{q.columns?.map((c, k) => <th key={k}>{c}</th>)}</tr></thead>
+                  <tbody>{q.rows.slice(0, 6).map((r, j) => <tr key={j}>{r.map((v, k) => <td key={k}>{v == null ? "—" : String(v)}</td>)}</tr>)}</tbody>
+                </table>{(q.row_count || 0) > Math.min(6, q.rows.length) && <span className={s.more}>+{(q.row_count || 0) - Math.min(6, q.rows.length)} more rows</span>}</div>}
+              </details>)}
             </div>}
-            {live.tools.filter(t => t.tool !== "query_books").length > 0 && <ol className={s.tools}>
-              {live.tools.filter(t => t.tool !== "query_books").map((t, i) => <li key={i} className={s[t.state]}>
-                <span className={s.ring} /><span className={s.mono}>{t.tool}</span>
-                <span className={s.toolState}>{t.state === "running" ? "Running" : t.state === "refused" ? "Refused" : "Done"}</span>
-                {t.preview && <pre>{t.preview}</pre>}
-              </li>)}
-            </ol>}
+            {(() => {
+              const groups: { tool: string; n: number; state: LiveTool["state"]; preview?: string }[] = [];
+              for (const t of live.tools.filter(t => t.tool !== "query_books")) {
+                const g = groups.find(x => x.tool === t.tool);
+                const state = t.state === "refused" || g?.state === "refused" ? "refused" : t.state === "running" || g?.state === "running" ? "running" : "done";
+                if (g) { g.n += 1; g.state = state; if (t.state === "refused") g.preview = t.preview; }
+                else groups.push({ tool: t.tool, n: 1, state, preview: t.state === "refused" ? t.preview : undefined });
+              }
+              return groups.length > 0 && <ol className={s.tools}>
+                {groups.map(g => <li key={g.tool} className={s[g.state]}>
+                  <span className={s.ring} /><span className={s.mono}>{g.tool.replace(/_/g, " ")}{g.n > 1 && <em className={s.times}> ×{g.n}</em>}</span>
+                  <span className={s.toolState}>{g.state === "running" ? "Running" : g.state === "refused" ? "Refused" : "Done"}</span>
+                  {g.preview && <pre>{g.preview}</pre>}
+                </li>)}
+              </ol>;
+            })()}
             {live.text && <p className={s.text}>{plain(live.text)}</p>}
           </div> : <p className={s.empty}>{finished
             ? "Run complete. Press Reset to watch it again from Apr 22."
             : "Press Play. Each day the agents wake on their own; their reasoning appears here as it is written."}</p>}
         </section>
 
-        <section className={`card ${s.panel}`}>
+        <section className={s.panel}>
           <div className={s.panelHead}><span className="micro">Decisions · {current}</span><span className={s.mono}>oldest first</span></div>
-          <div className={s.record} ref={recordRef}>
+          <div className={s.record} ref={recordRef} data-lenis-prevent>
             {tasks.length === 0 && <p className={s.empty}>No decisions yet.</p>}
             {flow && tasks.map(t => {
               const o = t.outcome || {}, quiet = o.decided_by === "schedule" || o.decided_by === "code", d = describe(t, flow);
@@ -455,11 +540,11 @@ export function LivePipeline() {
         </section>
       </div>}
 
-      {demo && <section className={`card ${s.panel} ${s.events}`}>
+      {demo && <section className={`${s.panel} ${s.events}`}>
         <div className={s.panelHead}><span className="micro">Event stream</span><span className={s.mono}>{lines.length} events</span></div>
-        <div className={s.eventList}>
+        <div className={s.eventList} data-lenis-prevent>
           {lines.length === 0 && <p className={s.empty}>Events appear here as the agents work.</p>}
-          {lines.map((l, i) => <div key={i} className={`${s.event} ${s[l.kind.replace(" ", "")] || ""}`}>
+          {lines.map(l => <div key={l.id} className={`${s.event} ${s[l.kind.replace(" ", "")] || ""}`}>
             <span>{l.at}</span><span>{l.agent}</span><span>{l.kind}</span><span>{l.detail}</span></div>)}
         </div>
       </section>}

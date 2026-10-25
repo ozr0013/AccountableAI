@@ -588,10 +588,11 @@ class DemoSession:
 
     def brief(self, question: str, use_model: bool = False) -> dict:
         from agents.briefing import Briefer
-        b = Briefer(self.rails, use_model=use_model and self.meter.ok())
+        gemini = bool(os.getenv("GEMINI_API_KEY"))      # Gemini's free tier: no budget to meter
+        b = Briefer(self.rails, use_model=use_model and (gemini or self.meter.ok()))
         out = b.brief(MANAGER, question)
         m = b.last or {}
-        if m.get("mode") == "model" and "input_tokens" in m:
+        if m.get("mode") == "model" and "input_tokens" in m and m.get("provider") != "gemini":
             self.meter.add("Briefing", m.get("model", "claude-sonnet-5-5"), m["input_tokens"], m.get("output_tokens", 0))
         return {**out.model_dump(mode="json"), "meta": m}
 

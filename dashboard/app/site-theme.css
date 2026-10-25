@@ -1,0 +1,165 @@
+/* The landing page's design for every dashboard tab (app/home.css): white and blue only, Geist
+   headlines with tight tracking, Instrument Serif italics in blue for emphasis, Geist Mono labels,
+   square corners, dashed hairline boxes, a faint blue glow. Loaded after aura.css; only inside the
+   dashboard shell (.theme-aura). The accent stays the theme's blue (--o, aura.css). */
+
+.theme-aura {
+  --sans: var(--font-geist), "Geist", system-ui, sans-serif;
+  --mono: var(--font-geist-mono), "Geist Mono", ui-monospace, monospace;
+  --serif: var(--font-serif), "Instrument Serif", Georgia, serif;
+  --dashboard-type-scale: 1;
+  --ink: #0b1220; --n9: #5b6475;
+  --hl: #e6eaf2; --box-line: #a9b4c8;
+  --r: 0px; --r-sm: 0px;
+  --shadow: 0 12px 32px #2d5bff0f;
+  font-family: var(--sans);
+}
+
+/* white, with the landing hero's faint blue glow */
+.theme-aura .main {
+  background:
+    radial-gradient(38% 42% at 92% 0%, rgba(45, 91, 255, .07), transparent 70%),
+    radial-gradient(30% 36% at 100% 100%, rgba(45, 91, 255, .04), transparent 70%),
+    #fff;
+}
+
+/* titles: Geist, tight; emphasis in blue Instrument Serif italic */
+.theme-aura .top h1 { font-family: var(--sans); font-weight: 500; letter-spacing: -.045em; font-size: 40px; line-height: 1.05; }
+.theme-aura .top .muted { font-size: 15px; color: var(--n9); }
+.theme-aura h2, .theme-aura .proof-hero h1 { font-family: var(--sans); font-weight: 500; letter-spacing: -.04em; }
+.theme-aura em, .theme-aura .serif { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--o); letter-spacing: -.015em; }
+
+/* labels: Geist Mono */
+.theme-aura .micro, .theme-aura .label { font-family: var(--mono); letter-spacing: .08em; text-transform: uppercase; font-size: 11px; color: var(--n9); }
+
+/* boxes: square, dashed hairline, the landing's faint blue shadow */
+.theme-aura .card, .theme-aura .lr-box, .theme-aura .block-shadow, .theme-aura .disclosure, .theme-aura .focus-panel,
+.theme-aura .quiet-metrics, .theme-aura .spotlight, .theme-aura .dots-panel, .theme-aura .dotted-card,
+.theme-aura .investigation-stage, .theme-aura .proof-panel, .theme-aura .ov-alerts, .theme-aura .ov-boxes, .theme-aura .ov-chart,
+.theme-aura .na, .theme-aura .jc-feed, .theme-aura .jc-docs, .theme-aura .jc-map, .theme-aura .jc-col, .theme-aura .jc-figs,
+.theme-aura .lr-stats, .theme-aura .lr-days, .theme-aura .lr-flags, .theme-aura .proof-hero, .theme-aura .proof-metrics,
+.theme-aura .proof-callout, .theme-aura .case-actions {
+  border: 1px dashed var(--box-line) !important; border-radius: 0 !important; background: #ffffffeb; box-shadow: var(--shadow) !important;
+}
+
+/* figures: Geist, tight; paid/past-due colours unchanged */
+.theme-aura .stat-value, .theme-aura .quiet-metrics strong, .theme-aura .sim-stats strong, .theme-aura .moment-amount,
+.theme-aura .proof-metrics strong, .theme-aura .ov-boxes strong {
+  font-family: var(--sans); font-weight: 500; letter-spacing: -.04em;
+}
+
+/* buttons: square; dark like "See it in action", outlined ones dashed */
+.theme-aura .btn { border-radius: 0 !important; background: var(--ink); color: #fff; }
+.theme-aura .btn:hover { background: #1d2740; }
+.theme-aura .btn.ghost { background: #fff; color: var(--ink); border: 1px dashed var(--box-line); box-shadow: none; }
+.theme-aura .btn.ghost:hover { background: var(--o-wash); }
+.theme-aura .pill, .theme-aura .chip, .theme-aura .kicker, .theme-aura .seg, .theme-aura .seg button, .theme-aura .input,
+.theme-aura .doc, .theme-aura .notice, .theme-aura .nav a { border-radius: 0 !important; }
+
+/* tables: mono headers */
+.theme-aura table th { font-family: var(--mono); letter-spacing: .08em; font-weight: 400; }
+
+/* white and blue only: the old orange "attention" colour becomes ink and blue */
+.theme-aura .nav > a.attention .count, .theme-aura .nav > a.nav-sub.attention .count { background: var(--o); color: #fff; }
+.theme-aura .warn, .theme-aura .warn-ink { color: var(--o-ink); }
+.na .g-keyway .na-seg, .na-seg.g-keyway, .na-legend .g-keyway i { background: var(--ink) !important; }
+.theme-aura .na-group.g-keyway { background: #f5f8ff; border: 1px dashed var(--o) !important; border-left: 3px solid var(--o) !important; border-radius: 0 !important; }
+.theme-aura .na-group.g-keyway .na-row { border-color: #d6e0ff; }
+.theme-aura .na-group.g-keyway .na-group-head h3 { color: var(--o-ink); }
+.theme-aura .na-act { background: var(--o) !important; color: #fff !important; border-radius: 0 !important; }
+.theme-aura .nav > a.attention:not([aria-current="page"]) { background: #f5f8ff; color: var(--o-ink); }
+
+/* -- breathing room ------------------------------------------------------------------------------ */
+.theme-aura .main { padding: 36px 52px 56px; }
+.theme-aura .main > .wrap { max-width: 1360px; margin-inline: auto; }
+.theme-aura .top { padding-bottom: 22px; margin-bottom: 32px; }
+.theme-aura .top .muted { margin-top: 8px; }
+.theme-aura .section { margin-top: 48px; }
+.theme-aura .section-head { margin-bottom: 24px; }
+.theme-aura .grid { gap: 20px; }
+/* Judge Console: roomier panels, tabs and cards */
+.theme-aura .jc-feed { padding: 24px 28px 26px; }
+.theme-aura .jc-feed-head { gap: 16px; margin-bottom: 18px; }
+.theme-aura .jc-tabs button { padding: 11px 18px; }
+.theme-aura .jc-doc { padding: 18px 20px; gap: 8px; }
+.theme-aura .jc-doc small { line-height: 1.6; }
+.theme-aura .jc-map { margin-top: 20px; padding: 28px; }
+.theme-aura .jc-col { padding: 22px 24px; }
+.theme-aura .jc-col h3 { margin-bottom: 16px; }
+.theme-aura .jc-figs > div { padding: 14px 16px; gap: 6px; }
+.theme-aura .jc-hint, .theme-aura .jc-fine { margin-top: 14px; line-height: 1.6; }
+.theme-aura .jc-now { margin: 26px 0 14px; }
+
+/* -- sidebar, in the landing page's ruled style -------------------------------------------------- */
+.theme-aura .side { padding: 0 0 20px; gap: 0; background: #fff; }
+.theme-aura .side-brand { min-height: 78px; border-bottom: 1px solid var(--hl); }
+.theme-aura .side > :not(.brand):not(.side-brand) { margin-inline: 18px; }
+.theme-aura .nav { margin-top: 24px; border-top: 0; }
+.theme-aura .nav::before { content: "/ Workspace"; display: block; padding: 0 2px 10px; border-bottom: 1px dashed var(--box-line);
+  font: 11px/1.5 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--n9); }
+.theme-aura .nav > a { height: 46px; padding: 0 14px; gap: 12px; font-size: 14.5px; border-bottom: 1px dashed var(--hl); transition: background .2s, color .2s; }
+.theme-aura .nav > a:hover { background: #f7f9ff; color: var(--o-ink); }
+.theme-aura .nav > a[aria-current="page"] { background: var(--o-wash); color: var(--o-ink); box-shadow: inset 2px 0 0 var(--o); font-weight: 500; }
+.theme-aura .nav > a[aria-current="page"]::before { display: none; }
+.theme-aura .nav a:focus { outline: none; }
+.theme-aura .nav a:focus-visible { outline: 2px solid var(--o); outline-offset: -2px; }
+.theme-aura .nav > a.attention:not([aria-current="page"]) { background: transparent; color: var(--n10); }
+.theme-aura .nav .count { margin-left: auto; min-width: 22px; height: 20px; padding: 0 6px; display: inline-grid; place-items: center;
+  border-radius: 0; font: 500 11px var(--mono); background: var(--o); color: #fff; }
+.theme-aura .nav svg { width: 15px; height: 15px; color: var(--n9); }
+.theme-aura .nav > a[aria-current="page"] svg, .theme-aura .nav > a:hover svg { color: var(--o); }
+
+.theme-aura .side-foot { gap: 12px; }
+.theme-aura .who { padding: 12px 14px; border: 1px dashed var(--box-line); background: #fff; gap: 12px; }
+.theme-aura .who:hover { background: #f7f9ff; }
+.theme-aura .who-av { width: 34px; height: 34px; }
+.theme-aura .ask-pill { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 46px;
+  padding: 5px 5px 5px 16px; border-radius: 0 !important; background: var(--ink); color: #fff; font-size: 13px; }
+.theme-aura .ask-pill .sidebar-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.theme-aura .ask-pill:hover { background: #1d2740; }
+.theme-aura .ask-pill svg { order: 2; flex: none; width: 34px !important; height: 34px !important; padding: 10px; background: var(--o); color: #fff; }
+
+/* collapsed sidebar: icons only, nothing the narrow strip can't hold */
+.theme-aura.sidebar-collapsed .side-brand { min-height: 78px; }
+.theme-aura.sidebar-collapsed .nav { margin-top: 14px; }
+.theme-aura.sidebar-collapsed .nav::before { display: none; }
+.theme-aura.sidebar-collapsed .nav > a { padding-inline: 0; justify-content: center; border-bottom-color: transparent; }
+.theme-aura.sidebar-collapsed .nav .count { position: absolute; right: 2px; top: 4px; min-width: 16px; height: 16px; padding: 0 3px; font-size: 9.5px; }
+.theme-aura.sidebar-collapsed .who { padding: 6px 0; border: 0; justify-content: center; background: transparent; }
+.theme-aura.sidebar-collapsed .ask-pill { padding: 0; min-height: 0; justify-content: center; background: transparent; }
+.theme-aura.sidebar-collapsed .ask-pill svg { order: 0; }
+
+/* selects: square, dashed, a blue chevron; in Chrome the open list is styled too */
+.theme-aura select { appearance: none; -webkit-appearance: none; border-radius: 0; padding-right: 36px !important;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%232d5bff' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 12px center;
+  border: 1px dashed var(--box-line); color: var(--ink); font-family: var(--sans); cursor: pointer; }
+.theme-aura select:focus { outline: none; border: 1px solid var(--o); box-shadow: 0 0 0 3px var(--o-wash); }
+.theme-aura .input:focus, .theme-aura textarea:focus, .theme-aura input:focus { outline: none; border-color: var(--o); box-shadow: 0 0 0 3px var(--o-wash); }
+@supports (appearance: base-select) {
+  .theme-aura select, .theme-aura select::picker(select) { appearance: base-select; }
+  .theme-aura select::picker-icon { display: none; }
+  .theme-aura select::picker(select) { border: 1px dashed var(--box-line); border-radius: 0; background: #fff; padding: 6px 0;
+    box-shadow: 0 18px 40px -12px rgba(11, 18, 32, .18); max-height: 360px; margin-top: 4px; }
+  .theme-aura select option { padding: 9px 16px; font: 14px var(--sans); color: var(--ink); }
+  .theme-aura select option:hover, .theme-aura select option:focus-visible { background: var(--o-wash); color: var(--o-ink); outline: none; }
+  .theme-aura select option:checked { color: var(--o-ink); font-weight: 500; }
+  .theme-aura select option::checkmark { color: var(--o); }
+}
+.theme-aura select { min-height: 42px; padding: 0 36px 0 12px; line-height: normal; }
+@supports (appearance: base-select) { .theme-aura select { display: flex; align-items: center; } }
+
+/* the logo in the sidebar: a touch smaller so it clears the menu button */
+.theme-aura .side-brand .wordmark { font-size: 17px; letter-spacing: .05em; gap: 8px; }
+
+/* collapsed sidebar: the logo mark at the top, the menu button beneath it */
+.theme-aura.sidebar-collapsed .side-brand { flex-direction: column; justify-content: center; gap: 10px; padding: 14px 0; }
+.theme-aura.sidebar-collapsed .side-brand .brand { display: flex; }
+.theme-aura.sidebar-collapsed .side-brand .wordmark { font-size: 0; gap: 0; }
+.theme-aura.sidebar-collapsed .side-brand .wordmark-mark { width: 28px; height: 28px; }
+.theme-aura .sidebar-toggle:focus { outline: none; }
+.theme-aura .sidebar-toggle:focus-visible { outline: 2px solid var(--o); outline-offset: 2px; }
+.theme-aura.sidebar-collapsed .side-brand { min-height: 0; padding: 22px 0 14px; align-items: center; }
+.theme-aura.sidebar-collapsed .side-brand .brand { margin: 0; padding: 0; justify-content: center; width: 100%; }
+.theme-aura.sidebar-collapsed .side-brand .wordmark { display: flex; justify-content: center; line-height: 0; }
+.theme-aura.sidebar-collapsed .side-brand { height: auto; } .theme-aura.sidebar-collapsed .side-brand .brand { flex: none; }
+.theme-aura .sidebar-toggle:focus, .theme-aura .sidebar-toggle:focus-visible { outline: none !important; box-shadow: none !important; } .theme-aura .sidebar-toggle:focus-visible { background: var(--o-wash); color: var(--o-ink); }

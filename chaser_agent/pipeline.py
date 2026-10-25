@@ -257,6 +257,29 @@ def _statement_claims(rails, invoice_id: str) -> list[dict]:
     return sorted(out, key=lambda c: c["dated"])
 
 
+def usage_by_invoice(all_tasks) -> dict[str, dict]:
+    """Model usage per task subject: an invoice id, or "portfolio" for the investigator's sweep."""
+    usage: dict[str, dict] = {}
+    for t in all_tasks:
+        u = (t.get("trace") or {}).get("usage") or {}
+        if u.get("output_tokens"):
+            acc = usage.setdefault(t["invoice_id"], {"calls": 0, "input": 0, "cached": 0, "output": 0})
+            acc["calls"] += 1
+            acc["input"] += (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
+            acc["cached"] += u.get("cache_read_input_tokens") or 0
+            acc["output"] += u.get("output_tokens") or 0
+    return usage
+
+
+def usage_total(mirror) -> dict:
+    """Every agent's model usage, the portfolio sweep included (the per-invoice rows miss it)."""
+    total = {"calls": 0, "input": 0, "cached": 0, "output": 0}
+    for acc in usage_by_invoice(tasks(mirror)).values():
+        for k in total:
+            total[k] += acc[k]
+    return total
+
+
 def ledger_view(rails, mirror, today: date) -> list[dict]:
     """Every invoice checked against its deadline, by code (no model): what was funded, when it
     was due and under which agreement, whether and when it was paid, how many reminders went out,
@@ -271,17 +294,11 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
     for h in service.history(mirror):
         actions.setdefault(h["invoice_id"], []).append(h)
     last_task: dict[str, dict] = {}
-    usage: dict[str, dict] = {}
-    for t in tasks(mirror):
+    all_tasks = tasks(mirror)
+    usage = usage_by_invoice(all_tasks)
+    for t in all_tasks:
         if t["status"] in ("done", "failed"):
             last_task[t["invoice_id"]] = t
-        u = (t.get("trace") or {}).get("usage") or {}
-        if u.get("output_tokens"):
-            acc = usage.setdefault(t["invoice_id"], {"calls": 0, "input": 0, "cached": 0, "output": 0})
-            acc["calls"] += 1
-            acc["input"] += (u.get("input_tokens") or 0) + (u.get("cache_read_input_tokens") or 0)
-            acc["cached"] += u.get("cache_read_input_tokens") or 0
-            acc["output"] += u.get("output_tokens") or 0
     out = []
     bank = daily.bank_rows_by_invoice(rails, MANAGER, today)
     for ledger_line in rails.ledger(MANAGER):

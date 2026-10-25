@@ -81,7 +81,7 @@ export function Shell({ children }: { children: ReactNode }) {
               </span>
             </Link>
             <Link href="/ask" className="ask-pill" aria-label="Ask about Keyway Management" title={collapsed ? "Ask about Keyway Management" : undefined}>
-              <Spark style={{ width: 13, height: 13 }} /><span className="sidebar-label">Ask about Keyway Management</span>
+              <Spark style={{ width: 13, height: 13 }} /><span className="sidebar-label">Ask about Keyway</span>
             </Link>
           </div>
         </aside>

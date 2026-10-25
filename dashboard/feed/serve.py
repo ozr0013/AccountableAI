@@ -120,7 +120,9 @@ def live_mode(body: LiveIn):
 @app.post("/api/brief")
 def brief(body: BriefIn):
     with _lock:
-        return session().brief(body.question, use_model=os.getenv("DASHBOARD_BRIEF_MODEL") == "1")
+        # Gemini (free tier) whenever its key is set; Claude only when asked for, since it is paid.
+        use_model = bool(os.getenv("GEMINI_API_KEY")) or os.getenv("DASHBOARD_BRIEF_MODEL") == "1"
+        return session().brief(body.question, use_model=use_model)
 
 
 @app.post("/api/loop/{step}")

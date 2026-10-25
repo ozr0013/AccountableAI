@@ -48,6 +48,18 @@ def _subject(row):
     return f"Finance workflow: {row['invoice_id']} — {row['kind']}"
 
 
+def _gmail():
+    """The owner's send-only Gmail (dashboard/feed/mailer.py), used when no SMTP server is set.
+    None unless its token exists and this isn't a test run."""
+    import importlib.util
+    from pathlib import Path
+    path = Path(__file__).resolve().parents[1] / "dashboard" / "feed" / "mailer.py"
+    spec = importlib.util.spec_from_file_location("feed_mailer", path)
+    mailer = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mailer)
+    return mailer if mailer.enabled() else None
+
+
 def dispatch(rails, mirror, manager="keyway", *, enabled=None, kinds=None, as_of=None):
     """Deliver current approved outbox actions only when explicitly configured.
 
@@ -72,7 +84,8 @@ def dispatch(rails, mirror, manager="keyway", *, enabled=None, kinds=None, as_of
     except ValueError:
         result["errors"].append({"outbox_id": None, "error": "smtp_configuration_invalid"})
         return result
-    if (
+    gmail = _gmail() if not host else None
+    if gmail is None and (
         not host
         or not sender
         or "\n" in sender
@@ -113,21 +126,13 @@ def dispatch(rails, mirror, manager="keyway", *, enabled=None, kinds=None, as_of
             )
             attempted.add(ident)
             try:
-                message = EmailMessage()
-                message["From"] = sender
-                message["To"] = ", ".join(recipients)
-                message["Subject"] = _subject(row)
-                message["Message-ID"] = message_id
-                message.set_content(row["body"] + FOOTER)
-                with smtplib.SMTP(host, port, timeout=30) as client:
-                    if os.getenv("SMTP_STARTTLS", "on").lower() != "off":
-                        client.starttls(context=ssl.create_default_context())
-                    if username:
-                        client.login(username, password)
-                    refused = client.send_message(message)
-                    if refused:
-                        raise smtplib.SMTPException("one or more recipients refused")
-                connected.acknowledge(rails, mirror, ident, message_id, "smtp", manager)
+                if gmail is not None:
+                    gmail.send(_subject(row), row["body"], to=", ".join(recipients))
+                    channel = "gmail"
+                else:
+                    _smtp(host, port, sender, username, password, recipients, row, message_id)
+                    channel = "smtp"
+                connected.acknowledge(rails, mirror, ident, message_id, channel, manager)
                 connected.record(
                     rails,
                     row["invoice_id"],
@@ -154,3 +159,20 @@ def dispatch(rails, mirror, manager="keyway", *, enabled=None, kinds=None, as_of
                 )
                 result["errors"].append({"outbox_id": ident, "error": error})
     return result
+
+
+def _smtp(host, port, sender, username, password, recipients, row, message_id):
+    message = EmailMessage()
+    message["From"] = sender
+    message["To"] = ", ".join(recipients)
+    message["Subject"] = _subject(row)
+    message["Message-ID"] = message_id
+    message.set_content(row["body"] + FOOTER)
+    with smtplib.SMTP(host, port, timeout=30) as client:
+        if os.getenv("SMTP_STARTTLS", "on").lower() != "off":
+            client.starttls(context=ssl.create_default_context())
+        if username:
+            client.login(username, password)
+        refused = client.send_message(message)
+        if refused:
+            raise smtplib.SMTPException("one or more recipients refused")
