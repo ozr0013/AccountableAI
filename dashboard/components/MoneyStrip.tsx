@@ -13,7 +13,7 @@ export function MoneyStrip({ items }: { items: Item[] }) {
   return (
     <div className="ov-boxes">
       <Link href="/keyway"><span>Paid by Oakline to Keyway</span><strong>{money(t.funded)}</strong></Link>
-      <Link href="/invoices?show=paid"><span>Paid to vendors by Keyway</span><strong>{money(t.paid)}</strong></Link>
+      <Link href="/invoices?show=paid" className="paid"><span>Paid to vendors by Keyway</span><strong>{money(t.paid)}</strong></Link>
       <Link href="/invoices?show=left"><span>Left to pay</span><strong>{money(t.left)}</strong></Link>
       <Link href="/invoices?show=late" className="late"><span>Past due</span><strong>{money(t.late)}</strong></Link>
     </div>

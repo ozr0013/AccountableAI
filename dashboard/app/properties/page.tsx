@@ -20,7 +20,7 @@ export default function Properties() {
     <PageTop title="Properties" sub={`${homes.length} homes Keyway manages for Oakline in ${cities.join(" · ")}`} />
     <div className="ov-boxes">
       <Link href="/invoices"><span>Homes · {homes.filter((h) => h.invoices).length} with repairs</span><strong>{homes.length}</strong></Link>
-      <Link href="/invoices?show=paid"><span>Paid to vendors</span><strong>{money(all.paid)}</strong></Link>
+      <Link href="/invoices?show=paid" className="paid"><span>Paid to vendors</span><strong>{money(all.paid)}</strong></Link>
       <Link href="/invoices?show=left"><span>Left to pay by Keyway</span><strong>{money(all.left)}</strong></Link>
       <Link href="/invoices?show=unfunded"><span>Not yet funded by Oakline</span><strong>{money(all.notFunded)}</strong></Link>
     </div>

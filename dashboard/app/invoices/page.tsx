@@ -52,7 +52,7 @@ export default function Invoices() {
     <PageTop title="Invoices" sub={homeLabel ? `${homeLabel.address}, ${homeLabel.city} ${homeLabel.state}` : "Every vendor bill: billed = paid + left to pay + not yet funded."} />
     <div className="ov-boxes inv-boxes">
       {box("all", `Billed · ${rows.length} bill${rows.length === 1 ? "" : "s"}`, t.billed)}
-      {box("paid", "Paid to vendors", t.paid)}
+      {box("paid", "Paid to vendors", t.paid, "paid")}
       {box("left", "Left to pay by Keyway", t.left)}
       {box("unfunded", "Not yet funded by Oakline", t.notFunded)}
     </div>

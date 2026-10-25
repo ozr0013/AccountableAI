@@ -572,3 +572,11 @@
 .inv-boxes > button.on { background: #eef3ff; box-shadow: inset 0 -3px 0 var(--o); }
 .late-ink { color: #b42323; }
 @media (max-width: 1000px) { .inv-boxes > button:nth-child(2n) { border-right: 0; } .inv-boxes > button:nth-child(-n+2) { border-bottom: 1px dashed var(--box-line); } }
+/* paid to vendors: green, the counterpart of past due's red */
+.ov-boxes > .paid { background: #f0f8f1; box-shadow: inset 0 -3px 0 #0ca30c; }
+.ov-boxes > .paid span { color: #1d6b2c; }
+.ov-boxes > .paid strong { color: #13602a; }
+.ov-boxes > .paid:hover { background: #e6f4e8; }
+.inv-boxes > button.paid.on { background: #e6f4e8; box-shadow: inset 0 -3px 0 #0ca30c; }
+.ov-cross { stroke: #98a6bf; stroke-width: 1; }
+.ov-val.zero { fill: var(--n7); }
