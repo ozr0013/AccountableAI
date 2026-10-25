@@ -5,8 +5,9 @@
 // actually happens. Nothing is scripted: a card exists only because that event was emitted.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AGENTS_URL } from "@/lib/agents-url";
 
-const API = process.env.NEXT_PUBLIC_AGENTS_URL || "http://127.0.0.1:8773";
+const API = AGENTS_URL;
 
 export type LiveLine = { kind: "check" | "result" | "evidence" | "thinking" | "sql"; text: string; rows?: unknown[][]; columns?: string[] };
 export type LiveCard = {

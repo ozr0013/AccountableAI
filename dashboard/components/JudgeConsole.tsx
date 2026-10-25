@@ -39,7 +39,8 @@ export function JudgeConsole() {
   // Paperwork goes to the real agents (Claude) through the agent API; see useAgentConsole.
   const agent = useAgentConsole();
   const agentRun = agent.run;
-  const agentOff = agent.busy || !agent.connected;
+  // The agents when their API is reachable; otherwise the built-in rules engine, so nothing greys out.
+  const viaAgents = agent.connected;
   const live = mode === "live";
   const names = state?.meta.names ?? {};
   const named = (t: string) => t.replace(/\s+/g, " ").replace(/\((v-[a-z0-9-]+)\)/g, (m, id) => (names[id] ? `(${names[id]})` : m));
@@ -123,7 +124,7 @@ export function JudgeConsole() {
 
   const fileIn = async (f: File | undefined) => {
     if (!f) return;
-    if (tab === "paper") {                     // the agents read it, like the samples
+    if (tab === "paper" && viaAgents) {        // the agents read it, like the samples
       const data = await new Promise<string>((res, rej) => {
         const fr = new FileReader();
         fr.onload = () => res(String(fr.result).split(",")[1] ?? "");
@@ -217,6 +218,7 @@ export function JudgeConsole() {
   const books = run?.books;
   const settled = !!run && !playing;
   const off = !live || playing || busy;
+  const blocked = agent.busy || playing || (!viaAgents && (!live || busy));
 
   return (
     <section className="jc" aria-label="Judge Console">
@@ -228,7 +230,7 @@ export function JudgeConsole() {
             ))}
           </div>
           <span className="jc-asof">Books as of {agentRun?.day ? new Date(agentRun.day + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : state ? new Date(state.meta.as_of + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "…"}</span>
-          <button className="pill" disabled={off || agent.busy} onClick={async () => { await Promise.all([reset(), agent.resetBooks()]); runRef.current = null; setRun(null); setCards([]); setPast([]); setLit(new Set()); }}>Reset books</button>
+          <button className="pill" disabled={off || agent.busy} onClick={async () => { await Promise.all([reset(), viaAgents ? agent.resetBooks() : Promise.resolve()]); runRef.current = null; setRun(null); setCards([]); setPast([]); setLit(new Set()); }}>Reset books</button>
         </div>
         {!live && <p className="jc-note">The console needs the live backend. Start it with <code>./demo.sh start</code>.</p>}
 
@@ -242,13 +244,13 @@ export function JudgeConsole() {
             ))}
           </div>
           <div className="jc-go">
-            <button className="btn" disabled={agentOff || !samples.length} onClick={() => { const s = samples.find((x) => x.file === pick); if (s) { setRun(null); setCards([]); void agent.sendSample(s.file, s.label); } }}>Send to the agents ↗</button>
+            <button className="btn" disabled={blocked || !samples.length} onClick={() => { const s = samples.find((x) => x.file === pick); if (s) { setRun(null); setCards([]); if (viaAgents) void agent.sendSample(s.file, s.label); else void send(s.label, () => addFile(s.file, true)); } }}>Send to the agents ↗</button>
             <a className="jc-link" href={`/api/samples/${encodeURIComponent(pick)}`} target="_blank" rel="noreferrer">Open this file ↗</a>
-            <label className={`pill jc-upload${agentOff ? " off" : ""}`}>Or bring your own (PDF, .eml, bank CSV)
-              <input type="file" accept=".pdf,.eml,.csv" disabled={agentOff} onChange={(e) => { void fileIn(e.target.files?.[0]); e.target.value = ""; }} />
+            <label className={`pill jc-upload${blocked ? " off" : ""}`}>Or bring your own (PDF, .eml, bank CSV)
+              <input type="file" accept=".pdf,.eml,.csv" disabled={blocked} onChange={(e) => { void fileIn(e.target.files?.[0]); e.target.value = ""; }} />
             </label>
           </div>
-          <p className="jc-fine">Paperwork goes to the AI agents: the reader files it in the books, the checks run, and the agents (Claude) decide, live. {agent.connected ? "" : "Waiting for the agent API on :8773…"}</p>
+          <p className="jc-fine">{viaAgents ? "Paperwork goes to the AI agents: the reader files it in the books, the checks run, and the agents (Claude) decide, live." : "The agent API isn’t reachable from here, so this runs on the built-in rules engine: same checks and policy gate, no Claude."}</p>
         </div>}
 
         {tab === "email" && <div className="jc-pane jc-email">
@@ -260,8 +262,8 @@ export function JudgeConsole() {
             <label>Subject<input className="input" value={mail.subject} disabled={off} onChange={(e) => setMail({ ...mail, subject: e.target.value })} /></label>
             <label>Message<textarea className="input" rows={4} value={mail.body} disabled={off} onChange={(e) => setMail({ ...mail, body: e.target.value })} /></label>
             <div className="jc-go">
-              <button className="btn" disabled={agentOff || !mail.body.trim()} onClick={() => { setRun(null); setCards([]); void agent.sendEmail(mail.sender, mail.subject, mail.body, `Email from ${mail.sender === "keyway" ? "Keyway Management" : vendors.find(([id]) => id === mail.sender)?.[1] ?? mail.sender}`); }}>Send the email ↗</button>
-              {EMAILS.map((e, k) => <button key={k} className="jc-chip" disabled={agentOff} onClick={() => setMail(e)}>{k === 0 ? "Keyway Management: “we paid”" : "Vendor: “we were paid”"}</button>)}
+              <button className="btn" disabled={blocked || !mail.body.trim()} onClick={() => { setRun(null); setCards([]); const label = `Email from ${mail.sender === "keyway" ? "Keyway Management" : vendors.find(([id]) => id === mail.sender)?.[1] ?? mail.sender}`; if (viaAgents) void agent.sendEmail(mail.sender, mail.subject, mail.body, label); else void send(label, () => write(mail.sender, mail.subject, mail.body)); }}>Send the email ↗</button>
+              {EMAILS.map((e, k) => <button key={k} className="jc-chip" disabled={blocked} onClick={() => setMail(e)}>{k === 0 ? "Keyway Management: “we paid”" : "Vendor: “we were paid”"}</button>)}
             </div>
           </div>
           <div className="jc-hint">
@@ -273,18 +275,18 @@ export function JudgeConsole() {
 
         {tab === "fact" && <div className="jc-pane">
           <div className="jc-go">
-            <input className="input jc-fact" value={fact} disabled={agentOff} onChange={(e) => setFact(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && fact.trim()) { setRun(null); setCards([]); void agent.tellFact(fact); } }} aria-label="A fact in plain words" />
-            <button className="btn" disabled={agentOff || !fact.trim()} onClick={() => { setRun(null); setCards([]); void agent.tellFact(fact); }}>Tell the agents ↗</button>
+            <input className="input jc-fact" value={fact} disabled={blocked} onChange={(e) => setFact(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && fact.trim()) { setRun(null); setCards([]); if (viaAgents) void agent.tellFact(fact); else void send(`Fact: ${fact}`, () => runConsole({ text: fact }, true)); } }} aria-label="A fact in plain words" />
+            <button className="btn" disabled={blocked || !fact.trim()} onClick={() => { setRun(null); setCards([]); if (viaAgents) void agent.tellFact(fact); else void send(`Fact: ${fact}`, () => runConsole({ text: fact }, true)); }}>Tell the agents ↗</button>
           </div>
-          <div className="jc-go">{FACTS.map((f) => <button key={f} className="jc-chip" disabled={agentOff} onClick={() => setFact(f)}>{f}</button>)}</div>
+          <div className="jc-go">{FACTS.map((f) => <button key={f} className="jc-chip" disabled={blocked} onClick={() => setFact(f)}>{f}</button>)}</div>
           <p className="jc-fine">A fact is a claim, not evidence: the investigator (Claude) checks it against the books and flags only what the documents prove.</p>
         </div>}
 
         {tab === "time" && <div className="jc-pane">
           <div className="jc-go">
-            <button className="btn" disabled={agentOff} onClick={() => { setRun(null); setCards([]); void agent.advance(1); }}>+1 day</button>
-            <button className="btn" disabled={agentOff} onClick={() => { setRun(null); setCards([]); void agent.advance(5); }}>+5 days</button>
-            <button className="pill" disabled={agentOff} onClick={() => { setRun(null); setCards([]); void agent.play(15, (i) => setAuto(`Day ${i} of 15`)).then(() => setAuto(null)); }}>Play 15 days on its own</button>
+            <button className="btn" disabled={blocked} onClick={() => { setRun(null); setCards([]); if (viaAgents) void agent.advance(1); else void send("+1 day", () => advance(1, true)); }}>+1 day</button>
+            <button className="btn" disabled={blocked} onClick={() => { setRun(null); setCards([]); if (viaAgents) void agent.advance(5); else void send("+5 days", () => advance(5, true)); }}>+5 days</button>
+            <button className="pill" disabled={blocked} onClick={() => { setRun(null); setCards([]); if (viaAgents) void agent.play(15, (i) => setAuto(`Day ${i} of 15`)).then(() => setAuto(null)); else void fifteen(); }}>Play 15 days on its own</button>
             {auto && <button className="pill" onClick={() => agent.stop()}>Stop after this day</button>}
           </div>
           <p className="jc-fine">Nobody prompts the agents: each day new paperwork arrives, the investigator sweeps the books, and the chaser follows up on its own schedule. Each day is real Claude work (roughly $0.10–0.50 a day).</p>

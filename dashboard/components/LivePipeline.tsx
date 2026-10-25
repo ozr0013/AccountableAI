@@ -8,8 +8,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import s from "./LivePipeline.module.css";
+import { AGENTS_URL } from "@/lib/agents-url";
 
-const API = process.env.NEXT_PUBLIC_AGENTS_URL || "http://127.0.0.1:8773";
+const API = AGENTS_URL;
 const PRICE = { input: 4e-6, cached: 4e-7, output: 2e-5 };      // Claude Opus 5.5, USD per token
 
 type Step = { tool: string; input?: unknown; result?: unknown; refused?: boolean; terminal?: boolean };
