@@ -51,12 +51,17 @@ def dispatch(rails, mirror, today: date, vendor: str | None = None,
     name = names_from(rails)
     by_vendor = daily._rules_by_vendor(mirror.query("SELECT * FROM agreement_rule"))
     manager = name(MANAGER)
-    done = {t["invoice_id"] for t in tasks(mirror)
-            if t["agent"] == "anomaly" or t["outcome"].get("decision") == "verified_paid"}
+    reviewed = {t["invoice_id"] for t in tasks(mirror)
+                if t["agent"] == "anomaly" or t["outcome"].get("decision") == "verified_paid"}
+    bank = daily.bank_rows_by_invoice(rails, MANAGER, today)
     out = []
-    for line in rails.ledger(MANAGER):
-        v = name(line.vendor_id)
-        if line.duplicate_of or not daily.rules_for(by_vendor, v, manager) or line.invoice_id in done:
+    for ledger_line in rails.ledger(MANAGER):
+        v = name(ledger_line.vendor_id)
+        line, _ = daily.verified_line(ledger_line, bank.get(ledger_line.invoice_id, []))
+        settled = line.paid_amount >= line.amount
+        # Reviewed and paid in full: done. Reviewed but a balance is still owed: keep chasing it.
+        if line.duplicate_of or not daily.rules_for(by_vendor, v, manager) or (
+                line.invoice_id in reviewed and settled):
             continue
         if vendor and daily.norm_name(vendor) != daily.norm_name(v):
             continue
@@ -251,9 +256,12 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
             acc["cached"] += u.get("cache_read_input_tokens") or 0
             acc["output"] += u.get("output_tokens") or 0
     out = []
-    for line in rails.ledger(MANAGER):
-        if line.duplicate_of:
+    bank = daily.bank_rows_by_invoice(rails, MANAGER, today)
+    for ledger_line in rails.ledger(MANAGER):
+        if ledger_line.duplicate_of:
             continue
+        rows_for = bank.get(ledger_line.invoice_id, [])
+        line, _ = daily.verified_line(ledger_line, rows_for)
         vendor = name(line.vendor_id)
         own = by_vendor.get(daily.norm_name(vendor))
         rules = daily.rules_for(by_vendor, vendor, manager)
@@ -263,7 +271,11 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
                if term and line.invoice_received else None)
         paid_on = line.paid_on if line.paid_on and line.paid_on <= today else None
         paid = line.paid_amount if paid_on else 0.0
-        if not line.funded_amount:
+        misdirected = bool(rows_for) and line.paid_amount <= 0 and any(
+            r.get("on", "") <= today.isoformat() for r in rows_for)
+        if misdirected:
+            state, days_ = "misdirected", None
+        elif not line.funded_amount:
             recent = line.invoice_received and (today - line.invoice_received).days <= 3
             state, days_ = ("awaiting_funding" if recent else "not_funded"), None
         elif paid and paid + 0.005 < line.amount:
@@ -289,6 +301,7 @@ def ledger_view(rails, mirror, today: date) -> list[dict]:
             "reminders": sorted({h["level"] for h in reminders if h.get("level")},
                                 key=lambda lv: daily.LEVEL_ORDER.index(lv)),
             "escalated": any(h["action"] == "escalate" for h in rows),
+            "flags": [h["level"] for h in rows if h["action"] == "flag"],
             "usage": usage.get(line.invoice_id),
             "last": ({"agent": t["agent"], "day": t["as_of"], "decision": t["outcome"].get("decision"),
                       "verdict": t["outcome"].get("verdict"),

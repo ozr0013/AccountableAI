@@ -19,7 +19,8 @@ type Outcome = { decision?: string | null; rationale?: string | null; verdict?: 
   finding_codes?: string[] | null; decided_by?: string; error?: string | null; result?: Result | null };
 type Task = { task_id: string; agent: "chaser" | "anomaly"; invoice_id: string; status: string; as_of: string;
   created_by: string; reason: string; outcome: Outcome; trace?: Trace };
-type Action = { action_id: string; status: string; level?: string | null; action: string; invoice_id: string; as_of: string };
+type Action = { action_id: string; status: string; level?: string | null; action: string; invoice_id: string; as_of: string;
+  message?: string | null };
 type Invoice = { amount: number; funded_amount?: number | null; funded_on?: string | null; paid_amount?: number | null;
   paid_on?: string | null; invoice_received?: string | null };
 type Claim = { statement: string; dated: string; says?: string; amount?: number; paid_on?: string | null };
@@ -33,13 +34,16 @@ type Live = { task_id: string; agent: string; invoice_id: string; day: string; r
 type Line = { at: string; agent: string; kind: string; detail: string };
 type Row = { invoice_id: string; vendor: string; amount: number; funded_amount: number; deadline: string | null;
   deadline_source: string | null; paid_on: string | null; paid_amount: number; state: string; days: number | null;
-  reminders: string[]; escalated: boolean; usage?: { calls: number; input: number; cached: number; output: number } | null;
+  reminders: string[]; escalated: boolean; flags?: string[]; usage?: { calls: number; input: number; cached: number; output: number } | null;
   last: { agent: string; day: string; decision?: string | null; verdict?: string | null; by: string } | null };
 
 const STATE: Record<string, string> = { overdue: "Overdue", not_due: "Not due", paid_on_time: "Paid on time",
-  awaiting_funding: "Awaiting funding",
+  awaiting_funding: "Awaiting funding", misdirected: "Paid to wrong vendor",
   paid_late: "Paid late", partial: "Partly paid", not_funded: "Not funded", no_deadline: "No deadline" };
-const RANK: Record<string, number> = { overdue: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4,
+const FLAG: Record<string, string> = { statement_claims_unbacked: "statement claims a payment the bank does not show",
+  vendor_reports_unpaid: "vendor reports it was not paid", reply_without_proof: "Keyway says paid without proof",
+  payment_to_other_vendor: "payment went to a different vendor", other_contradiction: "sources disagree" };
+const RANK: Record<string, number> = { overdue: 0, misdirected: 0, partial: 1, paid_late: 2, not_due: 3, not_funded: 4,
   awaiting_funding: 5, no_deadline: 6, paid_on_time: 7 };
 const LEVELS = ["polite", "firm", "escalation"];
 
@@ -146,7 +150,7 @@ function CaseStrip({ flow, today }: { flow: Flow; today: string }) {
 function InvoiceTable({ rows, selected, working, onSelect }:
     { rows: Row[]; selected: string; working: string | null; onSelect: (id: string) => void }) {
   const [filter, setFilter] = useState("attention");
-  const attention = (r: Row) => !["paid_on_time", "not_due", "awaiting_funding"].includes(r.state) || r.reminders.length > 0;
+  const attention = (r: Row) => !["paid_on_time", "not_due", "awaiting_funding"].includes(r.state) || r.reminders.length > 0 || !!r.flags?.length;
   const shown = rows.filter(r => filter === "all" || attention(r))
     .sort((a, b) => (RANK[a.state] - RANK[b.state]) || ((b.days || 0) - (a.days || 0)));
   const count = (k: string) => rows.filter(r => r.state === k).length;
@@ -169,7 +173,8 @@ function InvoiceTable({ rows, selected, working, onSelect }:
               <td>{r.vendor}</td>
               <td className={s.num}>{usd(r.funded_amount)}</td>
               <td>{day(r.deadline)}<span className={s.src2}>{r.deadline_source === "vendor agreement" ? "vendor" : r.deadline_source ? "mgmt" : ""}</span></td>
-              <td><span className={`${s.pill} ${s["st_" + r.state] || ""}`}>{STATE[r.state] || r.state}{r.days ? ` · ${r.days}d` : ""}</span></td>
+              <td><span className={`${s.pill} ${s["st_" + r.state] || ""}`}>{STATE[r.state] || r.state}{r.days ? ` · ${r.days}d` : ""}</span>
+                {!!r.flags?.length && <span className={s.raised}>flagged</span>}</td>
               <td><span className={s.ladder}>{LEVELS.map(l => <i key={l} className={r.reminders.includes(l) ? s.sent : ""} title={l} />)}</span>
                 {r.escalated && <span className={s.raised}>raised</span>}</td>
               <td className={s.lastCell}>{r.invoice_id === working ? <b className={s.workingTag}>working</b>
@@ -258,6 +263,7 @@ export function LivePipeline() {
     });
     on("day_done", () => refresh());
     on("email_sent", m => log("system", "email", `${m.invoice_id} · ${m.subject}${m.simulated ? " (simulated)" : ""}`));
+    on("flag_raised", m => log(String(m.agent || "chaser"), "flag", `${m.invoice_id} · ${FLAG[String(m.kind)] || m.kind} · cites ${(m.evidence as string[] || []).join(", ")}`));
     on("email_failed", m => log("system", "refused", `email not sent: ${m.error}`));
     return () => es.close();
   }, [refresh]);
@@ -296,9 +302,10 @@ export function LivePipeline() {
   const usage = rows.reduce((u, r) => (r.usage ? { calls: u.calls + r.usage.calls, input: u.input + r.usage.input,
     cached: u.cached + r.usage.cached, output: u.output + r.usage.output } : u), { calls: 0, input: 0, cached: 0, output: 0 });
   const cost = (usage.input - usage.cached) * PRICE.input + usage.cached * PRICE.cached + usage.output * PRICE.output;
-  const pending = flow?.chaser_actions.find(a => ["needs_approval", "needs_controller"].includes(a.status));
+  const pending = flow?.chaser_actions.find(a => a.action !== "flag" && ["needs_approval", "needs_controller"].includes(a.status));
+  const flags = flow?.chaser_actions.filter(a => a.action === "flag") || [];
   const raised = !!flow?.chaser_actions.some(a => a.action === "escalate");
-  const review = flow?.case?.state === "needs_controller" || raised;
+  const review = flow?.case?.state === "needs_controller" || raised || flags.length > 0;
   const current = selected || demo?.focus || "";
   const emails = rows.reduce((n, r) => n + r.reminders.length, 0);
   const controllerWaiting = !!pending || review;
@@ -411,7 +418,9 @@ export function LivePipeline() {
                 <span className={`${s.badge} ${s.hold}`}>Decision pending</span><span className={s.src}>Human</span>
               </div>
               <p className={s.itemText}>Review: {[...(flow?.case?.findings || []).map(f => FINDING[f.code] || f.message),
-                ...(raised ? ["no proof of payment after three reminders"] : [])].join("; ")}. Only a person can close this case or hold funds.</p>
+                ...(raised ? ["no proof of payment after three reminders"] : []),
+                ...flags.map(f => `flagged by the chaser: ${FLAG[f.level || ""] || f.level}`)].join("; ")}. Only a person can close this case or hold funds.</p>
+              {flags.map(f => <p key={f.action_id} className={s.quote}>{plain(f.message)}</p>)}
             </div>}
           </div>
         </section>

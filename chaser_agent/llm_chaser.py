@@ -8,18 +8,39 @@ A hand-off creates a task for the anomaly agent.
 """
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 
 from . import daily
 from .patterns import describe, vendor_patterns
 from .runtime import Tool, Trace, load_skill, run_agent
 
-SYSTEM = """You are the chaser agent for Oakline Homes, a property owner. Oakline funds a \
-management company (Keyway), which must pay each vendor by the deadline in that vendor's \
-agreement. You handle one invoice per task: read its context, then make exactly one decision \
-using a decision tool. Follow the chasing skill. Base every statement on tool results; cite \
-rule ids, dates and amounts. You never write or send messages yourself: reminders are \
-controller-approved templates, and firm or escalation steps still go to the controller."""
+def _sending() -> str:
+    """How reminders leave today, from the live settings (never a stale description)."""
+    order = daily.LEVEL_ORDER
+    auto = [lv for lv in order if lv in daily.AUTO_LEVELS]
+    held = [lv for lv in order if lv not in daily.AUTO_LEVELS]
+    out = (f"{', '.join(auto)} reminders go out automatically" if auto else "no reminder goes out automatically")
+    if held:
+        out += f"; {', '.join(held)} reminders wait for controller approval"
+    return out + ("; the escalation notice goes out automatically and only a hold needs the controller"
+                  if daily.AUTO_ESCALATE else "; an escalation waits for the controller")
+
+
+def system_prompt() -> str:
+    return ("You are the chaser agent for Oakline Homes, a property owner. Oakline funds a management "
+            "company (Keyway), which must pay each vendor by the agreement deadline. You handle one "
+            "invoice per task: read its context and its evidence, flag any contradiction to the "
+            "controller, then make exactly one decision using a decision tool. Follow the chasing "
+            "skill. Base every statement on tool results; cite rule ids, document ids, dates and "
+            f"amounts. You never write messages yourself: reminders are controller-approved templates. "
+            f"Today {_sending()}.")
+
+
+SYSTEM = system_prompt()
+
+FLAG_KINDS = ("statement_claims_unbacked", "vendor_reports_unpaid", "reply_without_proof",
+              "payment_to_other_vendor", "other_contradiction")
 
 RATIONALE = {"type": "string", "description": "1-3 neutral sentences: deadline, how overdue, "
              "what was already sent, why this step; cite the rule id", "minLength": 10,
@@ -38,14 +59,18 @@ class ChaserTools:
         self.rails, self.mirror, self.invoice_id, self.today = rails, mirror, invoice_id, today
         self.history_rows, self.enqueue, self.record = history_rows, enqueue, record
         self.manager_id, self.name = manager_id, names_from(rails)
-        self.line = next((l for l in rails.ledger(manager_id) if l.invoice_id == invoice_id), None)
+        line = next((l for l in rails.ledger(manager_id) if l.invoice_id == invoice_id), None)
+        self.bank_rows = daily.bank_rows_by_invoice(rails, manager_id, today).get(invoice_id, [])
+        self.line, self.paid_source = daily.verified_line(line, self.bank_rows) if line else (None, None)
         self.rule_rows = mirror.query("SELECT * FROM agreement_rule")
         vendor = self.name(self.line.vendor_id) if self.line else ""
         self.vendor = vendor
         self.rules = daily.rules_for(daily._rules_by_vendor(self.rule_rows), vendor, self.name(manager_id))
         self.history = [h for h in history_rows if h["invoice_id"] == invoice_id]
         self.code = (daily.decide(self.line, vendor, self.name(manager_id), self.rules,
-                                  self.history, today) if self.line else None)
+                                  self.history, today, payment_seen=bool(self.bank_rows),
+                                  paid_source=self.paid_source) if self.line else None)
+        self.evidence_ids: set[str] = set()
 
     def allowed(self) -> list[str]:
         a = self.code.action if self.code else "skip"
@@ -90,6 +115,58 @@ class ChaserTools:
                     out.append({"statement": d.id, "dated": str(d.dated), "says": row.get("status"),
                                 "amount": row.get("amount"), "paid_on": row.get("on")})
         return out
+
+    def get_evidence(self) -> dict:
+        """Every document filed so far about this invoice, newest last: the invoice, Oakline's
+        funding, Keyway's bank rows (with the vendor each paid), vendor confirmations and
+        notices, Keyway's replies and statement lines."""
+        out = []
+        for d in self.rails.documents(self.manager_id):
+            if d.dated and d.dated > self.today:
+                continue
+            data = d.data or {}
+            if data.get("invoice_id") == self.invoice_id:
+                detail = {k: v for k, v in data.items() if k != "invoice_id"}
+            elif d.kind.value == "manager_bank":
+                detail = [p for p in data.get("payments", []) if p.get("invoice_id") == self.invoice_id]
+            elif d.kind.value == "manager_statement":
+                detail = [r for r in data.get("lines", []) if r.get("invoice_id") == self.invoice_id]
+            else:
+                continue
+            if not detail:
+                continue
+            if d.kind.value == "manager_bank":
+                for p in detail:
+                    p["vendor"] = self.name(p["vendor_id"]) if p.get("vendor_id") else None
+                    p["to_this_invoices_vendor"] = p.get("vendor_id") in (None, self.line.vendor_id)
+            out.append({"document": d.id, "kind": d.kind.value, "dated": str(d.dated),
+                        "text": (d.text or "")[:300], "detail": detail})
+        out.sort(key=lambda x: (x["dated"], x["document"]))
+        self.evidence_ids = {x["document"] for x in out}
+        return {"invoice_id": self.invoice_id, "documents": out,
+                "counted_payment": {"amount": self.line.paid_amount, "on": str(self.line.paid_on),
+                                    "source": self.paid_source}}
+
+    def flag_for_controller(self, kind: str, evidence_ids: list[str], rationale: str) -> dict:
+        """Open a controller review for a contradiction between sources. Not a decision: the
+        reminder schedule goes on; the controller sees the flag with its cited documents."""
+        if self.code is None:
+            return {"error": "no ledger line for this invoice"}
+        if kind not in FLAG_KINDS:
+            return {"error": f"kind must be one of {list(FLAG_KINDS)}"}
+        if not self.evidence_ids:
+            self.get_evidence()
+        missing = [e for e in evidence_ids if e not in self.evidence_ids]
+        if not evidence_ids or missing:
+            return {"error": f"cite documents from get_evidence; unknown: {missing or 'none given'}"}
+        flag = replace(self.code, action="flag", level=kind, status="needs_controller",
+                       message=rationale, attempt=0)
+        if any(h["action_id"] == flag.action_id() for h in self.history):
+            return {"already_flagged": flag.action_id()}
+        self.record(flag, f"{rationale} [evidence: {', '.join(evidence_ids)}]")
+        from .runtime import emit
+        emit({"type": "flag_raised", "kind": kind, "evidence": evidence_ids, "summary": rationale[:400]})
+        return {"flagged": flag.action_id(), "status": "needs_controller"}
 
     # -- decisions (terminal) -------------------------------------------------------------
     def _guard(self, tool: str) -> dict | None:
@@ -140,9 +217,20 @@ class ChaserTools:
                  "rules with quotes, chaser history and controller decisions, manager replies, "
                  "vendor payment history, and `policy` (what the approved schedule allows today).",
                  _schema(), self.get_invoice_context),
+            Tool("get_evidence", "Every document about this invoice so far: invoice, funding, "
+                 "Keyway bank rows (and which vendor each paid), vendor confirmations and notices, "
+                 "Keyway's replies, statement lines. Use it to check claims against each other.",
+                 _schema(), self.get_evidence),
+            Tool("flag_for_controller", "Open a controller review when sources disagree (a statement "
+                 "or reply claims payment the bank does not show, a vendor says it was not paid, a "
+                 "payment went to another vendor). Cite document ids from get_evidence. Not a "
+                 "decision: still make one decision afterwards.",
+                 _schema(kind={"type": "string", "enum": list(FLAG_KINDS)},
+                         evidence_ids={"type": "array", "items": {"type": "string"}, "minItems": 1},
+                         rationale=RATIONALE),
+                 self.flag_for_controller),
             Tool("send_reminder", "Decision: send the next reminder on the approved ladder (the "
-                 "level and template come from policy). Polite goes out automatically; firm and "
-                 "escalation reminders wait for controller approval.",
+                 f"level and template come from policy). {_sending().capitalize()}.",
                  _schema(rationale=RATIONALE), self.send_reminder, terminal=True),
             Tool("escalate", "Decision: escalate after all three reminders - notifies owner and "
                  "management, proposes holding the amount owed, opens a controller review.",
@@ -162,7 +250,7 @@ class ChaserTools:
 def run(tools: ChaserTools, client=None) -> Trace:
     task = (f"Task: chase invoice {tools.invoice_id} as of {tools.today.isoformat()}. Read its "
             "context, then make one decision.")
-    return run_agent("chaser", SYSTEM, load_skill("chasing"), tools.tools(), task, client)
+    return run_agent("chaser", system_prompt(), load_skill("chasing"), tools.tools(), task, client)
 
 
 def outcome(trace: Trace) -> dict:

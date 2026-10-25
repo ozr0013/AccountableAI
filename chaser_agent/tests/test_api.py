@@ -176,7 +176,7 @@ def test_repeated_handoff_does_not_report_existing_records_as_new_saves(fixture)
     rails,mirror,client=fixture
     bank=Document(id='paid-handoff',kind='manager_bank',manager_id='keyway',
         dated=date(2026,4,27),data={'payments':[{'invoice_id':'INV-KW-0301',
-        'vendor_id':'v-riogrande','amount':1000,'on':'2026-04-27'}]})
+        'vendor_id':'v-riogrande','amount':1240,'on':'2026-04-27'}]})
     rails.append_event(document_event(bank))
     first=client.post('/chaser/run').json()
     assert first['saved']==1

@@ -115,8 +115,35 @@ def _cadence(rules: list[dict]) -> tuple[int, str]:
     return days, f"agreement: {rule.get('source_quote') or rule['check']}"
 
 
+def bank_rows_by_invoice(rails, manager_id: str = "keyway", today: date | None = None) -> dict[str, list[dict]]:
+    """Every bank payment row filed so far, by invoice: what Keyway's bank says it paid, to whom."""
+    out: dict[str, list[dict]] = {}
+    for d in rails.documents(manager_id):
+        if d.kind.value != "manager_bank" or (today and d.dated and d.dated > today):
+            continue
+        for p in d.data.get("payments", []):
+            if p.get("invoice_id"):
+                out.setdefault(p["invoice_id"], []).append({**p, "document": d.id})
+    return out
+
+
+def verified_line(line, bank_rows: list[dict]):
+    """The ledger line with only payments to the invoice's own vendor counted. A payment to a
+    different vendor does not pay this invoice (the ledger counts any row with its number).
+    Returns (line, source): source is 'bank', 'vendor confirmation' or None."""
+    if not bank_rows:
+        return line, ("vendor confirmation" if line.paid_amount > 0 else None)
+    right = [r for r in bank_rows if r.get("vendor_id") in (None, line.vendor_id)]
+    paid = round(sum(float(r.get("amount") or 0) for r in right), 2)
+    paid_on = max((date.fromisoformat(r["on"]) for r in right if r.get("on")), default=None)
+    return line.model_copy(update={"paid_amount": paid, "paid_on": paid_on if paid else None}), "bank"
+
+
 def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history: list[dict],
-           today: date, invoice=None) -> Decision:
+           today: date, invoice=None, payment_seen: bool | None = None,
+           paid_source: str | None = None) -> Decision:
+    """`payment_seen`: some bank row names this invoice (even one paying another vendor).
+    `paid_source`: where the counted payment comes from, for the reasons Claude reads."""
     base = {"invoice_id": line.invoice_id, "vendor_name": vendor_name}
     if not rules:
         return Decision(**base, action="skip", reason="no saved agreement for this vendor")
@@ -152,11 +179,21 @@ def decide(line, vendor_name: str, manager_name: str, rules: list[dict], history
     cite = {"rule_id": term["rule_id"], "rule_quote": term.get("source_quote"),
             "due_date": due.isoformat()}
     owed = round(line.amount - line.paid_amount, 2)
-    if line.paid_amount > 0:
-        what = "in full" if owed <= 0 else f"of ${line.amount:,.2f} (${owed:,.2f} short)"
+    seen = line.paid_amount > 0 if payment_seen is None else (payment_seen or line.paid_amount > 0)
+    handed = any(h["action"] == "handoff_anomaly" for h in history)
+    if seen and not handed:
+        source = paid_source or "bank"
+        if line.paid_amount <= 0:
+            what = "a bank payment names this invoice but went to a different vendor"
+        else:
+            what = (f"{source} shows ${line.paid_amount:,.2f} paid "
+                    + ("in full" if owed <= 0 else f"of ${line.amount:,.2f} (${owed:,.2f} still owed)")
+                    + f" on {line.paid_on}")
         return Decision(**base, **cite, action="handoff_anomaly", amount_owed=max(owed, 0),
-                        reason=f"bank shows ${line.paid_amount:,.2f} paid {what} on "
-                               f"{line.paid_on}; anomaly agent checks amount, recipient and timing")
+                        reason=f"{what}; anomaly agent checks amount, recipient and timing")
+    if seen and owed <= 0:
+        return Decision(**base, **cite, action="skip", reason="paid in full; anomaly review done")
+    # Unpaid, or a balance still owed after a short or misdirected payment: keep chasing it.
     if today <= due:
         return Decision(**base, **cite, action="not_due", amount_owed=owed,
                         reason=f"due {due} ({(due - today).days} days left) under "

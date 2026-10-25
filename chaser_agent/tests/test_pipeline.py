@@ -171,3 +171,53 @@ def test_failed_agent_run_is_recorded_and_the_queue_continues(world):
     assert mirror.tasks[f"chaser:{INV}:2026-04-22"]["status"] == "failed"
     assert "without a decision" in done["error"]
     assert plain({"some": 1}) == 1
+
+
+def _tools(rails, mirror, today, history=()):
+    from chaser_agent import llm_chaser
+    recorded = []
+
+    def record(d, reason):
+        recorded.append((d, reason))
+        pipeline._record_chase(mirror, today)(d, reason)
+    tools = llm_chaser.ChaserTools(rails, mirror, INV, today, list(history), lambda *a: "task", record)
+    return tools, recorded
+
+
+def test_evidence_lists_the_documents_and_a_flag_must_cite_them(world):
+    rails, mirror = world
+    today = date(2026, 4, 22)
+    tools, recorded = _tools(rails, mirror, today)
+    evidence = tools.get_evidence()
+    kinds = {d["kind"] for d in evidence["documents"]}
+    assert {"vendor_invoice", "funding"} <= kinds
+    assert tools.flag_for_controller("other_contradiction", ["made-up-doc"], "Claims disagree here.")["error"]
+    assert tools.flag_for_controller("not_a_kind", [evidence["documents"][0]["document"]], "x" * 20)["error"]
+    cited = evidence["documents"][0]["document"]
+    first = tools.flag_for_controller("statement_claims_unbacked", [cited], "The statement says paid; no bank row.")
+    assert first["status"] == "needs_controller" and recorded[0][0].action == "flag"
+    again, _ = _tools(rails, mirror, today, history=[{**recorded[0][0].to_dict(), "as_of": "2026-04-22"}])
+    assert "already_flagged" in again.flag_for_controller("statement_claims_unbacked", [cited], "Same again, once more.")
+
+
+def test_a_payment_to_another_vendor_is_not_counted_as_paid(world):
+    rails, mirror = world
+    rails.append_event(document_event(Document(
+        id="bank-wrong", kind="manager_bank", manager_id="keyway", dated=date(2026, 4, 21),
+        data={"payments": [{"invoice_id": INV, "vendor_id": "v-someone-else", "amount": 1240.0,
+                            "on": "2026-04-21"}]})))
+    tools, _ = _tools(rails, mirror, date(2026, 4, 22))
+    assert tools.line.paid_amount == 0 and tools.code.action == "handoff_anomaly"
+    assert "different vendor" in tools.code.reason
+    rows = tools.get_evidence()["documents"]
+    bank = next(d for d in rows if d["document"] == "bank-wrong")
+    assert bank["detail"][0]["to_this_invoices_vendor"] is False
+
+
+def test_the_prompt_describes_the_live_sending_rules(monkeypatch):
+    from chaser_agent import daily, llm_chaser
+    monkeypatch.setattr(daily, "AUTO_LEVELS", {"polite", "firm", "escalation"})
+    monkeypatch.setattr(daily, "AUTO_ESCALATE", True)
+    assert "polite, firm, escalation reminders go out automatically" in llm_chaser.system_prompt()
+    monkeypatch.setattr(daily, "AUTO_LEVELS", {"polite"})
+    assert "firm, escalation reminders wait for controller approval" in llm_chaser.system_prompt()

@@ -76,7 +76,7 @@ def test_escalation_notifies_both_proposes_a_hold_and_needs_the_controller():
 def test_any_payment_hands_off_to_the_anomaly_agent():
     assert _decide(date(2026, 4, 22), paid=1240.0).action == "handoff_anomaly"
     partial = _decide(date(2026, 4, 22), paid=1000.0)
-    assert partial.action == "handoff_anomaly" and "$240.00 short" in partial.reason
+    assert partial.action == "handoff_anomaly" and "$240.00 still owed" in partial.reason
 
 
 def test_agreement_waiting_for_controller_is_held_not_chased():
@@ -123,3 +123,27 @@ def test_all_levels_and_the_escalation_notice_go_out_without_approval(monkeypatc
             _row("escalation", "2026-05-02", "queued")]
     raised = _decide(date(2026, 5, 7), sent)
     assert raised.action == "escalate" and raised.status == "queued"
+
+
+def test_after_the_hand_off_a_balance_still_owed_is_chased():
+    handed = [_row(None, "2026-04-22", "reviewed", action="handoff_anomaly")]
+    d = _decide(date(2026, 4, 22), handed, paid=1000.0)
+    assert d.action == "reminder" and d.amount_owed == 240.0
+    assert _decide(date(2026, 4, 22), handed, paid=1240.0).action == "skip"
+
+
+def test_a_payment_to_another_vendor_is_handed_off_then_chased_as_unpaid():
+    from chaser_agent.daily import verified_line
+    line, source = verified_line(_line(paid=1240.0), [{"vendor_id": "v-other", "amount": 1240.0, "on": "2026-03-20"}])
+    assert (line.paid_amount, source) == (0.0, "bank")
+    first = decide(line, "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22), payment_seen=True)
+    assert first.action == "handoff_anomaly" and "different vendor" in first.reason
+    handed = [_row(None, "2026-04-22", "reviewed", action="handoff_anomaly")]
+    later = decide(line, "Rio Grande Plumbing", "Keyway", RULES, handed, date(2026, 4, 23), payment_seen=True)
+    assert later.action == "reminder" and later.amount_owed == 1240.0
+
+
+def test_a_vendor_confirmation_is_named_as_the_source():
+    d = decide(_line(paid=1240.0), "Rio Grande Plumbing", "Keyway", RULES, [], date(2026, 4, 22),
+               paid_source="vendor confirmation")
+    assert d.reason.startswith("vendor confirmation shows")
