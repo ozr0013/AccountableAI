@@ -36,6 +36,11 @@ python dashboard/feed/export.py
 
 Every citation chip opens its source document.
 
+The Agents page shows Agreement, Chaser, Anomaly, and Verifier with expandable prompts.
+`npm run dev` and `npm run build` regenerate `lib/agent-prompts.json` from the Python prompt
+sources and the Chaser/Anomaly skill files using `scripts/export_agent_prompts.py` (Python 3,
+standard library only). The Chaser’s delivery-policy placeholder is filled at runtime.
+
 ## Feed API (`feed/serve.py`)
 
 `GET /api/state` · `GET /api/presets` · `POST /api/console {preset, params} | {text}` ·

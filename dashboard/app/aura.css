@@ -590,6 +590,13 @@
 .sm-box text.sm-two { font-size: calc(11.5px * var(--dashboard-type-scale, 1)); }
 .theme-aura .ask-pill { white-space: nowrap; font-size: calc(12px * var(--dashboard-type-scale, 1)); }
 
+/* Judge-visible instructions stay readable on narrow screens and without a live feed. */
+.agent-card { align-self: start; min-width: 0; }
+.agent-card > .between { gap: 12px; flex-wrap: wrap; }
+.agent-prompt-section + .agent-prompt-section { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.agent-prompt { margin: 12px 0; padding: 16px; white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; font-size: calc(13px * var(--dashboard-type-scale, 1)); line-height: 1.6; background: var(--n2); border: 1px solid var(--line); }
+.agent-prompt-source { overflow-wrap: anywhere; text-transform: none; letter-spacing: 0; }
+
 /* The layout grid gives space released by the sidebar directly to the page. */
 .shell.theme-aura { grid-template-columns: var(--sidebar) minmax(0, 1fr); transition: grid-template-columns .2s ease; }
 .theme-aura .side { min-width: 0; }
