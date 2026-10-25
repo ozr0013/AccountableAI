@@ -382,3 +382,13 @@
 
 .na-recon { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 0; font-size: 13px; color: var(--n9); }
 .na-recon b { color: var(--ink); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* the money strip: four figures that add up */
+.theme-aura .quiet-metrics.money-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.theme-aura .money-strip strong { font-size: clamp(20px, 2.1vw, 30px); }
+@media (max-width: 900px) { .theme-aura .quiet-metrics.money-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Keyway must show proof: the owner's move, highlighted like the sidebar's attention item */
+.na-group.g-keyway { background: #fff7f0; border: 1px dashed #e0894a; border-left: 3px solid #e0894a; padding: 14px 16px 6px; }
+.na-group.g-keyway .na-row { border-color: #f1d2b8; }
+.na-act { margin-left: 10px; font: 600 10.5px var(--mono); letter-spacing: .06em; text-transform: uppercase; color: #fff; background: #e0894a; padding: 3px 7px; vertical-align: 2px; }

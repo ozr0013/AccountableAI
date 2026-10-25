@@ -72,7 +72,7 @@ export function NeedsAttention({ state }: { state: State }) {
         return (
           <div key={g.id} className={`na-group g-${g.id}`}>
             <div className="na-group-head">
-              <h3>{g.title}</h3>
+              <h3>{g.title}{g.id === "keyway" && <span className="na-act">Your response needed</span>}</h3>
               <span className="mono">{money(sum(g.id))} · {mine.length}</span>
             </div>
             <p className="na-note">{g.note}{g.id === "keyway" && pattern ? ` ${pattern.headline.replace(/^keyway/i, "Keyway")}.` : ""}</p>
