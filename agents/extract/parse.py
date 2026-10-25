@@ -17,6 +17,7 @@ from .fields import (
     money_values,
     parse_date,
     parse_datetime_header,
+    vendor_invoice_numbers,
 )
 from .readers import Mail, pdf_text, read_eml
 
@@ -55,8 +56,19 @@ class Parsed:
 # PDFs
 # ---------------------------------------------------------------------------------------------
 
+_EMAIL_HEAD = re.compile(r"^\s*From:\s*.+\n(?:.*\n){0,2}?\s*To:\s*.+", re.MULTILINE)
+_BANK_HEAD = re.compile(r"^\s*DATE\s+(?:TYPE\s+)?DESCRIPTION\s+AMOUNT\s+BALANCE\b",
+                        re.MULTILINE | re.IGNORECASE)
+
+
 def _pdf_kind(text: str) -> str:
     low = text.lower()
+    if _EMAIL_HEAD.search(text[:800]):
+        return "email"                       # an email printed to PDF: read it as an email
+    if "property management agreement" in low[:400]:
+        return "agreement"                   # before the W-9 check: agreements mention W-9s
+    if _BANK_HEAD.search(text) or "account activity" in low[:400]:
+        return "bank"
     if "credit memo" in low:
         return "credit_memo"
     if "estimate" in low and "not an invoice" in low:
@@ -93,7 +105,8 @@ def parse_invoice(text: str, source: str, vendors: VendorIndex, method: str,
     if not vid:
         p.flag("vendor not recognized", human=True, conf=0.3)
     m = re.search(r"(?:Invoice\s*(?:#|No\.?)?|INVOICE|Inv)\s*:?\s*([A-Z]{1,4}-\d{3,5})", text)
-    vendor_no = m[1] if m else None
+    vendor_no = m[1] if m else (vendor_invoice_numbers(text) or [None])[0]
+    job = re.search(r"\bJob\s*(?:ref|#|no\.?)\s*:?\s*([A-Z0-9-]{3,12})", text, re.IGNORECASE)
     refs = [r for r in keyway_refs(text) if not vendor_no or r[-4:] not in vendor_no]
     total = labeled_money(text, TOTAL_LABELS)
     current = labeled_money(text, ["current charges"])
@@ -139,6 +152,8 @@ def parse_invoice(text: str, source: str, vendors: VendorIndex, method: str,
         p.meta["needs_invoice_id"] = True
     if vendor_no:
         p.data["vendor_ref"] = vendor_no
+    if job:
+        p.data["job_ref"] = job[1]
     if received:
         p.data["received"] = received.isoformat()
     if re.search(r"inspection pending", text, re.IGNORECASE):
@@ -170,7 +185,7 @@ def forwarded_date(mail: Mail) -> date | None:
     return dt.date() if dt else None
 
 
-_STATUS = [(re.compile(r"\bhold\b.*w-?9|w-?9.*\bhold\b", re.IGNORECASE), "hold_missing_w9"),
+_STATUS = [(re.compile(r"\b(hold|held)\b.*w-?9|w-?9.*\b(hold|held)\b", re.IGNORECASE), "hold_missing_w9"),
            (re.compile(r"\bsched", re.IGNORECASE), "scheduled"),
            (re.compile(r"\bpa?id\b|\bpd\b", re.IGNORECASE), "paid"),
            (re.compile(r"\bbilled\b|\bopen\b|rec'?d", re.IGNORECASE), "billed")]
@@ -183,12 +198,60 @@ def norm_status(s: str) -> str:
     return s.strip().lower() or "unknown"
 
 
+_STMT_COLS = {"date": "date", "vendor": "vendor", "ref": "ref", "property": "property",
+              "description": "description", "amount": "amount", "status": "status"}
+
+
+def _statement_rows_by_header(pdf) -> list[dict] | None:
+    """Columns taken from the table's header row (Date | Vendor | Ref | ... | Amount | Status), for
+    statements without a line-number column. Wrapped cells continue on the next PDF line."""
+    rows: list[dict] = []
+    found = False
+    for page in pdf.pages:
+        lines: dict[int, list] = {}
+        for wd in page.extract_words(keep_blank_chars=False):
+            lines.setdefault(round(wd["top"] / 3), []).append(wd)
+        starts: list[tuple[float, str]] = []
+        last_key = None
+        for key in sorted(lines):
+            ws = sorted(lines[key], key=lambda w: w["x0"])
+            names = [w["text"].lower() for w in ws]
+            if not starts:
+                if "vendor" in names and "amount" in names and "ln" not in names:
+                    starts = [(w["x0"] - 2, _STMT_COLS[w["text"].lower()]) for w in ws
+                              if w["text"].lower() in _STMT_COLS]
+                    found = True
+                continue
+            cols: dict[str, list[str]] = {c: [] for _, c in starts}
+            for wd in ws:
+                col = next((c for x, c in reversed(starts) if wd["x0"] >= x), starts[0][1])
+                cols[col].append(wd["text"])
+            c = {k: " ".join(v) for k, v in cols.items()}
+            dated = bool(re.match(r"^\d{1,2}/\d{1,2}", c.get("date", "")))
+            if dated and money_values(c.get("amount", "") + " "):
+                rows.append({**c, "ln": str(len(rows) + 1)})
+                last_key = key
+            elif rows and last_key is not None and key - last_key <= 4 and not c.get("date"):
+                for k, v in c.items():                       # a wrapped cell
+                    if v and k in rows[-1]:
+                        rows[-1][k] = (rows[-1][k] + " " + v).strip()
+                last_key = key
+            elif rows:
+                last_key = None                              # the table has ended
+    return rows if found else None
+
+
 def parse_statement(data: bytes, text: str, source: str, vendors: VendorIndex) -> Parsed:
-    """Column positions from the PDF words: Ln | Date | Vendor | Ref | Amount | Status."""
+    """Column positions from the PDF words: Ln | Date | Vendor | Ref | Amount | Status, or the
+    table's own header row when there is no line-number column."""
     import pdfplumber
     p = Parsed(source, SourceKind.manager_statement, method="text_layer", text=text[:1500])
-    pm = re.search(r"Prepared\s+(.+)", text)
+    pm = re.search(r"Prepared\s*:?\s+(.+)", text)
     p.dated = parse_date(pm[1]) if pm else None
+    with pdfplumber.open(io.BytesIO(data)) as pdf:
+        by_header = _statement_rows_by_header(pdf)
+    if by_header is not None:
+        return _statement_lines(p, by_header, vendors)
     rows: list[dict] = []
     with pdfplumber.open(io.BytesIO(data)) as pdf:
         for page in pdf.pages:
@@ -208,16 +271,25 @@ def parse_statement(data: bytes, text: str, source: str, vendors: VendorIndex) -
                     rows.append(c)
                 elif rows and not c["ln"] and re.search(r"rec'?d", c["vendor"] + c["ref"], re.IGNORECASE):
                     rows[-1]["note"] = c["vendor"] + " " + c["ref"]
+    return _statement_lines(p, rows, vendors)
+
+
+def _statement_lines(p: Parsed, rows: list[dict], vendors: VendorIndex) -> Parsed:
     out = []
     for r in rows:
         ref_txt = r["ref"]
         refs = keyway_refs(ref_txt)
         on = parse_date(r["date"]) if r["date"] else None
         line = {"line": f"L{r['ln']}", "amount": money_values(r["amount"] + " ")[0],
-                "status": norm_status(r["status"]), "on": on.isoformat() if on else None}
+                "status": norm_status(r.get("status", "")), "on": on.isoformat() if on else None,
+                "_status_text": r.get("status", "")}
+        retained = re.search(r"\$\s?([\d,]+(?:\.\d{2})?)\s+(?:retained|retainage|held back)",
+                             r.get("status", ""), re.IGNORECASE)
+        if retained:
+            line["retained"] = float(retained[1].replace(",", ""))
         if refs:
             line["invoice_id"] = refs[0]
-        else:
+        elif ref_txt.strip() not in ("", "-"):
             line["_vendor_ref"] = ref_txt.strip()
         vid, _ = vendors.match(r["vendor"], 0.7)
         line["_vendor_id"] = vid
@@ -282,6 +354,10 @@ def parse_pdf_file(data: bytes, source: str, vendors: VendorIndex,
         p.flag(f"vendor credit memo ({'$%.2f' % amt[-1] if amt else 'amount unclear'}): check it is "
                "applied to Oakline's next funding", human=True)
         return [p]
+    if kind == "email" and mail is None:
+        return parse_mail(mail_from_text(pt.text), source, vendors)
+    if kind == "bank":
+        return [parse_bank_text(pt.text, source, vendors)]
     if kind == "wire":
         return parse_wire(pt.text, source, vendors)
     if kind == "agreement":
@@ -302,7 +378,7 @@ def parse_pdf_file(data: bytes, source: str, vendors: VendorIndex,
 # ---------------------------------------------------------------------------------------------
 
 _NON_VENDOR = re.compile(r"SERVICE FEE|TRANSFER|PAYROLL|WIRE IN|HOME DEPOT|INTEREST|DEPOSIT", re.IGNORECASE)
-_PREFIX = re.compile(r"^(ACH DEBIT|ACH PMT|BILL PAY|ONLINE PMT|CHECK\s+\d+)\s*", re.IGNORECASE)
+_PREFIX = re.compile(r"^(ACH DEBIT|ACH PMT|BILL PAY|ONLINE PMT|CHECK\s+\d+|CHK\s+\d+)\s*", re.IGNORECASE)
 
 
 def parse_bank_csv(text: str, source: str, vendors: VendorIndex) -> Parsed:
@@ -338,13 +414,76 @@ def parse_bank_csv(text: str, source: str, vendors: VendorIndex) -> Parsed:
     return p
 
 
+_BANK_ROW = re.compile(r"^(\d{1,2}/\d{1,2})\s+(DR|CR)\s+(.+?)\s+(-?[\d,]+\.\d{2})\s+(-?[\d,]+\.\d{2})\s*$")
+_FEE = re.compile(r"SVC\s*CHG|SERVICE CHARGE|\bFEE\b", re.IGNORECASE)
+_CHECK = re.compile(r"^CHK\s+\d+\s*", re.IGNORECASE)
+
+
+def parse_bank_text(text: str, source: str, vendors: VendorIndex) -> Parsed:
+    """A bank activity export printed to PDF: DATE | TYPE | DESCRIPTION | AMOUNT | BALANCE."""
+    p = Parsed(source, SourceKind.manager_bank, method="text_layer", text="")
+    per = re.search(r"Period:\s*(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{1,2}/\d{4})", text)
+    start, end = (parse_date(per[1]), parse_date(per[2])) if per else (None, None)
+    ex = re.search(r"Exported:\s*(\d{1,2}/\d{1,2}/\d{4})", text)
+    p.dated = parse_date(ex[1]) if ex else end
+    pays, skipped = [], 0
+    for line in text.splitlines():
+        m = _BANK_ROW.match(line.strip())
+        if not m:
+            continue
+        amount = float(m[4].replace(",", ""))
+        desc = m[3].strip()
+        if m[2].upper() != "DR" or amount >= 0:
+            continue
+        if _NON_VENDOR.search(desc) or _FEE.search(desc):
+            skipped += 1
+            continue
+        on = parse_date(f"{m[1]}/{(end or start).year}") if (end or start) else parse_date(m[1])
+        name = _CHECK.sub("", _PREFIX.sub("", desc))
+        name = re.sub(r"\b(pt\s*\d+|[A-Z]?\d{3,6})\b", "", name, flags=re.IGNORECASE).strip()
+        vid, _ = vendors.match(name, 0.7)
+        pays.append({"vendor_id": vid, "amount": -amount, "on": on.isoformat() if on else None,
+                     "_refs": keyway_refs(desc), "_desc": desc,
+                     "_nums": re.findall(r"\b[A-Z]?\d{3,6}\b", desc),
+                     "_retainage": "RETAINAGE" in desc.upper()})
+        if not vid:
+            p.flag(f"bank line payee not recognized: '{desc}'", human=True, conf=0.6)
+    bal = {k: float(v.replace(",", "")) for k, v in
+           re.findall(r"(OPENING|CLOSING) BALANCE\s+(-?[\d,]+\.\d{2})", text, re.IGNORECASE)}
+    p.text = (f"Bank activity export {start or '?'} to {end or '?'}: {len(pays)} vendor payments, "
+              f"{skipped} other debits ignored.")
+    p.data = {"payments": pays, "opening": bal.get("OPENING"), "closing": bal.get("CLOSING")}
+    return p
+
+
 # ---------------------------------------------------------------------------------------------
 # Emails
 # ---------------------------------------------------------------------------------------------
 
+def mail_from_text(text: str) -> Mail:
+    """An email printed to PDF: subject line, then From / To / Cc / Date headers, then the body."""
+    from email.utils import parseaddr
+    lines = text.splitlines()
+    head: dict[str, str] = {}
+    subject, body_at = "", len(lines)
+    for i, line in enumerate(lines):
+        m = re.match(r"^\s*(From|To|Cc|Date|Subject):\s*(.*)$", line)
+        if m and m[1].lower() not in head:
+            head[m[1].lower()] = m[2].strip()
+            if m[1] == "From" and not subject:
+                subject = " ".join(x.strip() for x in lines[:i] if x.strip())
+            if m[1] == "Date":
+                body_at = i + 1
+                break
+    name, addr = parseaddr(head.get("from", ""))
+    return Mail(name, addr.lower(), head.get("to", ""), head.get("subject") or subject,
+                parse_datetime_header(head.get("date", "")), "\n".join(lines[body_at:]))
+
 _JUNK = re.compile(r"automatic reply|out of (the )?office|unsubscribe|newsletter|quarterly:", re.IGNORECASE)
-_BANK_CHANGE = re.compile(r"banking information|bank(ing)? (details|info)|new account|"
-                          r"remittance info", re.IGNORECASE)
+_BANK_CHANGE = re.compile(r"banking information|bank(ing)? (details|info|provider)|new account|"
+                          r"remittance (info|details)|payment instructions", re.IGNORECASE)
+_W9_SENT = re.compile(r"\bW-?9\b[^.\n]{0,40}\b(attached|enclosed)\b|\b(attached|enclosed)\b[^.\n]{0,40}\bW-?9\b",
+                      re.IGNORECASE)
 _PAST_DUE = re.compile(r"past due|overdue|have not received payment|not received payment", re.IGNORECASE)
 _CONFIRM = re.compile(r"received your payment|we received|hit our account|payment rec'?d|"
                       r"confirming|caught up", re.IGNORECASE)
@@ -353,7 +492,11 @@ _PAID_CLAIM = re.compile(r"\b(paid|sent|cleared|processed|went out)\b", re.IGNOR
 
 def parse_email(data: bytes, source: str, vendors: VendorIndex,
                 keyway_domain: str = "keywaypm.com") -> list[Parsed]:
-    mail = read_eml(data)
+    return parse_mail(read_eml(data), source, vendors, keyway_domain)
+
+
+def parse_mail(mail: Mail, source: str, vendors: VendorIndex,
+               keyway_domain: str = "keywaypm.com") -> list[Parsed]:
     sent = mail.sent.date() if mail.sent else None
     if mail.attachments:
         out: list[Parsed] = []
@@ -371,7 +514,8 @@ def parse_email(data: bytes, source: str, vendors: VendorIndex,
             return out
     if _JUNK.search(mail.subject + "\n" + mail.body):
         return [Parsed(source, None, method="email", warnings=["ignored: auto-reply / newsletter"])]
-    if "statement" in mail.subject.lower() and not mail.attachments:
+    if not mail.attachments and re.search(r"statement\b.{0,30}\battach|\battach\w*\b.{0,30}\bstatement",
+                                          mail.subject + "\n" + mail.own_text, re.IGNORECASE | re.DOTALL):
         p = Parsed(source, None, method="email")
         p.flag("Keyway says a statement is attached, but nothing was attached")
         return [p]
@@ -387,11 +531,14 @@ def parse_email(data: bytes, source: str, vendors: VendorIndex,
             not any(mail.from_addr.endswith(d) for d in ("gmail.com", "yahoo.com", "outlook.com"))
     if from_keyway:
         refs = keyway_refs(mail.subject + "\n" + mail.body)
+        nos = vendor_invoice_numbers(mail.subject + "\n" + mail.body)
         p = Parsed(source, SourceKind.manager_reply, dated=sent, method="email", text=own.strip()[:800])
         p.data = {"invoice_id": refs[0] if refs else None,
                   "status": "paid" if _PAID_CLAIM.search(own) else "other",
                   "reply_id": source.rsplit("/", 1)[-1].removesuffix(".eml")}
-        if not refs:
+        if nos and not refs:
+            p.data["vendor_ref"] = nos[0]
+        if not refs and not nos:
             p.flag("reply doesn't say which invoice", human=True, conf=0.4)
         elif not keyway_refs(own):
             p.flag("invoice named only in the quoted message", conf=0.85)
@@ -400,12 +547,22 @@ def parse_email(data: bytes, source: str, vendors: VendorIndex,
             p.flag("says paid but gives no proof (no trace number, check or attachment)")
         return [p]
     refs = keyway_refs(own)
+    nos = vendor_invoice_numbers(mail.subject + "\n" + own)
+    if _W9_SENT.search(own):
+        p = Parsed(source, SourceKind.vendor_notice, vendor_id=vid, dated=sent, method="email",
+                   text=own.strip()[:800])
+        p.data = {"invoice_id": refs[0] if refs else None, "status": "paperwork_received"}
+        if nos:
+            p.data["vendor_ref"] = nos[0]
+        return [p]
     if _BANK_CHANGE.search(own):
         p = Parsed(source, SourceKind.vendor_notice, vendor_id=vid, dated=sent, method="email",
                    text=own.strip()[:800])
         last4 = re.search(r"ending (?:in )?(\d{4})", own)
         p.data = {"invoice_id": refs[0] if refs else None, "status": "bank_change_request",
                   "new_account_last4": last4[1] if last4 else None}
+        if nos:
+            p.data["vendor_ref"] = nos[0]
         if lookalike:
             p.flag(f"sender {mail.from_addr} is not the vendor's address on file", conf=0.9)
         return [p]
@@ -413,9 +570,17 @@ def parse_email(data: bytes, source: str, vendors: VendorIndex,
         p = Parsed(source, SourceKind.vendor_notice, vendor_id=vid, dated=sent, method="email",
                    text=own.strip()[:800])
         p.data = {"invoice_id": refs[0] if refs else None, "status": "not_received"}
+        if nos:
+            p.data["vendor_ref"] = nos[0]
         if not refs:
             p.meta["needs_invoice_id"] = True
             p.meta["amount"] = (money_values(own) or [None])[0]
+        return [p]
+    if _CONFIRM.search(own) and lookalike:
+        # a payment confirmation is proof only from the vendor's own address
+        p = Parsed(source, None, method="email", text=own.strip()[:800])
+        p.flag(f"'payment received' from {mail.from_addr}, not the vendor's address on file: "
+               "not treated as proof", human=True)
         return [p]
     if _CONFIRM.search(own):
         p = Parsed(source, SourceKind.vendor_confirmation, vendor_id=vid, dated=sent,
@@ -430,6 +595,8 @@ def parse_email(data: bytes, source: str, vendors: VendorIndex,
             p.data["invoice_id"] = refs[0]
         else:
             p.meta["needs_invoice_id"] = True
+        if nos:
+            p.data["vendor_ref"] = nos[0]
         if not vid:
             p.flag("can't tell which vendor sent this", human=True, conf=0.3)
         return [p]

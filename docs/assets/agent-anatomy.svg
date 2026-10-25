@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Anatomy of every agent: human text comes in, Claude reads it with tools, guards check every value is quoted verbatim, code decides, the verifier tries to refute the alert, the policy gate allows only approved actions, then the action happens.">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#0d1230"/><stop offset="1" stop-color="#211a4d"/></linearGradient>
+    <clipPath id="card"><rect width="1200" height="300" rx="20"/></clipPath>
+    <pattern id="dots" width="22" height="22" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1.1" fill="#8b80ff" fill-opacity=".18"/></pattern>
+    <path id="rail" d="M88 146 H1112"/>
+    <radialGradient id="pulse"><stop offset="0" stop-color="#fff"/><stop offset=".4" stop-color="#8b80ff"/><stop offset="1" stop-color="#8b80ff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <style>
+    .t { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+    .rail { stroke: #3a3f7a; stroke-width: 3; stroke-dasharray: 2 10; stroke-linecap: round; animation: run 1s linear infinite; }
+    @keyframes run { to { stroke-dashoffset: -12; } }
+    .box rect { fill: #161c45; stroke: #3a3f7a; stroke-width: 1.4; }
+    .box .h { fill: #fff; font-size: 15px; font-weight: 700; }
+    .box .s { fill: #9aa3cf; font-size: 12px; }
+    .box.model rect { stroke: #8b80ff; fill: #24215e; }
+    .box.code rect { stroke: #2bd4a4; fill: #11303a; }
+    .box.gate rect { stroke: #ff8a3d; fill: #3a2430; }
+    .glow { animation: glow 3.5s ease-in-out infinite; }
+    @keyframes glow { 0%, 100% { filter: none; } 50% { filter: drop-shadow(0 0 8px #8b80ff); } }
+    .legend { font-size: 12.5px; fill: #9aa3cf; }
+  </style>
+  <rect width="1200" height="300" rx="20" fill="url(#bg)"/>
+  <g clip-path="url(#card)"><rect width="1200" height="300" fill="url(#dots)"/></g>
+  <g class="t">
+    <text x="40" y="44" font-size="20" font-weight="700" fill="#fff" letter-spacing="-.3">Anatomy of every agent</text>
+    <text x="40" y="68" font-size="13.5" fill="#9aa3cf">A model only reads human text. Code decides, does the money math and routes. Nothing moves money.</text>
+
+    <use href="#rail" class="rail" fill="none"/>
+    <circle r="11" fill="url(#pulse)"><animateMotion dur="4.2s" repeatCount="indefinite"><mpath href="#rail"/></animateMotion></circle>
+
+    <g class="box"><rect x="40" y="110" width="140" height="72" rx="14"/><text class="h" x="110" y="140" text-anchor="middle">Human text</text><text class="s" x="110" y="162" text-anchor="middle">PDF · email · statement</text></g>
+    <g class="box model glow"><rect x="200" y="110" width="140" height="72" rx="14"/><text class="h" x="270" y="140" text-anchor="middle">Claude reads</text><text class="s" x="270" y="162" text-anchor="middle">tool calls · LangGraph</text></g>
+    <g class="box code"><rect x="360" y="110" width="140" height="72" rx="14"/><text class="h" x="430" y="140" text-anchor="middle">Guards</text><text class="s" x="430" y="162" text-anchor="middle">quote must be verbatim</text></g>
+    <g class="box code"><rect x="520" y="110" width="140" height="72" rx="14"/><text class="h" x="590" y="140" text-anchor="middle">Code decides</text><text class="s" x="590" y="162" text-anchor="middle">dates · cents · routes</text></g>
+    <g class="box model"><rect x="680" y="110" width="140" height="72" rx="14"/><text class="h" x="750" y="140" text-anchor="middle">Verifier</text><text class="s" x="750" y="162" text-anchor="middle">tries to refute · fails closed</text></g>
+    <g class="box gate"><rect x="840" y="110" width="140" height="72" rx="14"/><text class="h" x="910" y="140" text-anchor="middle">Policy gate</text><text class="s" x="910" y="162" text-anchor="middle">approved templates only</text></g>
+    <g class="box"><rect x="1000" y="110" width="160" height="72" rx="14"/><text class="h" x="1080" y="140" text-anchor="middle">Action</text><text class="s" x="1080" y="162" text-anchor="middle">alert · email · hold proposal</text></g>
+
+    <g class="legend">
+      <rect x="40" y="226" width="14" height="14" rx="4" fill="#24215e" stroke="#8b80ff"/><text x="62" y="238">Claude (reads, judges text)</text>
+      <rect x="250" y="226" width="14" height="14" rx="4" fill="#11303a" stroke="#2bd4a4"/><text x="272" y="238">deterministic code (free, no API key)</text>
+      <rect x="520" y="226" width="14" height="14" rx="4" fill="#3a2430" stroke="#ff8a3d"/><text x="542" y="238">guardrail: no money moves, ever; a person approves holds</text>
+      <text x="40" y="270">If Claude's answer fails a guard it is retried once, then the free rules answer is used. If the verifier can't run, the alert waits for a person.</text>
+    </g>
+  </g>
+</svg>

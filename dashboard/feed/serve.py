@@ -39,7 +39,7 @@ _session: DemoSession | None = None
 def session() -> DemoSession:
     global _session
     if _session is None:
-        _session = DemoSession(budget=float(os.getenv("FEED_BUDGET", "1.0")))
+        _session = DemoSession(budget=float(os.getenv("FEED_BUDGET", "1.0")), send_email=True)
     return _session
 
 
@@ -121,6 +121,20 @@ def live_mode(body: LiveIn):
 def brief(body: BriefIn):
     with _lock:
         return session().brief(body.question, use_model=os.getenv("DASHBOARD_BRIEF_MODEL") == "1")
+
+
+@app.post("/api/loop/{step}")
+def loop_step(step: Literal["start", "agreement", "chaser", "anomaly"]):
+    """The three-agent loop, one agent per call (dashboard Live loop page). start = fresh session."""
+    import loop
+    with _lock:
+        s = session()
+        if step == "start":
+            s.reset()
+            return {"ok": True, "as_of": s.rails.now().isoformat(), "live": s.live}
+        out = {"agreement": loop.agreement_step, "chaser": loop.chaser_step,
+               "anomaly": loop.anomaly_step}[step](s)
+        return {"ok": True, **out, "as_of": s.rails.now().isoformat()}
 
 
 @app.get("/api/timeline")
@@ -213,6 +227,14 @@ def reset():
     with _lock:
         session().reset()
         return session().snapshot()
+
+
+# -- the UI revamp 2 frontend (ui-revamp-2/), served by this backend --------------------------
+# Last, so every /api route above wins: the frontend at this server's root.
+_UI = ROOT / "ui-revamp-2"
+if _UI.is_dir():
+    from fastapi.staticfiles import StaticFiles
+    app.mount("/", StaticFiles(directory=str(_UI), html=True), name="ui")
 
 
 if __name__ == "__main__":

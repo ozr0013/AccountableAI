@@ -127,7 +127,7 @@ export function FeedProvider({ children }: { children: ReactNode }) {
   const addFile: Ctx["addFile"] = (name) =>
     act(() => (mode === "live" ? post<ActionResult>(`/api/samples/${encodeURIComponent(name)}/add`, {}) : replayOnly()));
 
-  /** Re-read the session (after the simulation drove it directly). */
+  /** Re-read the session after work that ran outside these actions (the simulation, the Live loop page). */
   const refresh: Ctx["refresh"] = async () => {
     if (mode === "live") setState(await json<State>("/api/state"));
   };

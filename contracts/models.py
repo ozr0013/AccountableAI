@@ -193,9 +193,12 @@ class StatementAnomaly(BaseModel):
     statement_amount: float
     expected_amount: float               # approved invoice amount; 0 if not on our ledger
     funded_amount: float = 0.0
-    difference: float                    # statement - expected
-    reason: Literal["amount_differs", "not_on_ledger"]
+    difference: float                    # statement - expected (or bank - statement for bank_differs)
+    reason: Literal["amount_differs", "not_on_ledger", "already_paid", "bank_differs"]
     citation: Citation
+    bank_amount: float | None = None     # bank_differs: what the bank shows paid for the invoice
+    retained: float = 0.0                # a holdback the statement states, counted toward the approved amount
+    note: str = ""
 
 
 class AnomalyReport(BaseModel):

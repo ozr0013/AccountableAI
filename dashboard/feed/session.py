@@ -69,7 +69,7 @@ AGENT_NAME = {"verifier": "Verifier", "recheck": "Recheck", "chaser": "Chaser ag
               "case_agent": "Case agent", "agreement_agent": "Agreement agent",
               "workflow": "Workflow", "controller": "Controller", "judge": "Judge",
               "keyway": "Keyway", "trail": "Payment-trail agent", "cause": "Delay-cause agent",
-              "policy": "Policy gate", "pattern": "Pattern check"}
+              "policy": "Policy gate", "pattern": "Pattern check", "anomaly": "Anomaly detector"}
 
 
 def _responses(events: list[Event], trace: list[str], names: dict,
@@ -170,10 +170,12 @@ def _iso(x) -> str | None:
 
 
 class DemoSession:
-    def __init__(self, seed: int = 13, n_clean: int = 100, budget: float = 1.0):
+    def __init__(self, seed: int = 13, n_clean: int = 100, budget: float = 1.0,
+                 send_email: bool = False):
         from live import Meter
         from stream import Hub
         self.seed, self.n_clean = seed, n_clean
+        self.send_email = send_email           # real emails only when the server turns this on
         self.meter = Meter(budget)
         self.live = False
         self.hub = Hub()                       # live decisions for /api/stream
@@ -212,6 +214,7 @@ class DemoSession:
         self.wf.replay([funding_event(MANAGER, FUNDING, self.world.as_of)])
         self.history: list[dict] = []          # every action, oldest first
         self.actions = 0
+        self.mailed: set[str] = set()          # event ids already emailed to the middleman
         self._watch()                          # stream decisions from here on (not the replay)
         if self.live:
             self.set_live(True)
@@ -289,6 +292,7 @@ class DemoSession:
                 ev = funding_event(MANAGER, FUNDING, self.rails.now())
                 runs += self.wf.replay([ev.model_copy(update={
                     "id": f"{ev.id}-recheck-{n}", "valid_from": t, "learned_at": t + _sec(2)})])
+            emails = self._deliver(seq0)
         finally:
             stop()
         after = self.snapshot()
@@ -305,12 +309,56 @@ class DemoSession:
                "agents": dict(Counter(m.get("agent") for m in signals if m["type"] == "agent_started")),
                "writes": {"total": len(written),
                           "notes": [w for e in written if (w := _write_note(e, open_before))]},
-               "state": after}
+               "emails": emails, "state": after}
         self.history.append({k: out[k] for k in ("kind", "summary", "affected", "diff", "responses", "cost")})
         self.hub.publish({"type": "action", "status": "finished", "kind": kind, "summary": summary,
                           "as_of": self.rails.now().isoformat(), "cost": out["cost"],
                           "unexplained": after["headline"]["unexplained"]})
         out["state"]["history"] = self.history
+        return out
+
+    def _deliver(self, seq0: int) -> list[dict]:
+        """Email the middleman what the workflow just decided to tell it: each reminder the
+        chaser sent and each statement note the anomaly detector raised (mailer.py). Only
+        events from this action, never the replayed history. Each email is recorded as an event."""
+        import mailer
+
+        from rails.guards.templates import STATEMENT_NOTICE_TEMPLATE
+        if not self.send_email or not mailer.enabled():
+            return []
+        out = []
+        for e in self.rails.events()[seq0:]:
+            if e.id in self.mailed:
+                continue
+            if e.type == "chase_sent":
+                c = e.payload["chase"]
+                kind, body = "reminder", c["body"]
+                subject = f"Payment reminder ({c['level']}): {', '.join(c['invoice_ids'])}"
+            elif e.type == "alert_raised" and e.payload["draft"]["kind"] == AlertKind.statement_mismatch.value:
+                d = e.payload["draft"]
+                kind, body = "statement_notice", (d.get("recommended_action") or "").partition(
+                    "Note to the middleman: ")[2]
+                subject = f"Statement amount check: {', '.join(d['invoice_ids'])}"
+                ok, why = self.rails.policy_check("send_statement_notice", "anomaly_detector", {
+                    "template_id": STATEMENT_NOTICE_TEMPLATE, "body": body,
+                    "to": mailer.MIDDLEMAN_EMAIL, "registered_to": mailer.MIDDLEMAN_EMAIL})
+                if not ok or not body:
+                    log.warning("statement notice not sent: %s", why)
+                    continue
+            else:
+                continue
+            self.mailed.add(e.id)
+            rec = {"type": "email", "kind": kind, "to": mailer.MIDDLEMAN_EMAIL, "subject": subject}
+            try:
+                rec.update(status="sent", message_id=mailer.send(subject, body))
+            except Exception as ex:                              # noqa: BLE001 - report, don't break the demo
+                log.warning("email to %s failed: %s", mailer.MIDDLEMAN_EMAIL, ex)
+                rec.update(status="failed", error=str(ex)[:200])
+            t = self._clock(12, 1)
+            self.rails.append_event(Event(id=f"ev-email-{e.id}", type="email_sent", manager_id=MANAGER,
+                                          valid_from=t, learned_at=t, payload=rec))
+            self.hub.publish(rec)
+            out.append(rec)
         return out
 
     def _unexplained(self) -> float:

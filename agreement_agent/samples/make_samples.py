@@ -37,6 +37,19 @@ MISSING = [
     "By: ____________________ (Owner)",
 ]
 
+# The live-loop demo's agreement: the same vendor, amount and 10-day window as INV-KW-0301 in the
+# demo world, so the chaser and anomaly steps that follow are about this agreement.
+LOOP_AGREEMENT = [
+    "REPAIR SERVICES AGREEMENT",
+    "This Repair Services Agreement is made as of March 1, 2026 by and between Oakline Homes LLC (\"Owner\") and Rio Grande Plumbing LLC (\"Vendor\"). Keyway Property Management pays Vendor from funds the Owner provides.",
+    "1. Services. Vendor shall repair the main water line at 412 Alder St.",
+    "2. Fees. Owner shall pay Vendor a fixed fee of $1,240 for the repair.",
+    "3. Payment Terms. Payment is due within ten (10) days of receipt of Vendor's invoice.",
+    "4. Payment Information. Payments shall be made by ACH to First Mesa Bank, routing number 102000021, account number 4471029, in the name of Rio Grande Plumbing LLC.",
+    "By: Dana Ortiz, Controller, Oakline Homes LLC   Date: March 1, 2026",
+    "By: Luis Ortega, Owner, Rio Grande Plumbing LLC   Date: March 1, 2026",
+]
+
 INVOICE = [
     "SPARKLINE ELECTRIC LLC",
     "INVOICE",
@@ -66,6 +79,8 @@ def main() -> None:
     pdf(COMPLETE, HERE / "rio_grande_services_agreement.pdf")
     pdf(MISSING, HERE / "greenedge_landscaping_agreement.pdf")
     pdf(INVOICE, HERE / "sparkline_invoice_SE-0402.pdf")
+    (HERE / "loop").mkdir(exist_ok=True)
+    pdf(LOOP_AGREEMENT, HERE / "loop" / "rio_grande_repair_agreement.pdf")
     # the invoice also arrives as an email attachment, like it would from Gmail
     msg = EmailMessage()
     msg["From"] = "billing@sparkline-electric.example"
