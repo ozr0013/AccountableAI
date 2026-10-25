@@ -68,15 +68,27 @@ def subjects_known(rails, manager_id: str = "keyway") -> set[str]:
     return {v for v in vendors if v} | {name(manager_id)}
 
 
+def match_subject(given: str, known: set[str]) -> str | None:
+    """'Keyway' or 'Rio Grande Plumbing LLC' finds 'Keyway Property Management' / 'Rio Grande
+    Plumbing': exact, then the same name without a company suffix, then a unique prefix."""
+    from .daily import norm_name
+    g = norm_name(given)
+    by_norm = {norm_name(k): k for k in known}
+    if g in by_norm:
+        return by_norm[g]
+    hits = [k for n, k in by_norm.items() if g and (n.startswith(g) or g.startswith(n))]
+    return hits[0] if len(hits) == 1 else None
+
+
 def remember(mirror, rails, agent: str, subject: str, lesson: str, evidence_ids: list[str],
              today: date) -> dict:
     """Record a lesson about a vendor or the manager, citing documents in the books."""
     from . import books
     from .runtime import emit
-    known = {s.lower(): s for s in subjects_known(rails)}
-    if subject.lower() not in known:
-        return {"error": f"subject must be a vendor or the manager by name; known: {sorted(known.values())}"}
-    subject = known[subject.lower()]
+    found = match_subject(subject, subjects_known(rails))
+    if found is None:
+        return {"error": f"subject must be a vendor or the manager by name; known: {sorted(subjects_known(rails))}"}
+    subject = found
     missing = sorted(set(evidence_ids) - books.known(rails, "documents", "document_id", evidence_ids))
     if not evidence_ids or missing:
         return {"error": f"cite document ids that exist in the books; unknown: {missing or 'none given'}"}

@@ -70,7 +70,7 @@ def check(sql: str) -> str:
     text = (sql or "").strip().rstrip(";").strip()
     if not text:
         raise QueryRefused("empty query")
-    if ";" in text:
+    if ";" in re.sub(r"'(?:[^']|'')*'", "''", text):      # a ';' inside a string literal is fine
         raise QueryRefused("one statement only")
     if not re.match(r"^(select|with)\b", text, re.IGNORECASE):
         raise QueryRefused("only SELECT queries are allowed")

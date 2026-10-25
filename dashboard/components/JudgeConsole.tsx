@@ -227,7 +227,7 @@ export function JudgeConsole() {
               <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "on" : ""} onClick={() => setTab(id)}>{label}</button>
             ))}
           </div>
-          <span className="jc-asof">Books as of {state ? new Date(state.meta.as_of + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "…"}</span>
+          <span className="jc-asof">Books as of {agentRun?.day ? new Date(agentRun.day + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : state ? new Date(state.meta.as_of + "T00:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "…"}</span>
           <button className="pill" disabled={off || agent.busy} onClick={async () => { await Promise.all([reset(), agent.resetBooks()]); runRef.current = null; setRun(null); setCards([]); setPast([]); setLit(new Set()); }}>Reset books</button>
         </div>
         {!live && <p className="jc-note">The console needs the live backend. Start it with <code>./demo.sh start</code>.</p>}
@@ -260,8 +260,8 @@ export function JudgeConsole() {
             <label>Subject<input className="input" value={mail.subject} disabled={off} onChange={(e) => setMail({ ...mail, subject: e.target.value })} /></label>
             <label>Message<textarea className="input" rows={4} value={mail.body} disabled={off} onChange={(e) => setMail({ ...mail, body: e.target.value })} /></label>
             <div className="jc-go">
-              <button className="btn" disabled={off} onClick={() => void send(`Email from ${mail.sender === "keyway" ? "Keyway Management" : vendors.find(([id]) => id === mail.sender)?.[1] ?? mail.sender}`, () => write(mail.sender, mail.subject, mail.body))}>Send the email ↗</button>
-              {EMAILS.map((e, k) => <button key={k} className="jc-chip" disabled={off} onClick={() => setMail(e)}>{k === 0 ? "Keyway Management: “we paid”" : "Vendor: “we were paid”"}</button>)}
+              <button className="btn" disabled={agentOff || !mail.body.trim()} onClick={() => { setRun(null); setCards([]); void agent.sendEmail(mail.sender, mail.subject, mail.body, `Email from ${mail.sender === "keyway" ? "Keyway Management" : vendors.find(([id]) => id === mail.sender)?.[1] ?? mail.sender}`); }}>Send the email ↗</button>
+              {EMAILS.map((e, k) => <button key={k} className="jc-chip" disabled={agentOff} onClick={() => setMail(e)}>{k === 0 ? "Keyway Management: “we paid”" : "Vendor: “we were paid”"}</button>)}
             </div>
           </div>
           <div className="jc-hint">
@@ -273,19 +273,21 @@ export function JudgeConsole() {
 
         {tab === "fact" && <div className="jc-pane">
           <div className="jc-go">
-            <input className="input jc-fact" value={fact} disabled={off} onChange={(e) => setFact(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void send(`Fact: ${fact}`, () => runConsole({ text: fact }, true)); }} aria-label="A fact in plain words" />
-            <button className="btn" disabled={off || !fact.trim()} onClick={() => void send(`Fact: ${fact}`, () => runConsole({ text: fact }, true))}>Tell the engine ↗</button>
+            <input className="input jc-fact" value={fact} disabled={agentOff} onChange={(e) => setFact(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && fact.trim()) { setRun(null); setCards([]); void agent.tellFact(fact); } }} aria-label="A fact in plain words" />
+            <button className="btn" disabled={agentOff || !fact.trim()} onClick={() => { setRun(null); setCards([]); void agent.tellFact(fact); }}>Tell the agents ↗</button>
           </div>
-          <div className="jc-go">{FACTS.map((f) => <button key={f} className="jc-chip" disabled={off} onClick={() => setFact(f)}>{f}</button>)}</div>
+          <div className="jc-go">{FACTS.map((f) => <button key={f} className="jc-chip" disabled={agentOff} onClick={() => setFact(f)}>{f}</button>)}</div>
+          <p className="jc-fine">A fact is a claim, not evidence: the investigator (Claude) checks it against the books and flags only what the documents prove.</p>
         </div>}
 
         {tab === "time" && <div className="jc-pane">
           <div className="jc-go">
-            <button className="btn" disabled={off} onClick={() => void send("+1 day", () => advance(1, true))}>+1 day</button>
-            <button className="btn" disabled={off} onClick={() => void send("+5 days", () => advance(5, true))}>+5 days</button>
-            <button className="pill" disabled={off} onClick={() => void fifteen()}>Play 15 days on its own</button>
+            <button className="btn" disabled={agentOff} onClick={() => { setRun(null); setCards([]); void agent.advance(1); }}>+1 day</button>
+            <button className="btn" disabled={agentOff} onClick={() => { setRun(null); setCards([]); void agent.advance(5); }}>+5 days</button>
+            <button className="pill" disabled={agentOff} onClick={() => { setRun(null); setCards([]); void agent.play(15, (i) => setAuto(`Day ${i} of 15`)).then(() => setAuto(null)); }}>Play 15 days on its own</button>
+            {auto && <button className="pill" onClick={() => agent.stop()}>Stop after this day</button>}
           </div>
-          <p className="jc-fine">Nobody prompts the agents: as days pass, invoices fall due and the chaser follows up on its own schedule. “Play 15 days” starts from fresh books.</p>
+          <p className="jc-fine">Nobody prompts the agents: each day new paperwork arrives, the investigator sweeps the books, and the chaser follows up on its own schedule. Each day is real Claude work (roughly $0.10–0.50 a day).</p>
         </div>}
         {error && <div className="jc-note warn-ink">{error.text}{error.hints?.length ? <> {error.hints.slice(0, 3).map((h) => <button key={h} className="jc-chip" onClick={() => { setTab("fact"); setFact(h); }}>{h}</button>)}</> : null}</div>}
       </div>

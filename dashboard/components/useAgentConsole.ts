@@ -18,6 +18,7 @@ export type Figures = { paid: number; left: number; late: number; attention: num
 export type AgentRun = {
   label: string; status: "running" | "done" | "failed"; summary?: string; error?: string;
   books?: { before: Figures; after: Figures }; emails: number; log: string[];
+  day?: string; usage?: { calls: number; cost: number };
 };
 
 const WHO: Record<string, { who: string; box: string }> = {
@@ -44,6 +45,8 @@ export function useAgentConsole() {
   const [run, setRun] = useState<AgentRun | null>(null);
   const [connected, setConnected] = useState(false);
   const runningRef = useRef(false);
+  const doneWaiter = useRef<(() => void) | null>(null);
+  const dayCard = useRef<string | null>(null);
   const agentCard = useRef<Record<string, string>>({});       // task id -> card key
 
   const light = (...ids: string[]) => {
@@ -65,6 +68,26 @@ export function useAgentConsole() {
     const on = (type: string, f: (m: Record<string, any>) => void) =>
       es.addEventListener(type, (e) => { if (runningRef.current) f(JSON.parse((e as MessageEvent).data)); });
 
+    on("fact", (m) => {
+      light("you", "you>log", "log");
+      add({ who: "Your fact", tone: "src", status: "done", title: `\u201c${m.text}\u201d`,
+        lines: [{ kind: "check", text: "A fact is a claim, not evidence: the investigator verifies it against the books" }] });
+    });
+    on("day_started", (m) => {
+      light("clock", "clock>log", "log");
+      dayCard.current = add({ who: "Clock", tone: "src", status: "done", title: `${fmtDay(m.day)} begins: the agents wake on their own`, lines: [] });
+      setRun((r) => (r ? { ...r, day: m.day } : r));
+    });
+    on("evidence", (m) => {
+      const k = dayCard.current;
+      if (k) patch(k, (c) => ({ ...c, lines: [...c.lines, { kind: "evidence", text: `${words(m.kind)} arrived: ${String(m.text || m.document).slice(0, 110)}` }] }));
+      light("inbox", "log");
+    });
+    on("matched", (m) => {
+      add({ who: "Payment matching", tone: "check", status: "done",
+        title: `The books now show a payment for ${m.invoices.join(", ")}`,
+        lines: Object.entries(m.paid || {}).map(([inv, [a, b]]: any) => ({ kind: "evidence" as const, text: `${inv}: paid $${a} \u2192 $${b}` })) });
+    });
     on("reader", (m) => {
       light("inbox", "inbox>reader", "reader");
       add({ who: "Reader", tone: "src", status: m.kinds?.length ? "done" : "quiet",
@@ -147,7 +170,9 @@ export function useAgentConsole() {
       runningRef.current = false;
       setActive(new Set());
       setRun((r) => (r ? { ...r, status: m.ok === false ? "failed" : "done", error: m.error, books: m.books,
-        summary: m.ok === false ? m.error : summarize(m) } : r));
+        usage: m.usage, day: m.day ?? r.day, summary: m.ok === false ? m.error : summarize(m) } : r));
+      doneWaiter.current?.();
+      doneWaiter.current = null;
     });
     return () => es.close();
   }, []);
@@ -171,19 +196,50 @@ export function useAgentConsole() {
     start(`Your file: ${name}`);
     try { await post("/pipeline/console/upload", { name, data }); } catch (e) { fail(e); }
   }, []);
+  const waitDone = () => new Promise<void>((res) => { doneWaiter.current = res; });
+  const sendEmail = useCallback(async (sender: string, subject: string, body: string, label: string) => {
+    start(label);
+    try { await post("/pipeline/console/email", { sender, subject, body }); } catch (e) { fail(e); }
+  }, []);
+  const tellFact = useCallback(async (text: string) => {
+    start(`Fact: ${text}`);
+    try { await post("/pipeline/console/fact", { text }); } catch (e) { fail(e); }
+  }, []);
+  const advance = useCallback(async (days: number) => {
+    start(`+${days} day${days > 1 ? "s" : ""}`);
+    try { const w = waitDone(); await post("/pipeline/console/advance", { days }); await w; } catch (e) { fail(e); }
+  }, []);
+  const stopRef = useRef(false);
+  /** Play day by day (one request per day) so it can be stopped between days. */
+  const play = useCallback(async (days: number, onDay?: (i: number) => void) => {
+    stopRef.current = false;
+    for (let i = 0; i < days && !stopRef.current; i++) {
+      onDay?.(i + 1);
+      start(`Day ${i + 1} of ${days}`);
+      try { const w = waitDone(); await post("/pipeline/console/advance", { days: 1 }); await w; } catch (e) { fail(e); break; }
+    }
+  }, []);
+  const stop = useCallback(() => { stopRef.current = true; }, []);
   const resetBooks = useCallback(async () => {
     await post("/pipeline/demo/reset?run_first_day=false");
     setCards([]); setLit(new Set()); setActive(new Set()); setRun(null);
   }, []);
 
-  return { cards, lit, active, run, connected, busy: run?.status === "running", sendSample, sendUpload, resetBooks };
+  return { cards, lit, active, run, connected, busy: run?.status === "running", sendSample, sendUpload, resetBooks,
+    sendEmail, tellFact, advance, play, stop };
+}
+
+function fmtDay(d?: string): string {
+  return d ? new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
 }
 
 function summarize(m: Record<string, any>): string {
   const flagged = Object.values(m.findings || {}).filter((c) => (c as string[]).length).length;
-  const parts = [`${m.label}: ${m.filed?.length ? `filed ${m.filed.length} document(s)` : "nothing new filed"}`];
+  const parts = [m.kind === "time" || m.kind === "fact" ? `${m.label}` : `${m.label}: ${m.filed?.length ? `filed ${m.filed.length} document(s)` : "nothing new filed"}`];
   if (flagged) parts.push(`${flagged} invoice(s) flagged`);
   if (m.decisions?.length) parts.push(`${m.decisions.length} agent decision(s)`);
   parts.push(m.emails ? `${m.emails} email(s) to Keyway` : "no email");
+  if (m.usage) parts.push(m.usage.calls ? `Claude: ${m.usage.calls} call(s), $${m.usage.cost.toFixed(3)}` : "no Claude call needed");
+  if (m.note) parts.push(m.note);
   return parts.join(" · ");
 }

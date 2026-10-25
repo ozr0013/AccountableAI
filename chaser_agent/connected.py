@@ -450,8 +450,8 @@ def _project(rails, line, rules, actions, today):
                 f"Provide a matching financial statement for {line.invoice_id}.",
             )
         return "needs_controller", findings, desired, fingerprint, False
-    if findings:
-        return "needs_controller", findings, desired, fingerprint, False
+    # Unpaid: a finding (a statement claim, a missing statement) goes to the controller, but it
+    # does not stop the reminders the chaser decided on; the money is still overdue.
     for a in actions:
         if a.get("action") not in ("reminder", "escalate") or a.get("status") not in (
             "queued",

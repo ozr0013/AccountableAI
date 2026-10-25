@@ -171,7 +171,8 @@ def run_investigator(task, rails, mirror, today, client=None) -> dict:
     def handoff(agent, invoice_id, reason, payload, day, created_by):
         return enqueue(mirror, agent, invoice_id, reason, payload, day, created_by)
     tools = investigator.InvestigatorTools(rails, mirror, today, _record_chase(mirror, today), handoff, MANAGER)
-    trace = investigator.run(tools, client)
+    lead = task["reason"] if task.get("created_by") not in (None, "daily_schedule") else None
+    trace = investigator.run(tools, client, lead)
     return {"outcome": investigator.outcome(trace), "trace": trace.to_dict()}
 
 

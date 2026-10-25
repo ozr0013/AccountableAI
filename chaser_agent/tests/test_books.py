@@ -63,3 +63,9 @@ def test_citations_are_checked_against_the_books():
     rails = _books()
     real = books.run(rails, "SELECT document_id FROM documents LIMIT 1")["rows"][0][0]
     assert books.known(rails, "documents", "document_id", [real, "made-up"]) == {real}
+
+
+def test_a_semicolon_inside_a_string_is_not_a_second_statement():
+    assert books.check("SELECT * FROM documents WHERE text LIKE '%paid; thanks%'")
+    with pytest.raises(books.QueryRefused, match="one statement"):
+        books.check("SELECT 1 FROM documents; SELECT 2 FROM documents")

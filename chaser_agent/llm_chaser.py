@@ -167,9 +167,12 @@ class ChaserTools:
             return {"error": f"kind must be one of {list(FLAG_KINDS)}"}
         if not self.evidence_ids:
             self.get_evidence()
-        missing = [e for e in evidence_ids if e not in self.evidence_ids]
+        from . import books
+        unseen = [e for e in evidence_ids if e not in self.evidence_ids]
+        missing = sorted(set(unseen) - books.known(self.rails, "documents", "document_id", unseen))
         if not evidence_ids or missing:
-            return {"error": f"cite documents from get_evidence; unknown: {missing or 'none given'}"}
+            return {"error": f"cite documents that exist in the books (from get_evidence or query_books); "
+                             f"unknown: {missing or 'none given'}"}
         flag = replace(self.code, action="flag", level=kind, status="needs_controller",
                        message=rationale, attempt=0)
         if any(h["action_id"] == flag.action_id() for h in self.history):

@@ -117,10 +117,17 @@ def briefing(tools: InvestigatorTools) -> str:
             + json.dumps(mem, default=str)[:6000])
 
 
-def run(tools: InvestigatorTools, client=None) -> Trace:
-    task = (f"Task: today is {tools.today.isoformat()}. Sweep Keyway's books for problems no single "
-            "invoice shows. Investigate with query_books, flag or hand on what you prove, then "
-            "finish_sweep.\n" + briefing(tools))
+def run(tools: InvestigatorTools, client=None, lead: str | None = None) -> Trace:
+    if lead:
+        # Someone told us something: a lead to verify against the books, never a fact by itself.
+        task = (f"Task: today is {tools.today.isoformat()}. {lead}\nVerify it against the books with "
+                "query_books: say whether the documents support it, contradict it, or are silent. Flag "
+                "or hand on only what the documents prove, then finish_sweep with your conclusion.\n"
+                + briefing(tools))
+    else:
+        task = (f"Task: today is {tools.today.isoformat()}. Sweep Keyway's books for problems no single "
+                "invoice shows. Investigate with query_books, flag or hand on what you prove, then "
+                "finish_sweep.\n" + briefing(tools))
     # INVESTIGATOR_EFFORT=low makes each daily sweep quicker, for a time-boxed showing.
     return run_agent("investigator", SYSTEM, load_skill("investigating"), tools.tools(), task,
                      client, effort=os.getenv("INVESTIGATOR_EFFORT", "medium"), max_turns=MAX_TURNS)
