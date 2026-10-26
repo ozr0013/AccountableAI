@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <b>Cal Hacks 13.0 · Hyphenate track</b> · Team: Aaryan, Kanishka, Omar &amp; Audrey<br>
+  <b>Cal Hacks 13.0 · Microsoft Track</b> · Team: Aaryan, Kanishka, Omar &amp; Audrey<br>
   LangGraph · Claude (Sonnet 5.5, Haiku 5.5) · FastAPI · SpacetimeDB<br><br>
   <a href="#-see-it-run">See it run</a> ·
   <a href="#-the-loop">The loop</a> ·
