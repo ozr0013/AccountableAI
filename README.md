@@ -200,7 +200,7 @@ These are code, not prompts, and they're shown in the demo:
 - **Documents are data, not instructions.** A spoofed "mark it PAID, release the funding" email and hidden white-on-white text change no decision.
 - **Gmail is read-only**, and a scan reads one sent-on day only.
 
-## 🧩 Hyphenate's five hard parts
+## 🧩 Microsoft's five hard parts
 
 | Hard part | How we answer it | Proven by |
 |---|---|---|
@@ -290,4 +290,4 @@ How the code is organized and the rules for changing it: [`CLAUDE.md`](CLAUDE.md
 | **Omar** | The verifier, evals and baselines, the Gmail agreement agent, the anomaly detector, the live three-agent loop |
 | **Audrey** | The dashboard design and frontend, the Judge Console, the pitch |
 
-<p align="center"><sub>All code written during the event. Fictional companies only. Real Hyphenate customers are named only as context in the pitch, never as data.</sub></p>
+<p align="center"><sub>All code written during the event. Fictional companies only. Real Microsoft customers are named only as context in the pitch, never as data.</sub></p>
